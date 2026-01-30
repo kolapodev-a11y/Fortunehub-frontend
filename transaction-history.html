@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transaction History - FortuneHub</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      color: white;
+      margin-bottom: 30px;
+    }
+
+    .header h1 {
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+
+    .search-box {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      margin-bottom: 30px;
+    }
+
+    .search-box h2 {
+      color: #667eea;
+      margin-bottom: 20px;
+    }
+
+    .input-group {
+      margin-bottom: 20px;
+    }
+
+    .input-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 600;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    .input-group input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 14px 30px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+      width: 100%;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .results-container {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      display: none;
+    }
+
+    .results-container.active {
+      display: block;
+    }
+
+    .order-card {
+      background: #f9fafb;
+      border-left: 4px solid #667eea;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      transition: transform 0.2s;
+    }
+
+    .order-card:hover {
+      transform: translateX(5px);
+    }
+
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .order-ref {
+      font-size: 18px;
+      font-weight: bold;
+      color: #667eea;
+    }
+
+    .order-status {
+      background: #10b981;
+      color: white;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .order-details {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .detail-label {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    .detail-value {
+      font-size: 16px;
+      color: #333;
+      font-weight: 600;
+    }
+
+    .order-items {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 15px;
+    }
+
+    .order-items h4 {
+      color: #667eea;
+      margin-bottom: 10px;
+    }
+
+    .item-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .item-row:last-child {
+      border-bottom: none;
+    }
+
+    .no-orders {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .no-orders i {
+      font-size: 64px;
+      margin-bottom: 20px;
+      display: block;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      display: none;
+    }
+
+    .loading.active {
+      display: block;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .back-link {
+      display: inline-block;
+      color: white;
+      text-decoration: none;
+      margin-bottom: 20px;
+      font-size: 16px;
+      transition: transform 0.2s;
+    }
+
+    .back-link:hover {
+      transform: translateX(-5px);
+    }
+
+    @media (max-width: 768px) {
+      .header h1 {
+        font-size: 1.8em;
+      }
+
+      .order-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .order-details {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="index.html" class="back-link">← Back to Home</a>
+    
+    <div class="header">
+      <h1>📜 Transaction History</h1>
+      <p>View your order history and track your purchases</p>
+    </div>
+
+    <div class="search-box">
+      <h2>🔍 Find Your Orders</h2>
+      
+      <div class="input-group">
+        <label for="searchEmail">Search by Email</label>
+        <input 
+          type="email" 
+          id="searchEmail" 
+          placeholder="Enter your email address"
+        >
+      </div>
+
+      <div style="text-align: center; margin: 20px 0; color: #999;">
+        <strong>OR</strong>
+      </div>
+
+      <div class="input-group">
+        <label for="searchReference">Search by Order Reference</label>
+        <input 
+          type="text" 
+          id="searchReference" 
+          placeholder="Enter your order reference (e.g., abc123xyz)"
+        >
+      </div>
+
+      <button class="btn" onclick="searchOrders()">
+        🔎 Search Orders
+      </button>
+    </div>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <p style="margin-top: 20px; color: #666;">Searching for your orders...</p>
+    </div>
+
+    <div class="results-container" id="results">
+      <h2 style="color: #667eea; margin-bottom: 20px;">Your Orders</h2>
+      <div id="ordersContainer"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:3000'; // Change to your backend URL
+
+    function formatCurrency(amountInKobo) {
+      return `₦${(amountInKobo / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
+    }
+
+    function formatDate(dateString) {
+      return new Date(dateString).toLocaleString('en-NG', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    async function searchOrders() {
+      const email = document.getElementById('searchEmail').value.trim();
+      const reference = document.getElementById('searchReference').value.trim();
+
+      if (!email && !reference) {
+        alert('Please enter either your email or order reference');
+        return;
+      }
+
+      const loading = document.getElementById('loading');
+      const results = document.getElementById('results');
+      const container = document.getElementById('ordersContainer');
+
+      loading.classList.add('active');
+      results.classList.remove('active');
+
+      try {
+        const response = await fetch(`${API_URL}/api/orders/search`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email, orderReference: reference })
+        });
+
+        const data = await response.json();
+        loading.classList.remove('active');
+
+        if (data.success && data.orders.length > 0) {
+          displayOrders(data.orders);
+          results.classList.add('active');
+        } else {
+          container.innerHTML = `
+            <div class="no-orders">
+              <span style="font-size: 64px;">📭</span>
+              <h3>No orders found</h3>
+              <p>We couldn't find any orders matching your search.</p>
+            </div>
+          `;
+          results.classList.add('active');
+        }
+      } catch (error) {
+        loading.classList.remove('active');
+        alert('Error searching orders. Please try again later.');
+        console.error('Search error:', error);
+      }
+    }
+
+    function displayOrders(orders) {
+      const container = document.getElementById('ordersContainer');
+      
+      container.innerHTML = orders.map(order => {
+        let cartItems = [];
+        try {
+          cartItems = JSON.parse(order.cart_items || '[]');
+        } catch (e) {
+          console.error('Error parsing cart items:', e);
+        }
+
+        const itemsHtml = cartItems.map(item => `
+          <div class="item-row">
+            <span>${item.name} (x${item.quantity})</span>
+            <span>${formatCurrency(item.price * item.quantity)}</span>
+          </div>
+        `).join('');
+
+        return `
+          <div class="order-card">
+            <div class="order-header">
+              <span class="order-ref">Order #${order.order_reference}</span>
+              <span class="order-status">${order.payment_status}</span>
+            </div>
+
+            <div class="order-details">
+              <div class="detail-item">
+                <span class="detail-label">Order Date</span>
+                <span class="detail-value">${formatDate(order.created_at)}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Customer Name</span>
+                <span class="detail-value">${order.customer_name}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Shipping State</span>
+                <span class="detail-value">${order.shipping_state}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Total Amount</span>
+                <span class="detail-value" style="color: #667eea;">${formatCurrency(order.total_amount)}</span>
+              </div>
+            </div>
+
+            <div class="order-items">
+              <h4>🛍️ Order Items</h4>
+              ${itemsHtml || '<p style="color: #999;">No items details available</p>'}
+              
+              <div style="margin-top: 15px; padding-top: 15px; border-top: 2px solid #667eea;">
+                <div class="item-row">
+                  <span>Subtotal:</span>
+                  <span>${formatCurrency(order.subtotal)}</span>
+                </div>
+                <div class="item-row">
+                  <span>Shipping Fee:</span>
+                  <span>₦${Number(order.shipping_fee).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div class="item-row" style="font-weight: bold; font-size: 18px; color: #667eea;">
+                  <span>Total:</span>
+                  <span>${formatCurrency(order.total_amount)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Allow Enter key to search
+    document.getElementById('searchEmail').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') searchOrders();
+    });
+
+    document.getElementById('searchReference').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') searchOrders();
+    });
+  </script>
+</body>
+</html>
