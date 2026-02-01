@@ -968,3 +968,89 @@ footer {
         align-items: flex-start;
     }
 }
+/* ==============================
+   PRODUCT IMAGE SLIDER (3 IMAGES)
+   ============================== */
+
+/* Product Image Slider Container */
+.product-image-slider {
+    position: relative;
+    width: 100%;
+    height: 220px;
+    overflow: hidden;
+    background: var(--light);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Main Product Image */
+.product-main-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transition: opacity 0.3s ease;
+}
+
+/* Thumbnails Strip */
+.product-thumbnails {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 0;
+    background: white;
+}
+
+/* Individual Thumbnail */
+.product-thumbnails .thumb {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+}
+
+.product-thumbnails .thumb.active,
+.product-thumbnails .thumb:hover {
+    opacity: 1;
+    border-color: var(--primary);
+    transform: scale(1.05);
+}
+
+/* Badge stays on top of main image */
+.product-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+}
+
+/* ==============================
+   RESPONSIVE ADJUSTMENTS
+   ============================== */
+
+@media (max-width: 768px) {
+    .product-image-slider {
+        height: 180px;
+    }
+    .product-thumbnails .thumb {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+@media (max-width: 480px) {
+    .product-image-slider {
+        height: 200px;
+    }
+    .product-thumbnails {
+        gap: 4px;
+    }
+    .product-thumbnails .thumb {
+        width: 35px;
+        height: 35px;
+    }
+}
