@@ -245,9 +245,8 @@ function formatCurrency(amountInKobo) {
     return `₦${(amountInKobo / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
 }
 
-
 // ===================================================
-// 3. PRODUCT DISPLAY & FILTERING
+// UPDATED: displayProducts — NOW WITH 3-IMAGE SLIDER
 // ===================================================
 
 function displayProducts(productsToShow) {
@@ -292,10 +291,20 @@ function displayProducts(productsToShow) {
             isDisabled = 'disabled';
         }
 
+        // Use images array if available; fallback to single image repeated
+        const images = Array.isArray(product.images) && product.images.length >= 3
+            ? product.images.slice(0, 3)
+            : [product.image, product.image, product.image];
+
         const productHTML = `
-            <div class="product-card" data-category="${product.category}">
-                <div class="product-image">
-                    <img src="${product.image}" alt="${product.name}">
+            <div class="product-card" data-category="${product.category}" data-images='${JSON.stringify(images)}'>
+                <div class="product-image-slider">
+                    <img src="${images[0]}" alt="${product.name}" class="product-main-img">
+                    <div class="product-thumbnails">
+                        <img src="${images[0]}" alt="1" class="thumb active" data-index="0">
+                        <img src="${images[1]}" alt="2" class="thumb" data-index="1">
+                        <img src="${images[2]}" alt="3" class="thumb" data-index="2">
+                    </div>
                     ${badgeClass !== 'hidden' ? `<span class="product-badge ${badgeClass}">${badgeText}</span>` : ''} 
                 </div>
                 <div class="product-info">
@@ -313,6 +322,30 @@ function displayProducts(productsToShow) {
         productsGrid.insertAdjacentHTML('beforeend', productHTML);
     });
 
+    attachProductButtonEvents();
+    attachThumbnailEvents(); // 👈 NEW: enables image switching
+}
+
+// ===================================================
+// NEW: Handle thumbnail clicks to change main image
+// ===================================================
+
+function attachThumbnailEvents() {
+    document.querySelectorAll('.product-thumbnails .thumb').forEach(thumb => {
+        thumb.addEventListener('click', function () {
+            const container = this.closest('.product-card');
+            const mainImg = container.querySelector('.product-main-img');
+            const index = this.dataset.index;
+            const images = JSON.parse(container.dataset.images);
+
+            mainImg.src = images[index];
+
+            // Update active state
+            container.querySelectorAll('.thumb').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+}
     attachProductButtonEvents();
 }
 
