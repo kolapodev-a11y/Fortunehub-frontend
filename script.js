@@ -1,525 +1,666 @@
-// Product data - embedded for GitHub Pages compatibility
-const productsData = [
-  {
-    "id": 1,
-    "name": "Wireless Bluetooth Headphones",
-    "price": 59999.00,
-    "category": "accessories",
-    "description": "Premium wireless headphones with noise cancellation, 30-hour battery life, and superior sound quality.",
-    "image": "images/product1.jpg",
-    "images": ["images/product1.jpg", "images/product1b.jpg", "images/product1c.jpg"],
-    "tag": "new",
-    "outOfStock": false,
-    "sold": false,
-    "statusIndicator": "new"
-  },
-  {
-    "id": 2,
-    "name": "Iphone 14 Pro Max",
-    "price": 599990.00,
-    "category": "phones",
-    "description": "The latest flagship phone with a stunning display and 5G capability.",
-    "image": "images/product2.jpg",
-    "images": ["images/product2.jpg", "images/product2b.jpg", "images/product2c.jpg"],
-    "tag": "sale",
-    "outOfStock": false,
-    "sold": false,
-    "statusIndicator": "sale"
-  },
-  {
-    "id": 3,
-    "name": "Super Fast Charger",
-    "price": 24999.00,
-    "category": "accessories",
-    "description": "30W USB-C fast charger compatible with all modern smartphones.",
-    "image": "images/product3.jpg",
-    "images": ["images/product3.jpg", "images/product3b.jpg", "images/product3c.jpg"],
-    "tag": "none",
-    "outOfStock": false,
-    "sold": false,
-    "statusIndicator": "available"
-  },
-  {
-    "id": 4,
-    "name": "Gaming Laptop X1",
-    "price": 950000.00,
-    "category": "laptops",
-    "description": "High-performance laptop for professional gaming and content creation.",
-    "image": "images/product4.jpg",
-    "images": ["images/product4.jpg", "images/product4b.jpg", "images/product4c.jpg"],
-    "tag": "none",
-    "outOfStock": true,
-    "sold": false,
-    "statusIndicator": "outofstock"
-  },
-  {
-    "id": 5,
-    "name": "Portable Bluetooth Speaker",
-    "price": 45000.00,
-    "category": "speakers",
-    "description": "Loud and clear portable speaker with waterproof rating.",
-    "image": "images/product5.jpg",
-    "images": ["images/product5.jpg", "images/product5b.jpg", "images/product5c.jpg"],
-    "tag": "none",
-    "outOfStock": false,
-    "sold": true,
-    "statusIndicator": "available"
-  },
-  {
-    "id": 6,
-    "name": "Smart Watch Series 7",
-    "price": 70000.00,
-    "category": "watches",
-    "description": "Feature-rich smartwatch with health monitoring.",
-    "image": "images/product6.jpg",
-    "images": ["images/product6.jpg", "images/product6b.jpg", "images/product6c.jpg"],
-    "tag": "sale",
-    "outOfStock": false,
-    "sold": false,
-    "statusIndicator": "sale"
-  },
-  {
-    "id": 7,
-    "name": "Playstation Portal",
-    "price": 340000.00,
-    "category": "games",
-    "description": "Sony PlayStation Portal Remote Player - PlayStation 5",
-    "image": "images/product7.jpg",
-    "images": ["images/product7.jpg", "images/product7b.jpg", "images/product7c.jpg"],
-    "tag": "sale",
-    "outOfStock": false,
-    "sold": false,
-    "statusIndicator": "sale"
-  },
-  {
-    "id": 8,
-    "name": "Wireless Bluetooth Headphones (Budget)",
-    "price": 20000.00,
-    "category": "accessories",
-    "description": "Affordable wireless headphones with 20-hour battery life.",
-    "image": "images/product8.jpg",
-    "images": ["images/product8.jpg", "images/product8b.jpg", "images/product8c.jpg"],
-    "tag": "sale",
-    "outOfStock": false,
-    "sold": false,
-    "statusIndicator": "sale"
+// ===================================================
+// FortuneHub Frontend Script - FIXED VERSION
+// ===================================================
+
+// ------------------------------
+// 1) STATE
+// ------------------------------
+let products = [];
+let cart = JSON.parse(localStorage.getItem("cart")) || [];
+
+// ✅ Paystack (test public key in frontend)
+const PAYSTACK_PUBLIC_KEY = "pk_test_9f6a5cb45aeab4bd8bccd72129beda47f2609921";
+
+// Backend (Render)
+const API_BASE_URL = "https://fortunehub-backend.onrender.com";
+
+// ------------------------------
+// 2) DOM ELEMENTS
+// ------------------------------
+const productsGrid = document.getElementById("productsGrid");
+const cartCount = document.getElementById("cartCount");
+const cartModal = document.getElementById("cartModal");
+const closeModal = document.getElementById("closeCartModal");
+const cartItemsContainer = document.getElementById("cartItems");
+const cartTotalElement = document.getElementById("cartTotal");
+const cartSubTotalElement = document.getElementById("cartSubTotal");
+const shippingFeeAmountElement = document.getElementById("shippingFeeAmount");
+const checkoutButton = document.getElementById("checkoutButton");
+const continueShoppingButton = document.getElementById("continueShoppingButton");
+const filterButtons = document.querySelectorAll(".filter-btn");
+const searchInput = document.getElementById("searchInput");
+const categoryCards = document.querySelectorAll(".category-card");
+const cartIcon = document.getElementById("cartIcon");
+const searchIconBtn = document.getElementById("searchIcon");
+
+// Customer info fields
+const customerNameInput = document.getElementById("customerName");
+const customerEmailInput = document.getElementById("customerEmail");
+const customerPhoneInput = document.getElementById("customerPhone");
+const shippingStateSelect = document.getElementById("shippingState");
+
+// Error elements
+const nameError = document.getElementById("nameError");
+const emailError = document.getElementById("emailError");
+const phoneError = document.getElementById("phoneError");
+
+// ------------------------------
+// 3) HELPERS
+// ------------------------------
+function formatCurrency(amountInKobo) {
+  return `₦${(amountInKobo / 100).toLocaleString("en-NG", {
+    minimumFractionDigits: 2,
+  })}`;
+}
+
+function getProductById(id) {
+  return products.find((p) => p.id === id);
+}
+
+/**
+ * ✅ GitHub Pages-safe URL to products.json
+ */
+function getProductsJsonUrl() {
+  return new URL("products.json", window.location.href).toString();
+}
+
+/**
+ * Resolve asset URLs for images
+ */
+function resolveAssetUrl(path) {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  if (path.startsWith("/")) return path;
+  return new URL(path, window.location.href).toString();
+}
+
+// ------------------------------
+// 4) CART UI + LOGIC
+// ------------------------------
+function updateCartUI() {
+  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  if (cartCount) cartCount.textContent = totalItems;
+
+  if (!cartItemsContainer) return;
+
+  cartItemsContainer.innerHTML = "";
+  if (cart.length === 0) {
+    cartItemsContainer.innerHTML =
+      '<p style="text-align:center;color:#555;">Your cart is empty.</p>';
+    if (checkoutButton) checkoutButton.disabled = true;
+    return;
   }
-];
 
-// Global variables
-let allProducts = [];
-let filteredProducts = [];
-let cart = [];
-let currentFilter = 'all';
-
-// Initialize app
-document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
-});
-
-// Initialize application
-function initializeApp() {
-    // Load products from embedded data
-    allProducts = productsData;
-    filteredProducts = [...allProducts];
-    
-    // Load cart from localStorage
-    loadCart();
-    
-    // Display products
-    displayProducts(filteredProducts);
-    
-    // Setup event listeners
-    setupEventListeners();
-    
-    // Hide loading state
-    document.getElementById('loadingState').style.display = 'none';
-}
-
-// Setup event listeners
-function setupEventListeners() {
-    // Filter buttons
-    const filterButtons = document.querySelectorAll('.filter-btn');
-    filterButtons.forEach(btn => {
-        btn.addEventListener('click', function() {
-            filterButtons.forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            currentFilter = this.getAttribute('data-filter');
-            filterProducts(currentFilter);
-        });
-    });
-    
-    // Category cards
-    const categoryCards = document.querySelectorAll('.category-card');
-    categoryCards.forEach(card => {
-        card.addEventListener('click', function() {
-            const category = this.getAttribute('data-category');
-            scrollToProducts();
-            setTimeout(() => {
-                const filterBtn = document.querySelector(`[data-filter="${category}"]`);
-                if (filterBtn) {
-                    filterBtn.click();
-                }
-            }, 500);
-        });
-    });
-    
-    // Search input
-    const searchInput = document.getElementById('searchInput');
-    searchInput.addEventListener('input', function() {
-        searchProducts(this.value);
-    });
-    
-    // Cart button
-    const cartBtn = document.querySelector('.cart-btn');
-    cartBtn.addEventListener('click', openCartModal);
-    
-    // Mobile menu toggle
-    const menuToggle = document.querySelector('.menu-toggle');
-    const navMenu = document.querySelector('.nav-menu');
-    menuToggle.addEventListener('click', function() {
-        navMenu.classList.toggle('active');
-    });
-    
-    // Modal close on outside click
-    const modals = document.querySelectorAll('.modal');
-    modals.forEach(modal => {
-        modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
-                modal.classList.remove('active');
-            }
-        });
-    });
-}
-
-// Scroll to search section
-function scrollToSearch() {
-    const searchSection = document.getElementById('search-section');
-    searchSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    
-    // Focus on search input after scrolling
-    setTimeout(() => {
-        document.getElementById('searchInput').focus();
-    }, 500);
-}
-
-// Scroll to products section
-function scrollToProducts() {
-    const productsSection = document.getElementById('products');
-    productsSection.scrollIntoView({ behavior: 'smooth' });
-}
-
-// Scroll to categories section
-function scrollToCategories() {
-    const categoriesSection = document.getElementById('categories');
-    categoriesSection.scrollIntoView({ behavior: 'smooth' });
-}
-
-// Display products
-function displayProducts(products) {
-    const productsGrid = document.getElementById('productsGrid');
-    const noProducts = document.getElementById('noProducts');
-    
-    productsGrid.innerHTML = '';
-    
-    if (products.length === 0) {
-        noProducts.style.display = 'flex';
-        return;
-    }
-    
-    noProducts.style.display = 'none';
-    
-    products.forEach(product => {
-        const productCard = createProductCard(product);
-        productsGrid.appendChild(productCard);
-    });
-}
-
-// Create product card
-function createProductCard(product) {
-    const card = document.createElement('div');
-    card.className = 'product-card';
-    
-    // Status indicator
-    let statusBadge = '';
-    if (product.outOfStock) {
-        statusBadge = '<span class="status-badge out-of-stock">Out of Stock</span>';
-    } else if (product.tag === 'new') {
-        statusBadge = '<span class="status-badge new">New</span>';
-    } else if (product.tag === 'sale') {
-        statusBadge = '<span class="status-badge sale">Sale</span>';
-    }
-    
-    card.innerHTML = `
-        ${statusBadge}
-        <div class="product-image">
-            <img src="${product.image}" alt="${product.name}" onerror="this.src='https://via.placeholder.com/300x300?text=Product+Image'">
-            <div class="product-overlay">
-                <button class="btn-icon" onclick="viewProduct(${product.id})" title="Quick View">
-                    <i class="fas fa-eye"></i>
-                </button>
-            </div>
+  cart.forEach((item) => {
+    const itemHTML = `
+      <div class="cart-item">
+        <div class="item-details">
+          <img src="${resolveAssetUrl(item.image)}" alt="${item.name}">
+          <div class="item-info">
+            <h4>${item.name}</h4>
+            <span class="item-price">${formatCurrency(item.price)}</span>
+          </div>
         </div>
+        <div class="item-quantity">
+          <button class="btn-quantity minus" data-id="${item.id}" data-change="-1">-</button>
+          <span>${item.quantity}</span>
+          <button class="btn-quantity plus" data-id="${item.id}" data-change="1">+</button>
+          <i class="fas fa-trash-alt remove-item" data-id="${item.id}"></i>
+        </div>
+      </div>
+    `;
+    cartItemsContainer.insertAdjacentHTML("beforeend", itemHTML);
+  });
+
+  // Quantity + Remove events
+  document.querySelectorAll(".btn-quantity").forEach((button) => {
+    button.addEventListener("click", (e) => {
+      const id = parseInt(e.currentTarget.dataset.id, 10);
+      const change = parseInt(e.currentTarget.dataset.change, 10);
+      updateQuantity(id, change);
+    });
+  });
+
+  document.querySelectorAll(".remove-item").forEach((button) => {
+    button.addEventListener("click", (e) => {
+      const id = parseInt(e.currentTarget.dataset.id, 10);
+      removeItem(id);
+    });
+  });
+
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const selectedShippingFeeNaira = parseInt(shippingStateSelect?.value || "0", 10);
+  const shippingFee = cart.length > 0 ? selectedShippingFeeNaira * 100 : 0;
+  const grandTotal = subtotal + shippingFee;
+
+  if (cartSubTotalElement) cartSubTotalElement.textContent = formatCurrency(subtotal);
+  if (shippingFeeAmountElement)
+    shippingFeeAmountElement.textContent = formatCurrency(shippingFee);
+
+  if (cartTotalElement) {
+    cartTotalElement.textContent = formatCurrency(grandTotal);
+  }
+
+  // Checkout button state
+  if (checkoutButton) {
+    const isValid = validateCustomerInfo({ silent: true });
+    const name = customerNameInput?.value?.trim() || "";
+    const email = customerEmailInput?.value?.trim() || "";
+    const phone = customerPhoneInput?.value?.trim() || "";
+
+    if (!isValid || !name || !email || !phone) {
+      checkoutButton.disabled = true;
+      checkoutButton.innerHTML = '<i class="fas fa-info-circle"></i> Complete Info to Continue';
+    } else {
+      checkoutButton.disabled = false;
+      checkoutButton.innerHTML = '<i class="fas fa-credit-card"></i> Proceed to Checkout';
+    }
+  }
+}
+
+function addToCart(productId, quantity = 1) {
+  const product = getProductById(productId);
+  if (!product || product.outOfStock) {
+    alert("Product is out of stock.");
+    return;
+  }
+
+  const cartItem = cart.find((item) => item.id === productId);
+  if (cartItem) cartItem.quantity += quantity;
+  else {
+    cart.push({
+      id: productId,
+      name: product.name,
+      price: product.price,
+      quantity,
+      image: product.image,
+    });
+  }
+
+  localStorage.setItem("cart", JSON.stringify(cart));
+  updateCartUI();
+  alert(`${product.name} added to cart!`);
+}
+
+function updateQuantity(productId, change) {
+  const cartItem = cart.find((item) => item.id === productId);
+  if (cartItem) {
+    cartItem.quantity += change;
+    if (cartItem.quantity <= 0) cart = cart.filter((item) => item.id !== productId);
+  }
+  localStorage.setItem("cart", JSON.stringify(cart));
+  updateCartUI();
+}
+
+function removeItem(productId) {
+  cart = cart.filter((item) => item.id !== productId);
+  localStorage.setItem("cart", JSON.stringify(cart));
+  updateCartUI();
+}
+
+// ------------------------------
+// 5) CUSTOMER VALIDATION
+// ------------------------------
+function validateCustomerInfo({ silent = false } = {}) {
+  let isValid = true;
+
+  if (nameError) nameError.style.display = "none";
+  if (emailError) emailError.style.display = "none";
+  if (phoneError) phoneError.style.display = "none";
+
+  const name = customerNameInput?.value?.trim() || "";
+  const email = customerEmailInput?.value?.trim() || "";
+  const phone = customerPhoneInput?.value?.trim() || "";
+  const stateValue = shippingStateSelect?.value || "";
+
+  // Name
+  if (!name || name.length < 3 || name.includes("@") || name.includes(".")) {
+    if (!silent && nameError) {
+      nameError.textContent = "Please enter your full name (not email).";
+      nameError.style.display = "block";
+    }
+    isValid = false;
+  }
+
+  // Email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email || !emailRegex.test(email)) {
+    if (!silent && emailError) {
+      emailError.textContent = "Enter a valid email (e.g., name@example.com).";
+      emailError.style.display = "block";
+    }
+    isValid = false;
+  }
+
+  // Phone (NG)
+  const phoneRegex = /^(0[789][01])\d{8}$/;
+  if (!phone || !phoneRegex.test(phone)) {
+    if (!silent && phoneError) {
+      phoneError.textContent =
+        "Enter a valid Nigerian phone number (e.g., 08031234567).";
+      phoneError.style.display = "block";
+    }
+    isValid = false;
+  }
+
+  // Shipping state
+  if (!stateValue) isValid = false;
+
+  return isValid;
+}
+
+// ------------------------------
+// 6) PRODUCTS UI (with 3-image thumbnails)
+// ------------------------------
+function displayProducts(productsToShow) {
+  if (!productsGrid) return;
+  productsGrid.innerHTML = "";
+
+  if (!productsToShow || productsToShow.length === 0) {
+    productsGrid.innerHTML = `
+      <div style="grid-column:1/-1;text-align:center;padding:40px;color:#555;">
+        <i class="fas fa-box-open" style="font-size:48px;color:#ccc;margin-bottom:15px;"></i>
+        <p style="font-size:18px;margin:0;">No products found</p>
+      </div>
+    `;
+    return;
+  }
+
+  productsToShow.forEach((product) => {
+    const isSold = !!product.sold;
+    const isOutOfStock = !!product.outOfStock;
+
+    let badgeClass = "";
+    let badgeText = "";
+
+    if (isSold) {
+      badgeClass = "badge-sold";
+      badgeText = "SOLD";
+    } else if (product.tag === "new") {
+      badgeClass = "badge-new";
+      badgeText = "NEW";
+    } else if (product.tag === "sale") {
+      badgeClass = "badge-sale";
+      badgeText = "SALE";
+    }
+
+    // Buttons
+    let buttonText = "Add to Cart";
+    let buttonClass = "btn-add-to-cart add-to-cart";
+    let buyNowText = "Buy Now";
+    let buyNowClass = "btn-buy-now buy-now";
+    let isDisabled = "";
+
+    if (isSold) {
+      buttonText = "SOLD";
+      buttonClass = "btn-secondary";
+      buyNowText = "SOLD";
+      buyNowClass = "btn-secondary";
+      isDisabled = "disabled";
+    } else if (isOutOfStock) {
+      buttonText = "Out of Stock";
+      buttonClass = "btn-secondary";
+      buyNowText = "Out of Stock";
+      buyNowClass = "btn-secondary";
+      isDisabled = "disabled";
+    }
+
+    // Images: prefer product.images[0..2]
+    const imgs = Array.isArray(product.images) && product.images.length
+      ? product.images.slice(0, 3)
+      : [product.image, product.image, product.image];
+
+    const images = [
+      resolveAssetUrl(imgs[0] || product.image),
+      resolveAssetUrl(imgs[1] || product.image),
+      resolveAssetUrl(imgs[2] || product.image),
+    ];
+
+    const productHTML = `
+      <div class="product-card" data-category="${product.category}">
+        <div class="product-image-slider" data-images='${JSON.stringify(images)}'>
+          <img src="${images[0]}" alt="${product.name}" class="product-main-img">
+          
+          <div class="product-thumbnails">
+            <img src="${images[0]}" alt="1" class="thumb active" data-index="0">
+            <img src="${images[1]}" alt="2" class="thumb" data-index="1">
+            <img src="${images[2]}" alt="3" class="thumb" data-index="2">
+          </div>
+
+          ${badgeText ? `<span class="product-badge ${badgeClass}">${badgeText}</span>` : ""}
+        </div>
+
         <div class="product-info">
-            <h3 class="product-name">${product.name}</h3>
-            <p class="product-description">${product.description.substring(0, 60)}...</p>
-            <div class="product-footer">
-                <span class="product-price">₦${formatPrice(product.price)}</span>
-                <button class="btn-add-cart" onclick="addToCart(${product.id})" ${product.outOfStock ? 'disabled' : ''}>
-                    <i class="fas fa-shopping-cart"></i>
-                    ${product.outOfStock ? 'Out of Stock' : 'Add to Cart'}
-                </button>
-            </div>
-        </div>
-    `;
-    
-    return card;
-}
+          <p class="product-category">${product.category}</p>
+          <h3 class="product-title">${product.name}</h3>
+          <p class="product-price">${formatCurrency(product.price)}</p>
+          <p class="product-description">${product.description}</p>
 
-// Filter products
-function filterProducts(filter) {
-    if (filter === 'all') {
-        filteredProducts = [...allProducts];
-    } else {
-        filteredProducts = allProducts.filter(product => product.category === filter);
-    }
-    
-    displayProducts(filteredProducts);
-}
-
-// Search products
-function searchProducts(query) {
-    const searchQuery = query.toLowerCase().trim();
-    
-    if (searchQuery === '') {
-        filteredProducts = currentFilter === 'all' 
-            ? [...allProducts] 
-            : allProducts.filter(p => p.category === currentFilter);
-    } else {
-        const baseProducts = currentFilter === 'all' 
-            ? allProducts 
-            : allProducts.filter(p => p.category === currentFilter);
-            
-        filteredProducts = baseProducts.filter(product => 
-            product.name.toLowerCase().includes(searchQuery) ||
-            product.description.toLowerCase().includes(searchQuery) ||
-            product.category.toLowerCase().includes(searchQuery)
-        );
-    }
-    
-    displayProducts(filteredProducts);
-}
-
-// Add to cart
-function addToCart(productId) {
-    const product = allProducts.find(p => p.id === productId);
-    
-    if (!product || product.outOfStock) {
-        return;
-    }
-    
-    const existingItem = cart.find(item => item.id === productId);
-    
-    if (existingItem) {
-        existingItem.quantity += 1;
-    } else {
-        cart.push({
-            ...product,
-            quantity: 1
-        });
-    }
-    
-    saveCart();
-    updateCartCount();
-    showNotification('Product added to cart!');
-}
-
-// Remove from cart
-function removeFromCart(productId) {
-    cart = cart.filter(item => item.id !== productId);
-    saveCart();
-    updateCartCount();
-    displayCart();
-}
-
-// Update cart quantity
-function updateCartQuantity(productId, change) {
-    const item = cart.find(item => item.id === productId);
-    
-    if (item) {
-        item.quantity += change;
-        
-        if (item.quantity <= 0) {
-            removeFromCart(productId);
-        } else {
-            saveCart();
-            displayCart();
-        }
-    }
-}
-
-// Save cart to localStorage
-function saveCart() {
-    localStorage.setItem('fortunehub_cart', JSON.stringify(cart));
-}
-
-// Load cart from localStorage
-function loadCart() {
-    const savedCart = localStorage.getItem('fortunehub_cart');
-    if (savedCart) {
-        cart = JSON.parse(savedCart);
-        updateCartCount();
-    }
-}
-
-// Update cart count
-function updateCartCount() {
-    const cartCount = document.querySelector('.cart-count');
-    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-    cartCount.textContent = totalItems;
-    
-    if (totalItems > 0) {
-        cartCount.style.display = 'flex';
-    } else {
-        cartCount.style.display = 'none';
-    }
-}
-
-// Open cart modal
-function openCartModal() {
-    const modal = document.getElementById('cartModal');
-    modal.classList.add('active');
-    displayCart();
-}
-
-// Close cart modal
-function closeCartModal() {
-    const modal = document.getElementById('cartModal');
-    modal.classList.remove('active');
-}
-
-// Display cart
-function displayCart() {
-    const cartItems = document.getElementById('cartItems');
-    const cartTotal = document.getElementById('cartTotal');
-    
-    if (cart.length === 0) {
-        cartItems.innerHTML = '<div class="empty-cart"><i class="fas fa-shopping-cart"></i><p>Your cart is empty</p></div>';
-        cartTotal.textContent = '₦0.00';
-        return;
-    }
-    
-    let total = 0;
-    cartItems.innerHTML = '';
-    
-    cart.forEach(item => {
-        total += item.price * item.quantity;
-        
-        const cartItem = document.createElement('div');
-        cartItem.className = 'cart-item';
-        cartItem.innerHTML = `
-            <img src="${item.image}" alt="${item.name}" onerror="this.src='https://via.placeholder.com/80x80?text=Product'">
-            <div class="cart-item-info">
-                <h4>${item.name}</h4>
-                <p class="cart-item-price">₦${formatPrice(item.price)}</p>
-            </div>
-            <div class="cart-item-quantity">
-                <button onclick="updateCartQuantity(${item.id}, -1)">-</button>
-                <span>${item.quantity}</span>
-                <button onclick="updateCartQuantity(${item.id}, 1)">+</button>
-            </div>
-            <button class="cart-item-remove" onclick="removeFromCart(${item.id})">
-                <i class="fas fa-trash"></i>
+          <div class="product-actions">
+            <button class="btn ${buttonClass}" ${isDisabled} data-id="${product.id}">
+              ${buttonText}
             </button>
-        `;
-        cartItems.appendChild(cartItem);
+            <button class="btn ${buyNowClass}" ${isDisabled} data-id="${product.id}">
+              ${buyNowText}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    productsGrid.insertAdjacentHTML("beforeend", productHTML);
+  });
+}
+
+function filterProducts(category) {
+  if (!products || products.length === 0) return;
+
+  const filtered =
+    category === "all"
+      ? products
+      : products.filter(
+          (p) => (p.category || "").toLowerCase() === category.toLowerCase()
+        );
+
+  displayProducts(filtered);
+}
+
+function searchProducts(query) {
+  const text = (query || "").toLowerCase();
+
+  const filtered = products.filter((p) => {
+    const name = (p.name || "").toLowerCase();
+    const category = (p.category || "").toLowerCase();
+    const desc = (p.description || "").toLowerCase();
+    return name.includes(text) || category.includes(text) || desc.includes(text);
+  });
+
+  displayProducts(filtered);
+}
+
+// ------------------------------
+// 7) EVENTS (use delegation to avoid duplicates)
+// ------------------------------
+function setupEventListeners() {
+  // ✅ FIXED: Search icon (top right) -> scroll to products section AND focus search input
+  if (searchIconBtn) {
+    searchIconBtn.addEventListener("click", () => {
+      const productsSection = document.getElementById("products");
+      const searchContainer = document.getElementById("search-container");
+      
+      // Scroll to products section
+      if (productsSection) {
+        productsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      
+      // Wait a bit for scroll, then focus search input
+      setTimeout(() => {
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 500);
     });
-    
-    cartTotal.textContent = `₦${formatPrice(total)}`;
-}
+  }
 
-// View product detail
-function viewProduct(productId) {
-    const product = allProducts.find(p => p.id === productId);
-    
-    if (!product) return;
-    
-    const modal = document.getElementById('productModal');
-    const productDetail = document.getElementById('productDetail');
-    
-    let statusBadge = '';
-    if (product.outOfStock) {
-        statusBadge = '<span class="status-badge out-of-stock">Out of Stock</span>';
-    } else if (product.tag === 'new') {
-        statusBadge = '<span class="status-badge new">New</span>';
-    } else if (product.tag === 'sale') {
-        statusBadge = '<span class="status-badge sale">Sale</span>';
+  // Search input typing
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => searchProducts(e.target.value));
+  }
+
+  // Filter buttons
+  filterButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      filterButtons.forEach((btn) => btn.classList.remove("active"));
+      button.classList.add("active");
+      filterProducts(button.dataset.category);
+    });
+  });
+
+  // Category cards -> filter + scroll
+  categoryCards.forEach((card) => {
+    card.addEventListener("click", () => {
+      const category = card.dataset.category;
+      filterProducts(category);
+
+      filterButtons.forEach((btn) => {
+        btn.classList.remove("active");
+        if (btn.dataset.category === category) btn.classList.add("active");
+      });
+
+      document.getElementById("products")?.scrollIntoView({ behavior: "smooth" });
+    });
+  });
+
+  // Cart modal open/close
+  cartIcon?.addEventListener("click", openCartModal);
+  closeModal?.addEventListener("click", closeCartModal);
+  continueShoppingButton?.addEventListener("click", closeCartModal);
+
+  window.addEventListener("click", (e) => {
+    if (cartModal && e.target === cartModal) closeCartModal();
+  });
+
+  // Shipping select affects total
+  shippingStateSelect?.addEventListener("change", updateCartUI);
+
+  // Validate typing -> refresh checkout state
+  customerNameInput?.addEventListener("input", () => {
+    validateCustomerInfo({ silent: true });
+    updateCartUI();
+  });
+  customerEmailInput?.addEventListener("input", () => {
+    validateCustomerInfo({ silent: true });
+    updateCartUI();
+  });
+  customerPhoneInput?.addEventListener("input", () => {
+    validateCustomerInfo({ silent: true });
+    updateCartUI();
+  });
+
+  // Checkout
+  checkoutButton?.addEventListener("click", initiatePaystackPayment);
+
+  // ✅ Product grid delegation:
+  // - add to cart
+  // - buy now
+  // - thumbnail click swap image
+  productsGrid?.addEventListener("click", (e) => {
+    const target = e.target;
+
+    // Add to cart button
+    if (target?.classList?.contains("add-to-cart")) {
+      const id = parseInt(target.dataset.id, 10);
+      addToCart(id);
+      return;
     }
-    
-    productDetail.innerHTML = `
-        <div class="product-detail-images">
-            <div class="main-image">
-                ${statusBadge}
-                <img src="${product.image}" alt="${product.name}" id="mainProductImage" onerror="this.src='https://via.placeholder.com/500x500?text=Product+Image'">
-            </div>
-            <div class="thumbnail-images">
-                ${product.images.map(img => `
-                    <img src="${img}" alt="${product.name}" onclick="changeMainImage('${img}')" onerror="this.src='https://via.placeholder.com/100x100?text=Image'">
-                `).join('')}
-            </div>
-        </div>
-        <div class="product-detail-info">
-            <h2>${product.name}</h2>
-            <p class="product-detail-price">₦${formatPrice(product.price)}</p>
-            <p class="product-detail-description">${product.description}</p>
-            <div class="product-detail-actions">
-                <button class="btn btn-primary" onclick="addToCart(${product.id}); closeProductModal();" ${product.outOfStock ? 'disabled' : ''}>
-                    <i class="fas fa-shopping-cart"></i>
-                    ${product.outOfStock ? 'Out of Stock' : 'Add to Cart'}
-                </button>
-            </div>
-        </div>
-    `;
-    
-    modal.classList.add('active');
+
+    // Buy now button
+    if (target?.classList?.contains("buy-now")) {
+      const id = parseInt(target.dataset.id, 10);
+      addToCart(id, 1);
+      openCartModal();
+      return;
+    }
+
+    // Thumbnail click
+    if (target?.classList?.contains("thumb")) {
+      const slider = target.closest(".product-image-slider");
+      const mainImg = slider?.querySelector(".product-main-img");
+      if (!slider || !mainImg) return;
+
+      const images = JSON.parse(slider.dataset.images || "[]");
+      const index = parseInt(target.dataset.index, 10);
+
+      if (images[index]) mainImg.src = images[index];
+
+      slider.querySelectorAll(".thumb").forEach((t) => t.classList.remove("active"));
+      target.classList.add("active");
+    }
+  });
 }
 
-// Close product modal
-function closeProductModal() {
-    const modal = document.getElementById('productModal');
-    modal.classList.remove('active');
+// ------------------------------
+// 8) MODAL CONTROL
+// ------------------------------
+function openCartModal() {
+  if (cartModal) {
+    cartModal.style.display = "block";
+    updateCartUI();
+
+    // Smart focus
+    if (customerNameInput && !customerNameInput.value) customerNameInput.focus();
+    else if (customerEmailInput && !customerEmailInput.value) customerEmailInput.focus();
+  }
 }
 
-// Change main product image
-function changeMainImage(imageSrc) {
-    const mainImage = document.getElementById('mainProductImage');
-    mainImage.src = imageSrc;
+function closeCartModal() {
+  if (cartModal) cartModal.style.display = "none";
 }
 
-// Format price
-function formatPrice(price) {
-    return price.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+// ------------------------------
+// 9) PAYSTACK
+// ------------------------------
+function initiatePaystackPayment() {
+  if (cart.length === 0) {
+    alert("Your cart is empty.");
+    return;
+  }
+
+  const name = (customerNameInput?.value || "").trim();
+  const email = (customerEmailInput?.value || "").trim();
+  const phone = (customerPhoneInput?.value || "").trim();
+
+  // Strong validation
+  if (!name || name.length < 3 || name.includes("@") || name.includes(".")) {
+    alert("Please enter your real full name (not email).");
+    customerNameInput?.focus();
+    return;
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email || !emailRegex.test(email)) {
+    alert("Please enter a valid email address.");
+    customerEmailInput?.focus();
+    return;
+  }
+
+  const phoneRegex = /^(0[789][01])\d{8}$/;
+  if (!phone || !phoneRegex.test(phone)) {
+    alert("Please enter a valid Nigerian WhatsApp number (e.g., 08031234567).");
+    customerPhoneInput?.focus();
+    return;
+  }
+
+  if (!validateCustomerInfo()) {
+    alert("Please complete all required shipping information.");
+    return;
+  }
+
+  const stateOption = shippingStateSelect.options[shippingStateSelect.selectedIndex];
+  const shippingState = (stateOption?.textContent?.split("—")[0]?.trim() || "Unknown");
+  const shippingFeeNaira = parseInt(shippingStateSelect.value, 10) || 0;
+
+  const productNames = cart.map((item) => item.name).join(", ") || "Products";
+  const subtotalKobo = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const shippingKobo = shippingFeeNaira * 100;
+  const totalKobo = subtotalKobo + shippingKobo;
+
+  if (!Number.isFinite(totalKobo) || totalKobo <= 0) {
+    alert("Invalid payment amount. Please try again.");
+    return;
+  }
+
+  const safeMeta = {
+    customer_name: name,
+    customer_email: email,
+    customer_phone: phone,
+    shipping_state: shippingState,
+    shipping_fee: shippingFeeNaira,
+    products: productNames,
+    cart_items: cart.map((item) => ({
+      id: item.id || 0,
+      name: item.name || "Unknown Item",
+      price: item.price || 0,
+      quantity: item.quantity || 1,
+      image: item.image || "",
+    })),
+  };
+
+  const handler = PaystackPop.setup({
+    key: PAYSTACK_PUBLIC_KEY,
+    email,
+    amount: totalKobo,
+    metadata: safeMeta,
+    callback: function (response) {
+      fetch(`${API_BASE_URL}/api/verify-payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ reference: response.reference }),
+      })
+        .then((r) => {
+          if (!r.ok) throw new Error("Network response was not ok");
+          return r.json();
+        })
+        .then((data) => {
+          if (data.message && data.message.includes("email sent")) {
+            alert("✅ Order placed! We'll contact you shortly.");
+            cart = [];
+            localStorage.setItem("cart", JSON.stringify(cart));
+
+            if (customerNameInput) customerNameInput.value = "";
+            if (customerEmailInput) customerEmailInput.value = "";
+            if (customerPhoneInput) customerPhoneInput.value = "";
+            if (shippingStateSelect) shippingStateSelect.value = "";
+
+            updateCartUI();
+            closeCartModal();
+          } else if (data.error) {
+            alert("⚠️ " + data.error);
+          } else {
+            alert("⚠️ Payment verification failed. Please contact support.");
+          }
+        })
+        .catch((err) => {
+          console.error("Verification failed:", err);
+          alert("❌ Failed to verify payment. Please try again.");
+        });
+    },
+    onClose: function () {
+      if (nameError) nameError.style.display = "none";
+      if (emailError) emailError.style.display = "none";
+      if (phoneError) phoneError.style.display = "none";
+    },
+  });
+
+  handler.openIframe();
 }
 
-// Show notification
-function showNotification(message) {
-    const notification = document.createElement('div');
-    notification.className = 'notification';
-    notification.innerHTML = `
-        <i class="fas fa-check-circle"></i>
-        <span>${message}</span>
-    `;
+// ------------------------------
+// 10) APP INIT
+// ------------------------------
+async function initializeApp() {
+  console.log("🚀 Initializing FortuneHub...");
+  
+  try {
+    const url = getProductsJsonUrl();
+    console.log("📦 Fetching products from:", url);
     
-    document.body.appendChild(notification);
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     
-    setTimeout(() => {
-        notification.classList.add('show');
-    }, 100);
-    
-    setTimeout(() => {
-        notification.classList.remove('show');
-        setTimeout(() => {
-            notification.remove();
-        }, 300);
-    }, 3000);
+    products = await response.json();
+    console.log("✅ Loaded", products.length, "products");
+  } catch (e) {
+    console.error("❌ Failed to load products.json:", e);
+    products = [];
+  }
+
+  displayProducts(products);
+  setupEventListeners();
+  updateCartUI();
+  
+  console.log("✅ FortuneHub initialized!");
 }
+
+document.addEventListener("DOMContentLoaded", initializeApp);
