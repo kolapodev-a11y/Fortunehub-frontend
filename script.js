@@ -1,5 +1,5 @@
 // ===================================================
-// FortuneHub Frontend Script (Cleaned for GitHub Pages)
+// FortuneHub Frontend Script - FIXED VERSION
 // ===================================================
 
 // ------------------------------
@@ -59,18 +59,13 @@ function getProductById(id) {
 
 /**
  * ✅ GitHub Pages-safe URL to products.json
- * Works whether your page is:
- * - https://kolapodev-a11y.github.io/Fortunehub-frontend/
- * - https://kolapodev-a11y.github.io/Fortunehub-frontend/index.html
  */
 function getProductsJsonUrl() {
   return new URL("products.json", window.location.href).toString();
 }
 
 /**
- * If you later move images into /images, you can keep JSON clean and fix paths here:
- * - If image path starts with http(s) or "/", keep it.
- * - Otherwise resolve relative to current page.
+ * Resolve asset URLs for images
  */
 function resolveAssetUrl(path) {
   if (!path) return "";
@@ -117,7 +112,7 @@ function updateCartUI() {
     cartItemsContainer.insertAdjacentHTML("beforeend", itemHTML);
   });
 
-  // Quantity + Remove events (delegation could also be used, but this is fine)
+  // Quantity + Remove events
   document.querySelectorAll(".btn-quantity").forEach((button) => {
     button.addEventListener("click", (e) => {
       const id = parseInt(e.currentTarget.dataset.id, 10);
@@ -143,9 +138,7 @@ function updateCartUI() {
     shippingFeeAmountElement.textContent = formatCurrency(shippingFee);
 
   if (cartTotalElement) {
-    cartTotalElement.textContent = (grandTotal / 100).toLocaleString("en-NG", {
-      minimumFractionDigits: 2,
-    });
+    cartTotalElement.textContent = formatCurrency(grandTotal);
   }
 
   // Checkout button state
@@ -157,10 +150,10 @@ function updateCartUI() {
 
     if (!isValid || !name || !email || !phone) {
       checkoutButton.disabled = true;
-      checkoutButton.textContent = "Complete Info to Continue";
+      checkoutButton.innerHTML = '<i class="fas fa-info-circle"></i> Complete Info to Continue';
     } else {
       checkoutButton.disabled = false;
-      checkoutButton.textContent = "Proceed to Checkout";
+      checkoutButton.innerHTML = '<i class="fas fa-credit-card"></i> Proceed to Checkout';
     }
   }
 }
@@ -265,8 +258,9 @@ function displayProducts(productsToShow) {
 
   if (!productsToShow || productsToShow.length === 0) {
     productsGrid.innerHTML = `
-      <div style="grid-column:1/-1;text-align:center;padding:20px;color:#555;">
-        No products to show. If you’re on GitHub Pages, check that <b>products.json</b> loads correctly.
+      <div style="grid-column:1/-1;text-align:center;padding:40px;color:#555;">
+        <i class="fas fa-box-open" style="font-size:48px;color:#ccc;margin-bottom:15px;"></i>
+        <p style="font-size:18px;margin:0;">No products found</p>
       </div>
     `;
     return;
@@ -388,12 +382,24 @@ function searchProducts(query) {
 // 7) EVENTS (use delegation to avoid duplicates)
 // ------------------------------
 function setupEventListeners() {
-  // Search icon (top right) -> go to products + focus search
+  // ✅ FIXED: Search icon (top right) -> scroll to products section AND focus search input
   if (searchIconBtn) {
     searchIconBtn.addEventListener("click", () => {
-      document.getElementById("products")?.scrollIntoView({ behavior: "smooth" });
-      searchInput?.scrollIntoView({ behavior: "smooth", block: "center" });
-      searchInput?.focus();
+      const productsSection = document.getElementById("products");
+      const searchContainer = document.getElementById("search-container");
+      
+      // Scroll to products section
+      if (productsSection) {
+        productsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      
+      // Wait a bit for scroll, then focus search input
+      setTimeout(() => {
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 500);
     });
   }
 
@@ -587,7 +593,7 @@ function initiatePaystackPayment() {
     amount: totalKobo,
     metadata: safeMeta,
     callback: function (response) {
-      fetch(${API_BASE_URL}/api/verify-payment, {
+      fetch(`${API_BASE_URL}/api/verify-payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ reference: response.reference }),
@@ -598,7 +604,7 @@ function initiatePaystackPayment() {
         })
         .then((data) => {
           if (data.message && data.message.includes("email sent")) {
-            alert("✅ Order placed! We’ll contact you shortly.");
+            alert("✅ Order placed! We'll contact you shortly.");
             cart = [];
             localStorage.setItem("cart", JSON.stringify(cart));
 
@@ -634,19 +640,27 @@ function initiatePaystackPayment() {
 // 10) APP INIT
 // ------------------------------
 async function initializeApp() {
+  console.log("🚀 Initializing FortuneHub...");
+  
   try {
     const url = getProductsJsonUrl();
+    console.log("📦 Fetching products from:", url);
+    
     const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) throw new Error(HTTP ${response.status});
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    
     products = await response.json();
+    console.log("✅ Loaded", products.length, "products");
   } catch (e) {
-    console.warn("⚠️ products.json not loaded. Using empty list.", e);
+    console.error("❌ Failed to load products.json:", e);
     products = [];
   }
 
   displayProducts(products);
   setupEventListeners();
   updateCartUI();
+  
+  console.log("✅ FortuneHub initialized!");
 }
 
 document.addEventListener("DOMContentLoaded", initializeApp);
