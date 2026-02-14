@@ -3,314 +3,230 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fortunehub - E-commerce website</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <title>FortuneHub - Shop The Latest Trends</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <!-- Header -->
-    <header>
+    <header class="header">
         <div class="container">
-            <nav class="navbar">
-               <a href="#" class="logo">Fortune<span>Hub</span></a>
-                <ul class="nav-links">
-                    <li><a href="#">Home</a></li>
-                    <li><a href="#products">Products</a></li>
-                    <li><a href="#categories">Categories</a></li>
-                </ul>
-                <div class="header-icons">
-                    <div class="icon-btn" id="searchIcon" title="Search Products">
-                        <i class="fas fa-search"></i>
-                    </div>
-                    <div class="icon-btn" id="cartIcon" title="View Cart">
-                        <i class="fas fa-shopping-cart"></i>
-                        <span class="cart-count" id="cartCount">0</span>
-                    </div>
+            <div class="nav-wrapper">
+                <div class="logo">
+                    <h1>Fortune<span>Hub</span></h1>
                 </div>
-            </nav>
+                <nav class="nav-menu">
+                    <ul>
+                        <li><a href="#home" class="active">Home</a></li>
+                        <li><a href="#products">Products</a></li>
+                        <li><a href="#about">About</a></li>
+                        <li><a href="#contact">Contact</a></li>
+                    </ul>
+                </nav>
+                <div class="nav-icons">
+                    <button class="icon-btn search-icon-btn" onclick="scrollToSearch()" aria-label="Search">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <button class="icon-btn cart-btn" aria-label="Cart">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span class="cart-count">0</span>
+                    </button>
+                    <button class="menu-toggle" aria-label="Menu">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                </div>
+            </div>
         </div>
     </header>
 
     <!-- Hero Section -->
-    <section class="hero">
-        <div class="container">
-            <div class="hero-content">
-                <div style="margin: 20px 0;">
-                    <img src="fot.png" alt="Fortune Hub Logo" style="width: 120px; height: 120px; border-radius: 50%; border: 4px solid white; display: none;">
+    <section class="hero" id="home">
+        <div class="hero-content">
+            <div class="hero-logo">
+                <div class="logo-circle">
+                    <span class="logo-text">FH</span>
                 </div>
-                <h1>Shop The Latest Trends</h1>
-                <p>Discover amazing products at unbeatable prices. Fast shipping and easy returns.</p>
-                <div class="hero-btns">
-                   <a href="#products" class="btn btn-primary">Shop Now</a>
-                   <a href="#categories" class="btn btn-outline">Browse Categories</a>
-                </div>
+            </div>
+            <h1 class="hero-title">Shop The Latest Trends</h1>
+            <p class="hero-subtitle">Discover amazing products at unbeatable prices. Fast shipping and easy returns.</p>
+            <div class="hero-buttons">
+                <button class="btn btn-primary" onclick="scrollToProducts()">Shop Now</button>
+                <button class="btn btn-secondary" onclick="scrollToCategories()">Browse Categories</button>
             </div>
         </div>
     </section>
 
-    <!-- Search Container -->
-    <div class="container">
-        <div class="search-container" id="search-container">
-            <i class="fas fa-search search-icon"></i>
-            <input type="text" class="search-input" id="searchInput" placeholder="Search for products...">
-        </div>
-    </div>
-    
     <!-- Categories Section -->
-    <section class="categories" id="categories">
+    <section class="categories-section" id="categories">
         <div class="container">
             <h2 class="section-title">Shop By Category</h2>
-            <div class="category-grid">
-                
+            <div class="categories-grid">
                 <div class="category-card" data-category="phones">
                     <div class="category-icon">
                         <i class="fas fa-mobile-alt"></i>
                     </div>
                     <h3>Phones</h3>
-                    <p>50+ items</p>
+                    <p class="item-count">10+ items</p>
                 </div>
-
                 <div class="category-card" data-category="accessories">
                     <div class="category-icon">
                         <i class="fas fa-headphones"></i>
                     </div>
                     <h3>Phone Accessories</h3>
-                    <p>100+ items</p>
+                    <p class="item-count">20+ items</p>
                 </div>
-
                 <div class="category-card" data-category="laptops">
                     <div class="category-icon">
                         <i class="fas fa-laptop"></i>
                     </div>
                     <h3>Laptops</h3>
-                    <p>10+ items</p>
+                    <p class="item-count">10+ items</p>
                 </div>
-
                 <div class="category-card" data-category="games">
                     <div class="category-icon">
                         <i class="fas fa-gamepad"></i>
                     </div>
                     <h3>Games</h3>
-                    <p>20+ items</p>
+                    <p class="item-count">20+ items</p>
                 </div>
-
                 <div class="category-card" data-category="speakers">
                     <div class="category-icon">
                         <i class="fas fa-volume-up"></i>
                     </div>
                     <h3>Speaker</h3>
-                    <p>15+ items</p>
+                    <p class="item-count">15+ items</p>
                 </div>
-
                 <div class="category-card" data-category="watches">
                     <div class="category-icon">
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style="display:inline-block; vertical-align:middle;">
-                            <path d="M16 2H8C7.44772 2 7 2.44772 7 3V4H17V3C17 2.44772 16.5523 2 16 2Z" />
-                            <path fill-rule="evenodd" clip-rule="evenodd" d="M18 6H6C4.89543 6 4 6.89543 4 8V16C4 17.1046 4.89543 18 6 18H18C19.1046 18 20 17.1046 20 16V8C20 6.89543 19.1046 6 18 6ZM12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" />
-                            <path d="M8 22H16C16.5523 22 17 21.5523 17 21V20H7V21C7 21.5523 7.44772 22 8 22Z" />
-                        </svg>
+                        <i class="fas fa-clock"></i>
                     </div>
                     <h3>Watches</h3>
-                    <p>60+ items</p>
+                    <p class="item-count">60+ items</p>
                 </div>
+            </div>
+        </div>
+    </section>
 
+    <!-- Search Section -->
+    <section class="search-section" id="search-section">
+        <div class="container">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="Search for products...">
             </div>
         </div>
     </section>
 
     <!-- Products Section -->
-    <section class="products" id="products">
+    <section class="products-section" id="products">
         <div class="container">
             <h2 class="section-title">Featured Products</h2>
             
-            <div class="filters">
-                <button class="filter-btn active" data-category="all">All Products</button>
-                <button class="filter-btn" data-category="phones">Phones</button>
-                <button class="filter-btn" data-category="accessories">Phone Accessories</button>
-                <button class="filter-btn" data-category="laptops">Laptops</button>
-                <button class="filter-btn" data-category="games">Games</button>
-                <button class="filter-btn" data-category="speakers">Speakers</button>
-                <button class="filter-btn" data-category="watches">Watches</button>
+            <!-- Product Filters -->
+            <div class="product-filters">
+                <button class="filter-btn active" data-filter="all">All Products</button>
+                <button class="filter-btn" data-filter="phones">Phones</button>
+                <button class="filter-btn" data-filter="accessories">Phone Accessories</button>
+                <button class="filter-btn" data-filter="laptops">Laptops</button>
+                <button class="filter-btn" data-filter="games">Games</button>
+                <button class="filter-btn" data-filter="speakers">Speakers</button>
+                <button class="filter-btn" data-filter="watches">Watches</button>
             </div>
-            
+
+            <!-- Loading State -->
+            <div class="loading-state" id="loadingState">
+                <div class="spinner"></div>
+                <p>Loading products...</p>
+            </div>
+
+            <!-- Products Grid -->
             <div class="products-grid" id="productsGrid">
-                <!-- Products will be dynamically loaded here -->
+                <!-- Products will be loaded here dynamically -->
+            </div>
+
+            <!-- No Products Message -->
+            <div class="no-products" id="noProducts" style="display: none;">
+                <i class="fas fa-box-open"></i>
+                <p>No products found</p>
             </div>
         </div>
     </section>
-  
+
     <!-- Cart Modal -->
-    <div id="cartModal" class="modal">
+    <div class="modal" id="cartModal">
         <div class="modal-content">
-            <span class="close" id="closeCartModal">&times;</span>
-            <h2>Your Cart</h2>
-            
-            <div id="cartItems" class="cart-items">
-                <!-- Cart items will be dynamically loaded here -->
+            <div class="modal-header">
+                <h2>Shopping Cart</h2>
+                <button class="close-btn" onclick="closeCartModal()">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-            
-            <div class="shipping-section">
-                <h3><i class="fas fa-shipping-fast"></i> Contact & Shipping Info <span style="color: red;">*</span></h3>
-
-                <div class="form-group">
-                    <label for="customerName">
-                        <i class="fas fa-user"></i> Full Name
-                    </label>
-                    <input 
-                        type="text" 
-                        id="customerName" 
-                        class="form-input" 
-                        placeholder="e.g. John Doe" 
-                        autocomplete="name"
-                        required>
-                    <small id="nameError" class="error-msg"></small>
-                </div>
-
-                <div class="form-group">
-                    <label for="customerEmail">
-                        <i class="fas fa-envelope"></i> Email Address
-                    </label>
-                    <input 
-                        type="email" 
-                        id="customerEmail" 
-                        class="form-input" 
-                        placeholder="e.g. john@example.com" 
-                        autocomplete="email"
-                        required>
-                    <small id="emailError" class="error-msg"></small>
-                    <small class="helper-text">We'll send your receipt and delivery updates here.</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="customerPhone">
-                        <i class="fas fa-phone-alt"></i> Phone Number
-                    </label>
-                    <input 
-                        type="tel" 
-                        id="customerPhone" 
-                        class="form-input" 
-                        placeholder="e.g. 08031234567" 
-                        autocomplete="tel"
-                        required>
-                    <small id="phoneError" class="error-msg"></small>
-                    <small class="helper-text">For delivery coordination (whatsapp number).</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="shippingState">
-                        <i class="fas fa-map-marker-alt"></i> Shipping State
-                    </label>
-                    <select 
-                        id="shippingState" 
-                        class="form-select" 
-                        required>
-                        <option value="">📍 Select Your State</option>
-                        <option value="1500">Ondo State — ₦1,500</option>
-                        <option value="3000">Lagos — ₦3,000</option>
-                        <option value="3000">Osun — ₦3,000</option>
-                        <option value="2000">Ekiti — ₦2,000</option>
-                        <option value="3000">Oyo — ₦3,000</option>
-                        <option value="3000">Kogi — ₦3,000</option>
-                        <option value="3000">Kwara — ₦3,000</option>
-                    </select>
-                    <small class="helper-text">Delivery fee depends on your location.</small>
-                </div>
-            </div> 
-            
-            <div class="cart-summary">
-                <div class="cart-total-section">
-                    <div class="subtotal-row">
-                        <span>Subtotal:</span>
-                        <span id="cartSubTotal">₦0.00</span>
-                    </div>
-                    <div class="shipping-row">
-                        <span>Shipping Fee:</span>
-                        <span id="shippingFeeAmount">₦0.00</span>
-                    </div>
-                </div>
-                
-                <div class="cart-total grand-total-row">
-                    <strong>Total: <span id="cartTotal">₦0.00</span></strong>
-                </div>
-                
-                <div class="cart-actions">
-                    <button id="checkoutButton" class="btn btn-tertiary">
-                        <i class="fas fa-credit-card"></i> Proceed to Checkout
-                    </button>
-                    <button id="continueShoppingButton" class="btn btn-secondary">
-                        Continue Shopping
-                    </button>
-                </div>
+            <div class="modal-body" id="cartItems">
+                <!-- Cart items will be loaded here -->
             </div>
+            <div class="modal-footer">
+                <div class="cart-total">
+                    <span>Total:</span>
+                    <span id="cartTotal">₦0.00</span>
+                </div>
+                <button class="btn btn-primary btn-block">Checkout</button>
+            </div>
+        </div>
+    </div>
 
+    <!-- Product Detail Modal -->
+    <div class="modal" id="productModal">
+        <div class="modal-content modal-large">
+            <button class="close-btn" onclick="closeProductModal()">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="product-detail" id="productDetail">
+                <!-- Product details will be loaded here -->
+            </div>
         </div>
     </div>
 
     <!-- Footer -->
-    <footer>
+    <footer class="footer">
         <div class="container">
             <div class="footer-content">
-                <div class="footer-column">
+                <div class="footer-section">
                     <h3>FortuneHub</h3>
-                    <p>Your one-stop destination for all your shopping needs. Quality products at affordable prices.</p>
-                    <div class="social-links">
-                        <a href="#" class="social-btn facebook">
-                            <i class="fab fa-facebook-f"></i>
-                        </a>
-                        
-                        <a href="#" class="social-btn instagram">
-                            <i class="fab fa-instagram"></i>
-                        </a>
-                        
-                        <a href="#" class="social-btn twitter">
-                            <i class="fab fa-x-twitter"></i>
-                        </a>
-                        
-                        <a href="#" class="social-btn whatsapp">
-                            <i class="fab fa-whatsapp"></i>
-                        </a>
+                    <p>Your trusted online marketplace for quality products at competitive prices.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="#home">Home</a></li>
+                        <li><a href="#products">Products</a></li>
+                        <li><a href="#about">About</a></li>
+                        <li><a href="#contact">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contact Us</h4>
+                    <ul>
+                        <li><i class="fas fa-envelope"></i> <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2841464e47684e475a5c5d464d405d4a064b4745">[email&#160;protected]</a></li>
+                        <li><i class="fas fa-phone"></i> +234 123 456 7890</li>
+                        <li><i class="fas fa-map-marker-alt"></i> Lagos, Nigeria</li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Follow Us</h4>
+                    <div class="social-icons">
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-linkedin"></i></a>
                     </div>
                 </div>
-                
-                <div class="footer-column">
-                    <h3>Quick Links</h3>
-                    <ul class="footer-links">
-                        <li><a href="#">Home</a></li>
-                        <li><a href="#products">Products</a></li>
-                        <li><a href="#categories">Categories</a></li>
-                    </ul>
-                </div>
-                
-                <div class="footer-column">
-                    <h3>Customer Service</h3>
-                    <ul class="footer-links">
-                        <li><a href="#">Contact Us</a></li>
-                        <li><a href="#">FAQs</a></li>
-                        <li><a href="#">Shipping Policy</a></li>
-                        <li><a href="#">Returns & Refunds</a></li>
-                        <li><a href="#">Privacy Policy</a></li>
-                    </ul>
-                </div>
-                
-                <div class="footer-column">
-                    <h3>Contact Info</h3>
-                    <ul class="footer-links">
-                        <li><i class="fas fa-map-marker-alt"></i> 123 Condolence street, Lagos</li>
-                        <li><i class="fas fa-phone"></i> +234Xxxxxxxx</li>
-                        <li><i class="fas fa-envelope"></i> <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="fe8d8b8e8e918c8abe98918c8a8b909b968b9cd09d9193">[email&#160;protected]</a></li>
-                    </ul>
-                </div>
             </div>
-            
-            <div class="copyright">
-                <p>&copy; 2026 Fortunehub. All rights reserved.</p>
+            <div class="footer-bottom">
+                <p>&copy; 2026 FortuneHub. All rights reserved.</p>
             </div>
         </div>
     </footer>
 
-    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="https://js.paystack.co/v1/inline.js"></script>
-    <script src="script.js"></script>
-
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="script.js"></script>
 </body>
-                            </html>
-                            
+</html>
