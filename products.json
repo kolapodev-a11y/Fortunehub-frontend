@@ -2,7 +2,7 @@
   {
     "id": 1,
     "name": "Wireless Bluetooth Headphones",
-    "price": 5999900,
+    "price": 59999.00,
     "category": "accessories",
     "description": "Premium wireless headphones with noise cancellation, 30-hour battery life, and superior sound quality.",
     "image": "images/product1.jpg",
@@ -15,7 +15,7 @@
   {
     "id": 2,
     "name": "Iphone 14 Pro Max",
-    "price": 59999000,
+    "price": 599990.00,
     "category": "phones",
     "description": "The latest flagship phone with a stunning display and 5G capability.",
     "image": "images/product2.jpg",
@@ -28,7 +28,7 @@
   {
     "id": 3,
     "name": "Super Fast Charger",
-    "price": 2499900,
+    "price": 24999.00,
     "category": "accessories",
     "description": "30W USB-C fast charger compatible with all modern smartphones.",
     "image": "images/product3.jpg",
@@ -41,7 +41,7 @@
   {
     "id": 4,
     "name": "Gaming Laptop X1",
-    "price": 95000000,
+    "price": 950000.00,
     "category": "laptops",
     "description": "High-performance laptop for professional gaming and content creation.",
     "image": "images/product4.jpg",
@@ -54,7 +54,7 @@
   {
     "id": 5,
     "name": "Portable Bluetooth Speaker",
-    "price": 4500000,
+    "price": 45000.00,
     "category": "speakers",
     "description": "Loud and clear portable speaker with waterproof rating.",
     "image": "images/product5.jpg",
@@ -67,7 +67,7 @@
   {
     "id": 6,
     "name": "Smart Watch Series 7",
-    "price": 7000000,
+    "price": 70000.00,
     "category": "watches",
     "description": "Feature-rich smartwatch with health monitoring.",
     "image": "images/product6.jpg",
@@ -80,7 +80,7 @@
   {
     "id": 7,
     "name": "Playstation Portal",
-    "price": 34000000,
+    "price": 340000.00,
     "category": "games",
     "description": "Sony PlayStation Portal Remote Player - PlayStation 5",
     "image": "images/product7.jpg",
@@ -93,7 +93,7 @@
   {
     "id": 8,
     "name": "Wireless Bluetooth Headphones (Budget)",
-    "price": 2000000,
+    "price": 20000.00,
     "category": "accessories",
     "description": "Affordable wireless headphones with 20-hour battery life.",
     "image": "images/product8.jpg",
