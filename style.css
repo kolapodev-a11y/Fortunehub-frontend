@@ -433,10 +433,10 @@ header {
     color: white;
 }
 
-/* Product Grid Layout */
+/* ✅ Product Grid Layout (UPDATED for 4 per row desktop, 2 per row mobile) */
 .products-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(4, 1fr); /* desktop default */
     gap: 30px;
     max-width: 1200px;
     margin: 0 auto;
@@ -457,10 +457,7 @@ header {
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
 }
 
-/* ==============================
-   PRODUCT IMAGE SLIDER (3 IMAGES) - FIXED
-   ============================== */
-
+/* PRODUCT IMAGE SLIDER */
 .product-image-slider {
     position: relative;
     width: 100%;
@@ -473,7 +470,6 @@ header {
     margin-bottom: 15px;
 }
 
-/* Main Product Image */
 .product-main-img {
     width: 100%;
     height: 170px;
@@ -482,7 +478,6 @@ header {
     padding: 10px;
 }
 
-/* Thumbnails Strip */
 .product-thumbnails {
     display: flex;
     justify-content: center;
@@ -492,7 +487,6 @@ header {
     border-top: 1px solid #eee;
 }
 
-/* Individual Thumbnail */
 .product-thumbnails .thumb {
     width: 50px;
     height: 50px;
@@ -516,7 +510,6 @@ header {
     transform: scale(1.05);
 }
 
-/* Badge stays on top of main image */
 .product-badge {
     position: absolute;
     top: 10px;
@@ -581,7 +574,7 @@ header {
     gap: 10px;
 }
 
-/* Cart Modal - FIXED FOR WIDER LAYOUT */
+/* Cart Modal */
 .modal {
     display: none;
     position: fixed;
@@ -639,7 +632,7 @@ header {
     color: #000;
 }
 
-/* Cart Items - IMPROVED LAYOUT */
+/* Cart Items */
 .cart-items {
     max-height: 400px;
     overflow-y: auto;
@@ -857,23 +850,48 @@ header {
     margin-top: 4px;
 }
 
-/* Footer */
-footer {
+/* ✅ UPDATED PROFESSIONAL FOOTER (keeps your colors) */
+.site-footer {
     background: var(--dark);
-    color: white;
-    padding: 50px 0 20px;
+    color: #e9ecef;
+    padding: 56px 0 22px;
 }
 
-.footer-content {
+.footer-top {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 30px;
-    margin-bottom: 30px;
+    grid-template-columns: 1.3fr 1fr 1fr 1fr;
+    gap: 28px;
+    margin-bottom: 28px;
+}
+
+.footer-logo {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: #1D2386;
+    display: inline-block;
+    margin-bottom: 10px;
+}
+
+.footer-logo span {
+    color: #BA1921;
+}
+
+.footer-desc {
+    color: #adb5bd;
+    max-width: 360px;
+    font-size: 0.98rem;
+    line-height: 1.7;
+}
+
+.footer-social {
+    display: flex;
+    gap: 12px;
+    margin-top: 18px;
 }
 
 .footer-column h3 {
-    font-size: 1.3rem;
-    margin-bottom: 20px;
+    font-size: 1.15rem;
+    margin-bottom: 14px;
     position: relative;
     padding-bottom: 10px;
     color: #1D2386;
@@ -884,7 +902,7 @@ footer {
     position: absolute;
     bottom: 0;
     left: 0;
-    width: 40px;
+    width: 38px;
     height: 3px;
     background: #BA1921;
 }
@@ -904,29 +922,54 @@ footer {
     transform: translateX(5px);
 }
 
-.social-links {
+.footer-contact {
+    display: grid;
+    gap: 10px;
+}
+
+.footer-contact li {
     display: flex;
-    gap: 15px;
-    margin-top: 20px;
+    align-items: flex-start;
+    gap: 10px;
+    color: #adb5bd;
+}
+
+.footer-contact i {
+    color: #BA1921;
+    margin-top: 3px;
+    min-width: 18px;
+}
+
+.footer-mini-note {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #adb5bd;
+    font-size: 0.95rem;
+}
+
+.footer-mini-note i {
+    color: #1D2386;
 }
 
 .social-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 45px;
-    height: 45px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
     text-decoration: none;
     transition: all 0.3s ease;
 }
 
 .social-btn i {
-    font-size: 20px;
+    font-size: 18px;
 }
 
 .social-btn.facebook { background-color: #1877F2; color: white; }
-.social-btn.instagram { 
+.social-btn.instagram {
     background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%);
     color: white;
 }
@@ -935,24 +978,72 @@ footer {
 
 .social-btn:hover {
     transform: translateY(-5px);
-    filter: brightness(1.1);
+    filter: brightness(1.08);
 }
 
-.copyright {
-    text-align: center;
-    padding-top: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+.footer-bottom {
+    padding-top: 18px;
+    border-top: 1px solid rgba(255, 255, 255, 0.10);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.footer-bottom p {
+    margin: 0;
     color: #adb5bd;
-    font-size: 0.9rem;
+    font-size: 0.92rem;
+}
+
+.footer-bottom-links {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #adb5bd;
+    font-size: 0.92rem;
+}
+
+.footer-bottom-links a {
+    color: #adb5bd;
+    transition: var(--transition);
+}
+
+.footer-bottom-links a:hover {
+    color: #fff;
+}
+
+.footer-bottom-links .dot {
+    opacity: 0.45;
 }
 
 /* ==============================
-   RESPONSIVE DESIGN - FIXED
+   RESPONSIVE DESIGN (UPDATED GRID RULES)
    ============================== */
+
+@media (max-width: 1200px) {
+    .footer-top {
+        grid-template-columns: 1.2fr 1fr 1fr;
+    }
+    .footer-top .footer-column:last-child {
+        grid-column: 1 / -1;
+    }
+}
 
 @media (max-width: 992px) {
     .category-grid {
         grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* medium screens: 3 per row */
+    .products-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 22px;
+    }
+
+    .footer-top {
+        grid-template-columns: 1fr 1fr;
     }
 }
 
@@ -960,11 +1051,11 @@ footer {
     .nav-links {
         display: none;
     }
-    
+
     .hero h1 {
         font-size: 2.5rem;
     }
-    
+
     .modal-content {
         width: 95%;
         max-width: 550px;
@@ -987,9 +1078,10 @@ footer {
         margin-top: 10px;
     }
 
+    /* ✅ Mobile requirement: 2 per row */
     .products-grid {
         grid-template-columns: repeat(2, 1fr);
-        gap: 20px;
+        gap: 18px;
     }
 
     .category-grid {
@@ -1031,64 +1123,6 @@ footer {
     .category-card p {
         font-size: 0.8rem;
     }
-}
 
-@media (max-width: 480px) {
-    .hero h1 {
-        font-size: 2rem;
-    }
-    
-    .section-title {
-        font-size: 1.8rem;
-    }
-    
-    .product-actions {
-        flex-direction: column;
-    }
-    
-    .btn {
-        width: 100%;
-        padding: 10px;
-        font-size: 1rem;
-    }
-    
-    .modal-content {
-        width: 95%;
-        max-width: 480px;
-        padding: 15px;
-    }
-    
-    .item-info h4 {
-        font-size: 1rem;
-    }
-    
-    .hero-btns {
-        max-width: 100%;
-    }
-    
-    .item-details {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .products-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .product-image-slider {
-        height: 200px;
-    }
-
-    .product-main-img {
-        height: 150px;
-    }
-
-    .product-thumbnails {
-        gap: 4px;
-    }
-
-    .product-thumbnails .thumb {
-        width: 35px;
-        height: 35px;
-    }
-}
+    .footer-top {
+        grid-tem
