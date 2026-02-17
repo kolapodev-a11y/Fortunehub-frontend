@@ -1,5 +1,6 @@
 // ===================================================
 // FortuneHub Frontend Script - FIXED + GitHub Pages Image Path Fix
+// (Updated for Render backend + Postgres JSON products)
 // ===================================================
 
 // ------------------------------
@@ -96,6 +97,11 @@ function updateCartUI() {
     cartItemsContainer.innerHTML =
       '<p style="text-align:center;color:#555;">Your cart is empty.</p>';
     if (checkoutButton) checkoutButton.disabled = true;
+
+    if (cartSubTotalElement) cartSubTotalElement.textContent = formatCurrency(0);
+    if (shippingFeeAmountElement) shippingFeeAmountElement.textContent = formatCurrency(0);
+    if (cartTotalElement) cartTotalElement.textContent = formatCurrency(0);
+
     return;
   }
 
@@ -502,12 +508,30 @@ function initiatePaystackPayment() {
     key: PAYSTACK_PUBLIC_KEY,
     email,
     amount: totalKobo,
+
+    // ✅ UPDATED METADATA (JSON products + shipping info)
     metadata: {
       customer_name: name,
       customer_email: email,
       customer_phone: phone,
+
+      shipping_state:
+        shippingStateSelect.options[shippingStateSelect.selectedIndex]?.text || "",
+      shipping_fee: shippingFeeNaira, // NAIRA
+
+      // Improved schema: JSON products
+      products: cart.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price, // KOBO
+        quantity: item.quantity,
+        image: item.image,
+      })),
+
+      // Keep cart_items too
       cart_items: cart,
     },
+
     callback: function (response) {
       fetch(`${API_BASE_URL}/api/verify-payment`, {
         method: "POST",
@@ -516,8 +540,10 @@ function initiatePaystackPayment() {
       })
         .then((r) => r.json())
         .then((data) => {
-          if (data.message && data.message.toLowerCase().includes("email sent")) {
+          // ✅ FIXED SUCCESS CHECK
+          if (data && (data.reference || data.orderId)) {
             alert("✅ Order placed! We'll contact you shortly.");
+
             cart = [];
             localStorage.setItem("cart", JSON.stringify(cart));
 
@@ -529,7 +555,10 @@ function initiatePaystackPayment() {
             updateCartUI();
             closeCartModal();
           } else {
-            alert("⚠️ Payment verification response received. Please confirm with support if needed.");
+            console.log("verify-payment response:", data);
+            alert(
+              "⚠️ Payment verification response received. Please confirm with support if needed."
+            );
           }
         })
         .catch((err) => {
@@ -565,4 +594,4 @@ async function initializeApp() {
 }
 
 document.addEventListener("DOMContentLoaded", initializeApp);
-  
+    
