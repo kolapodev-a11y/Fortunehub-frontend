@@ -203,6 +203,7 @@ img { max-width: 100%; display: block; }
   align-items: center;
   padding: 14px 0;
   gap: 12px;
+  font-size: 20px
 }
 
 .logo {
