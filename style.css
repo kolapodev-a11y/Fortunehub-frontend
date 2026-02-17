@@ -186,6 +186,29 @@ html {
     background: #BA1921;
     border-radius: 2px;
 }
+/* ---------------------------
+   FIX: Filter buttons "double hover" / sticky hover look
+   --------------------------- */
+.filters {
+  position: relative;
+}
+
+.filter-btn {
+  position: relative;
+  z-index: 0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.filter-btn:hover,
+.filter-btn:focus {
+  z-index: 2; /* hovered button sits above neighbors */
+}
+
+.filter-btn:focus-visible {
+  outline: 2px solid rgba(29, 35, 134, 0.35);
+  outline-offset: 2px;
+}
 
 /* Header Styles */
 header {
