@@ -204,14 +204,14 @@
                         id="shippingState" 
                         class="form-select" 
                         required>
-                        <option value="">📍 Select Your State</option>
-                        <option value="1500">Ondo State — ₦1,500</option>
-                        <option value="3000">Lagos — ₦3,000</option>
-                        <option value="3000">Osun — ₦3,000</option>
-                        <option value="2000">Ekiti — ₦2,000</option>
-                        <option value="3000">Oyo — ₦3,000</option>
-                        <option value="3000">Kogi — ₦3,000</option>
-                        <option value="3000">Kwara — ₦3,000</option>
+                        <option value=""> Select Your State</option>
+                        <option value="1500">Ondo State  1,500</option>
+                        <option value="3000">Lagos  3,000</option>
+                        <option value="3000">Osun  3,000</option>
+                        <option value="2000">Ekiti  2,000</option>
+                        <option value="3000">Oyo  3,000</option>
+                        <option value="3000">Kogi  3,000</option>
+                        <option value="3000">Kwara  3,000</option>
                     </select>
                     <small class="helper-text">Delivery fee depends on your location.</small>
                 </div>
@@ -221,16 +221,16 @@
                 <div class="cart-total-section">
                     <div class="subtotal-row">
                         <span>Subtotal:</span>
-                        <span id="cartSubTotal">₦0.00</span>
+                        <span id="cartSubTotal">0.00</span>
                     </div>
                     <div class="shipping-row">
                         <span>Shipping Fee:</span>
-                        <span id="shippingFeeAmount">₦0.00</span>
+                        <span id="shippingFeeAmount">0.00</span>
                     </div>
                 </div>
                 
                 <div class="cart-total grand-total-row">
-                    <strong>Total: <span id="cartTotal">₦0.00</span></strong>
+                    <strong>Total: <span id="cartTotal">0.00</span></strong>
                 </div>
                 
                 <div class="cart-actions">
@@ -246,70 +246,74 @@
         </div>
     </div>
 
-    <!-- Footer -->
-    <footer>
+    <!-- Footer (UPDATED PROFESSIONAL FOOTER) -->
+    <footer class="site-footer">
         <div class="container">
-            <div class="footer-content">
-                <div class="footer-column">
-                    <h3>FortuneHub</h3>
-                    <p>Your one-stop destination for all your shopping needs. Quality products at affordable prices.</p>
-                    <div class="social-links">
-                        <a href="#" class="social-btn facebook">
-                            <i class="fab fa-facebook-f"></i>
-                        </a>
-                        
-                        <a href="#" class="social-btn instagram">
-                            <i class="fab fa-instagram"></i>
-                        </a>
-                        
-                        <a href="#" class="social-btn twitter">
-                            <i class="fab fa-x-twitter"></i>
-                        </a>
-                        
-                        <a href="#" class="social-btn whatsapp">
-                            <i class="fab fa-whatsapp"></i>
-                        </a>
+            <div class="footer-top">
+                <div class="footer-brand">
+                    <a href="#" class="footer-logo">Fortune<span>Hub</span></a>
+                    <p class="footer-desc">
+                        Your one-stop destination for quality gadgets and accessories at affordable prices.
+                    </p>
+
+                    <div class="footer-social">
+                        <a href="#" class="social-btn facebook" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#" class="social-btn instagram" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="social-btn twitter" aria-label="X / Twitter"><i class="fab fa-x-twitter"></i></a>
+                        <a href="#" class="social-btn whatsapp" aria-label="WhatsApp"><i class="fab fa-whatsapp"></i></a>
                     </div>
                 </div>
-                
+
                 <div class="footer-column">
-                    <h3>Quick Links</h3>
+                    <h3>Shop</h3>
                     <ul class="footer-links">
-                        <li><a href="#">Home</a></li>
-                        <li><a href="#products">Products</a></li>
+                        <li><a href="#products">Featured Products</a></li>
                         <li><a href="#categories">Categories</a></li>
+                        <li><a href="#products">New Arrivals</a></li>
+                        <li><a href="#products">On Sale</a></li>
                     </ul>
                 </div>
-                
+
                 <div class="footer-column">
-                    <h3>Customer Service</h3>
+                    <h3>Support</h3>
                     <ul class="footer-links">
-                        <li><a href="#">Contact Us</a></li>
-                        <li><a href="#">FAQs</a></li>
+                        <li><a href="#cartModal" id="footerOpenCart">View Cart</a></li>
                         <li><a href="#">Shipping Policy</a></li>
                         <li><a href="#">Returns & Refunds</a></li>
                         <li><a href="#">Privacy Policy</a></li>
                     </ul>
                 </div>
-                
+
                 <div class="footer-column">
-                    <h3>Contact Info</h3>
-                    <ul class="footer-links">
-                        <li><i class="fas fa-map-marker-alt"></i> 123 Condolence street, Lagos</li>
-                        <li><i class="fas fa-phone"></i> +234Xxxxxxxx</li>
-                        <li><i class="fas fa-envelope"></i> <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="94e7e1e4e4fbe6e0d4f2fbe6e0e1faf1fce1f6baf7fbf9">[email&#160;protected]</a></li>
+                    <h3>Contact</h3>
+                    <ul class="footer-contact">
+                        <li><i class="fas fa-map-marker-alt"></i><span>123 Condolence street, Lagos</span></li>
+                        <li><i class="fas fa-phone"></i><span>+234Xxxxxxxx</span></li>
+                        <li><i class="fas fa-envelope"></i><span>support@fortunehub.com</span></li>
                     </ul>
+
+                    <div class="footer-mini-note">
+                        <i class="fas fa-clock"></i>
+                        <span>Mon–Sat: 9:00am – 6:00pm</span>
+                    </div>
                 </div>
             </div>
-            
-            <div class="copyright">
+
+            <div class="footer-bottom">
                 <p>&copy; 2025 Fortunehub. All rights reserved.</p>
+                <div class="footer-bottom-links">
+                    <a href="#products">Products</a>
+                    <span class="dot">•</span>
+                    <a href="#categories">Categories</a>
+                    <span class="dot">•</span>
+                    <a href="#">Terms</a>
+                </div>
             </div>
         </div>
     </footer>
 
-    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="https://js.paystack.co/v1/inline.js"></script>
+    <script src="https://js.paystack.co/v1/inline.js"></script>
     <script src="script.js"></script>
-
 </body>
-</html>
+                    </html>
+                    
