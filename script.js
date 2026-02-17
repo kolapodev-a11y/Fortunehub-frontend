@@ -1,5 +1,5 @@
 // ===================================================
-// FortuneHub Frontend Script - FIXED VERSION
+// FortuneHub Frontend Script - UPDATED (GitHub Pages image fix + layout + footer link)
 // ===================================================
 
 // ------------------------------
@@ -33,6 +33,9 @@ const categoryCards = document.querySelectorAll(".category-card");
 const cartIcon = document.getElementById("cartIcon");
 const searchIconBtn = document.getElementById("searchIcon");
 
+// Footer cart link (new)
+const footerOpenCart = document.getElementById("footerOpenCart");
+
 // Customer info fields
 const customerNameInput = document.getElementById("customerName");
 const customerEmailInput = document.getElementById("customerEmail");
@@ -59,19 +62,36 @@ function getProductById(id) {
 
 /**
  * ✅ GitHub Pages-safe URL to products.json
+ * Works on: https://kolapodev-a11y.github.io/Fortunehub-frontend/
  */
 function getProductsJsonUrl() {
   return new URL("products.json", window.location.href).toString();
 }
 
 /**
- * Resolve asset URLs for images
+ * ✅ IMPORTANT: Fix images for GitHub Pages project sites
+ * Your JSON uses "images/product1.jpg"
+ * On GitHub Pages project site, it must be resolved against the repo base URL:
+ * https://kolapodev-a11y.github.io/Fortunehub-frontend/images/product1.jpg
  */
+function getRepoBaseUrl() {
+  // Example path: /Fortunehub-frontend/ or /Fortunehub-frontend/index.html
+  const parts = window.location.pathname.split("/").filter(Boolean);
+  const repoName = parts.length ? parts[0] : "";
+  return `${window.location.origin}/${repoName}/`;
+}
+
 function resolveAssetUrl(path) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
-  if (path.startsWith("/")) return path;
-  return new URL(path, window.location.href).toString();
+
+  const base = getRepoBaseUrl();
+
+  // If already absolute-from-root like "/Fortunehub-frontend/images/..", keep it
+  if (path.startsWith("/")) return `${window.location.origin}${path}`;
+
+  // Otherwise resolve relative to repo base
+  return new URL(path, base).toString();
 }
 
 // ------------------------------
@@ -305,7 +325,7 @@ function displayProducts(productsToShow) {
       isDisabled = "disabled";
     }
 
-    // Images: prefer product.images[0..2]
+    // Images
     const imgs = Array.isArray(product.images) && product.images.length
       ? product.images.slice(0, 3)
       : [product.image, product.image, product.image];
@@ -320,7 +340,7 @@ function displayProducts(productsToShow) {
       <div class="product-card" data-category="${product.category}">
         <div class="product-image-slider" data-images='${JSON.stringify(images)}'>
           <img src="${images[0]}" alt="${product.name}" class="product-main-img">
-          
+
           <div class="product-thumbnails">
             <img src="${images[0]}" alt="1" class="thumb active" data-index="0">
             <img src="${images[1]}" alt="2" class="thumb" data-index="1">
@@ -382,18 +402,15 @@ function searchProducts(query) {
 // 7) EVENTS (use delegation to avoid duplicates)
 // ------------------------------
 function setupEventListeners() {
-  // ✅ FIXED: Search icon (top right) -> scroll to products section AND focus search input
+  // Search icon -> scroll to products + focus search
   if (searchIconBtn) {
     searchIconBtn.addEventListener("click", () => {
       const productsSection = document.getElementById("products");
-      const searchContainer = document.getElementById("search-container");
-      
-      // Scroll to products section
+
       if (productsSection) {
         productsSection.scrollIntoView({ behavior: "smooth", block: "start" });
       }
-      
-      // Wait a bit for scroll, then focus search input
+
       setTimeout(() => {
         if (searchInput) {
           searchInput.focus();
@@ -434,6 +451,11 @@ function setupEventListeners() {
 
   // Cart modal open/close
   cartIcon?.addEventListener("click", openCartModal);
+  footerOpenCart?.addEventListener("click", (e) => {
+    e.preventDefault();
+    openCartModal();
+  });
+
   closeModal?.addEventListener("click", closeCartModal);
   continueShoppingButton?.addEventListener("click", closeCartModal);
 
@@ -461,21 +483,18 @@ function setupEventListeners() {
   // Checkout
   checkoutButton?.addEventListener("click", initiatePaystackPayment);
 
-  // ✅ Product grid delegation:
-  // - add to cart
-  // - buy now
-  // - thumbnail click swap image
+  // Product grid delegation:
   productsGrid?.addEventListener("click", (e) => {
     const target = e.target;
 
-    // Add to cart button
+    // Add to cart
     if (target?.classList?.contains("add-to-cart")) {
       const id = parseInt(target.dataset.id, 10);
       addToCart(id);
       return;
     }
 
-    // Buy now button
+    // Buy now
     if (target?.classList?.contains("buy-now")) {
       const id = parseInt(target.dataset.id, 10);
       addToCart(id, 1);
@@ -508,7 +527,6 @@ function openCartModal() {
     cartModal.style.display = "block";
     updateCartUI();
 
-    // Smart focus
     if (customerNameInput && !customerNameInput.value) customerNameInput.focus();
     else if (customerEmailInput && !customerEmailInput.value) customerEmailInput.focus();
   }
@@ -531,54 +549,12 @@ function initiatePaystackPayment() {
   const email = (customerEmailInput?.value || "").trim();
   const phone = (customerPhoneInput?.value || "").trim();
 
-  // Strong validation
-  if (!name || name.length < 3 || name.includes("@") || name.includes(".")) {
-    alert("Please enter your real full name (not email).");
-    customerNameInput?.focus();
-    return;
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!email || !emailRegex.test(email)) {
-    alert("Please enter a valid email address.");
-    customerEmailInput?.focus();
-    return;
-  }
-
-  const phoneRegex = /^(0[789][01])\d{8}$/;
-  if (!phone || !phoneRegex.test(phone)) {
-    alert("Please enter a valid Nigerian WhatsApp number (e.g., 08031234567).");
-    customerPhoneInput?.focus();
-    return;
-  }
-
-  if (!validateCustomerInfo()) {
-    alert("Please complete all required shipping information.");
-    return;
-  }
-
-  const stateOption = shippingStateSelect.options[shippingStateSelect.selectedIndex];
-  const shippingState = (stateOption?.textContent?.split("—")[0]?.trim() || "Unknown");
-  const shippingFeeNaira = parseInt(shippingStateSelect.value, 10) || 0;
-
-  const productNames = cart.map((item) => item.name).join(", ") || "Products";
+  if (!name || name.length  item.name).join(", ") || "Products";
   const subtotalKobo = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shippingKobo = shippingFeeNaira * 100;
   const totalKobo = subtotalKobo + shippingKobo;
 
-  if (!Number.isFinite(totalKobo) || totalKobo <= 0) {
-    alert("Invalid payment amount. Please try again.");
-    return;
-  }
-
-  const safeMeta = {
-    customer_name: name,
-    customer_email: email,
-    customer_phone: phone,
-    shipping_state: shippingState,
-    shipping_fee: shippingFeeNaira,
-    products: productNames,
-    cart_items: cart.map((item) => ({
+  if (!Number.isFinite(totalKobo) || totalKobo  ({
       id: item.id || 0,
       name: item.name || "Unknown Item",
       price: item.price || 0,
@@ -593,7 +569,7 @@ function initiatePaystackPayment() {
     amount: totalKobo,
     metadata: safeMeta,
     callback: function (response) {
-      fetch(`${API_BASE_URL}/api/verify-payment`, {
+      fetch(${API_BASE_URL}/api/verify-payment, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ reference: response.reference }),
@@ -640,17 +616,11 @@ function initiatePaystackPayment() {
 // 10) APP INIT
 // ------------------------------
 async function initializeApp() {
-  console.log("🚀 Initializing FortuneHub...");
-  
   try {
     const url = getProductsJsonUrl();
-    console.log("📦 Fetching products from:", url);
-    
     const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    
+    if (!response.ok) throw new Error(HTTP ${response.status});
     products = await response.json();
-    console.log("✅ Loaded", products.length, "products");
   } catch (e) {
     console.error("❌ Failed to load products.json:", e);
     products = [];
@@ -659,8 +629,6 @@ async function initializeApp() {
   displayProducts(products);
   setupEventListeners();
   updateCartUI();
-  
-  console.log("✅ FortuneHub initialized!");
 }
 
 document.addEventListener("DOMContentLoaded", initializeApp);
