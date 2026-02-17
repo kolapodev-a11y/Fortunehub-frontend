@@ -1124,28 +1124,53 @@ header {
         height: 40px;
     }
 }
-
 @media (max-width: 576px) {
+    /* Category Grid: Keep 2 per row but reduce gap for small screens */
     .category-grid {
         grid-template-columns: repeat(2, 1fr);
-        gap: 15px;
+        gap: 12px;
     }
 
     .category-card {
-        padding: 20px 10px;
+        padding: 15px 8px;
     }
 
-    .category-icon {
-        font-size: 2rem;
+    /* Hero Section: Scaling down text so it doesn't overlap the logo/buttons */
+    .hero h1 {
+        font-size: 1.8rem; /* Adjusted from 2.5rem */
+        line-height: 1.2;
     }
 
-    .category-card h3 {
-        font-size: 0.95rem;
+    .hero p {
+        font-size: 0.9rem;
+        padding: 0 10px;
     }
 
-    .category-card p {
-        font-size: 0.8rem;
-    }
-
+    /* Footer: Force single column for readability on narrow phones */
     .footer-top {
-        grid-tem
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+        text-align: left; /* Align left to match your brand style */
+    }
+
+    /* Adjusting Product Grid for very small screens */
+    .products-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    /* Buttons: Make them easier to tap */
+    .hero-btns {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        padding: 0 20px;
+        gap: 10px;
+    }
+
+    .hero-btns .btn {
+        width: 100%;
+        margin: 0;
+    }
+}
