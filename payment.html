@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Make Payment - FortuneHub</title>
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .payment-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .payment-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .payment-header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .payment-header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .payment-body {
+            padding: 40px 30px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .amount-display {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .amount-display .label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .amount-display .amount {
+            font-size: 36px;
+            font-weight: bold;
+        }
+
+        .pay-button {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .pay-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .pay-button:active {
+            transform: translateY(0);
+        }
+
+        .pay-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .security-note {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .security-note svg {
+            width: 16px;
+            height: 16px;
+            vertical-align: middle;
+            margin-right: 5px;
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c00;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            font-size: 14px;
+        }
+
+        @media (max-width: 600px) {
+            .payment-header h1 {
+                font-size: 24px;
+            }
+            
+            .amount-display .amount {
+                font-size: 28px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="payment-container">
+        <div class="payment-header">
+            <h1>💳 Make Payment</h1>
+            <p>Secure payment powered by Paystack</p>
+        </div>
+
+        <div class="payment-body">
+            <div class="error-message" id="errorMessage"></div>
+
+            <form id="paymentForm">
+                <div class="form-group">
+                    <label for="email">Email Address *</label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        name="email" 
+                        placeholder="your@email.com" 
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="fullName">Full Name *</label>
+                    <input 
+                        type="text" 
+                        id="fullName" 
+                        name="fullName" 
+                        placeholder="John Doe" 
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="amount">Select Amount *</label>
+                    <select id="amount" name="amount" required>
+                        <option value="">-- Select Amount --</option>
+                        <option value="1000">₦1,000</option>
+                        <option value="2500">₦2,500</option>
+                        <option value="5000">₦5,000</option>
+                        <option value="10000">₦10,000</option>
+                        <option value="custom">Custom Amount</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="customAmountGroup" style="display: none;">
+                    <label for="customAmount">Enter Custom Amount (₦) *</label>
+                    <input 
+                        type="number" 
+                        id="customAmount" 
+                        name="customAmount" 
+                        placeholder="5000" 
+                        min="100"
+                    >
+                </div>
+
+                <div class="amount-display" id="amountDisplay" style="display: none;">
+                    <div class="label">Amount to Pay</div>
+                    <div class="amount" id="displayAmount">₦0.00</div>
+                </div>
+
+                <button type="submit" class="pay-button" id="payButton">
+                    🔒 Pay with Paystack
+                </button>
+
+                <div class="security-note">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    Secured by Paystack • Your payment information is safe
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            paystackPublicKey: 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxx', // Replace with your Paystack public key
+            backendUrl: 'https://fortunehub-backend.onrender.com', // Replace with your backend URL
+            callbackUrl: 'https://kolapodev-a11y.github.io/Fortunehub-frontend/success.html' // Your success page
+        };
+
+        // DOM Elements
+        const form = document.getElementById('paymentForm');
+        const emailInput = document.getElementById('email');
+        const fullNameInput = document.getElementById('fullName');
+        const amountSelect = document.getElementById('amount');
+        const customAmountGroup = document.getElementById('customAmountGroup');
+        const customAmountInput = document.getElementById('customAmount');
+        const amountDisplay = document.getElementById('amountDisplay');
+        const displayAmount = document.getElementById('displayAmount');
+        const payButton = document.getElementById('payButton');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // Amount selection handler
+        amountSelect.addEventListener('change', function() {
+            const value = this.value;
+            
+            if (value === 'custom') {
+                customAmountGroup.style.display = 'block';
+                customAmountInput.required = true;
+                amountDisplay.style.display = 'none';
+            } else if (value) {
+                customAmountGroup.style.display = 'none';
+                customAmountInput.required = false;
+                amountDisplay.style.display = 'block';
+                displayAmount.textContent = `₦${parseInt(value).toLocaleString('en-NG', {
+                    minimumFractionDigits: 2
+                })}`;
+            } else {
+                customAmountGroup.style.display = 'none';
+                amountDisplay.style.display = 'none';
+            }
+        });
+
+        // Custom amount input handler
+        customAmountInput.addEventListener('input', function() {
+            const value = parseInt(this.value) || 0;
+            if (value > 0) {
+                amountDisplay.style.display = 'block';
+                displayAmount.textContent = `₦${value.toLocaleString('en-NG', {
+                    minimumFractionDigits: 2
+                })}`;
+            } else {
+                amountDisplay.style.display = 'none';
+            }
+        });
+
+        // Show error message
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            setTimeout(() => {
+                errorMessage.style.display = 'none';
+            }, 5000);
+        }
+
+        // Get final amount
+        function getFinalAmount() {
+            const selectedAmount = amountSelect.value;
+            if (selectedAmount === 'custom') {
+                return parseInt(customAmountInput.value) || 0;
+            }
+            return parseInt(selectedAmount) || 0;
+        }
+
+        // Form submission handler
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const email = emailInput.value.trim();
+            const fullName = fullNameInput.value.trim();
+            const amount = getFinalAmount();
+
+            // Validation
+            if (!email || !fullName) {
+                showError('Please fill in all required fields');
+                return;
+            }
+
+            if (amount < 100) {
+                showError('Amount must be at least ₦100');
+                return;
+            }
+
+            // Generate unique reference
+            const reference = `FH-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+            // Disable button
+            payButton.disabled = true;
+            payButton.textContent = 'Processing...';
+
+            // Initialize Paystack payment
+            const handler = PaystackPop.setup({
+                key: CONFIG.paystackPublicKey,
+                email: email,
+                amount: amount * 100, // Convert to kobo
+                currency: 'NGN',
+                ref: reference,
+                metadata: {
+                    custom_fields: [
+                        {
+                            display_name: "Customer Name",
+                            variable_name: "customer_name",
+                            value: fullName
+                        },
+                        {
+                            display_name: "Customer Email",
+                            variable_name: "customer_email",
+                            value: email
+                        }
+                    ]
+                },
+                callback: function(response) {
+                    console.log('Payment successful:', response);
+                    // Redirect to verification page
+                    window.location.href = `callback.html?reference=${response.reference}`;
+                },
+                onClose: function() {
+                    console.log('Payment window closed');
+                    payButton.disabled = false;
+                    payButton.textContent = '🔒 Pay with Paystack';
+                    showError('Payment cancelled. Please try again.');
+                }
+            });
+
+            handler.openIframe();
+        });
+
+        // Auto-fill email from URL parameter (if provided)
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlEmail = urlParams.get('email');
+        if (urlEmail) {
+            emailInput.value = urlEmail;
+        }
+    </script>
+</body>
+</html>

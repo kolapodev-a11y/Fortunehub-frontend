@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Verification - FortuneHub</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .callback-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+            padding: 50px 40px;
+            text-align: center;
+        }
+
+        .status-icon {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .status-icon.verifying {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .status-icon.success {
+            background: #10b981;
+        }
+
+        .status-icon.error {
+            background: #ef4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status-icon svg {
+            width: 60px;
+            height: 60px;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        p {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .payment-details {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 30px 0;
+            text-align: left;
+        }
+
+        .payment-details h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            color: #666;
+            font-weight: 600;
+        }
+
+        .detail-value {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .amount-value {
+            color: #667eea;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .redirect-message {
+            background: #e0e7ff;
+            color: #4f46e5;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: bold;
+            margin-top: 20px;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .error-details {
+            background: #fee;
+            color: #c00;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        @media (max-width: 600px) {
+            .callback-container {
+                padding: 40px 25px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .status-icon {
+                width: 80px;
+                height: 80px;
+            }
+
+            .status-icon svg {
+                width: 50px;
+                height: 50px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="callback-container">
+        <div id="verifyingState">
+            <div class="status-icon verifying">
+                <div class="spinner"></div>
+            </div>
+            <h1>Verifying Payment...</h1>
+            <p>Please wait while we confirm your payment with the payment provider.</p>
+            <p>This should only take a few seconds.</p>
+        </div>
+
+        <div id="successState" style="display: none;">
+            <div class="status-icon success">
+                <svg fill="none" stroke="white" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            <h1>✅ Payment Successful!</h1>
+            <p>Your payment has been confirmed and processed successfully.</p>
+
+            <div class="payment-details" id="paymentDetails">
+                <!-- Payment details will be inserted here -->
+            </div>
+
+            <div class="redirect-message">
+                <strong>📧 Email Confirmation</strong><br>
+                A confirmation email has been sent to your email address.
+            </div>
+
+            <p style="margin-top: 20px; font-size: 14px; color: #999;">
+                Redirecting to success page in <span id="countdown">5</span> seconds...
+            </p>
+
+            <a href="success.html" class="button" id="successButton">
+                Continue to Dashboard
+            </a>
+        </div>
+
+        <div id="errorState" style="display: none;">
+            <div class="status-icon error">
+                <svg fill="none" stroke="white" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </div>
+            <h1>❌ Payment Verification Failed</h1>
+            <p id="errorMessage">We couldn't verify your payment. Please try again.</p>
+
+            <div class="error-details" id="errorDetails" style="display: none;">
+                <!-- Error details will be inserted here -->
+            </div>
+
+            <a href="payment.html" class="button">
+                Try Again
+            </a>
+
+            <p style="margin-top: 20px; font-size: 14px; color: #666;">
+                If you've already paid and still see this error, please contact support with your reference number.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            backendUrl: 'https://fortunehub-backend.onrender.com', // Replace with your backend URL
+            successRedirectUrl: 'success.html',
+            redirectDelay: 5000 // 5 seconds
+        };
+
+        // Get reference from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const reference = urlParams.get('reference');
+
+        console.log('Payment reference:', reference);
+
+        // Verify payment
+        async function verifyPayment() {
+            if (!reference) {
+                showError('No payment reference found', 'Please check your payment confirmation email or try making a new payment.');
+                return;
+            }
+
+            try {
+                console.log('Verifying payment with backend...');
+                
+                const response = await fetch(
+                    `${CONFIG.backendUrl}/api/payment/verify?reference=${reference}`
+                );
+
+                const data = await response.json();
+                console.log('Verification response:', data);
+
+                if (data.success) {
+                    showSuccess(data.data, data.emailSent);
+                } else {
+                    showError(
+                        data.message || 'Payment verification failed',
+                        `Reference: ${reference}`
+                    );
+                }
+            } catch (error) {
+                console.error('Verification error:', error);
+                showError(
+                    'Connection Error',
+                    'Unable to connect to the server. Please check your internet connection and try again.'
+                );
+            }
+        }
+
+        // Show success state
+        function showSuccess(paymentData, emailSent) {
+            document.getElementById('verifyingState').style.display = 'none';
+            document.getElementById('successState').style.display = 'block';
+
+            // Display payment details
+            const detailsHtml = `
+                <h3>📋 Payment Details</h3>
+                <div class="detail-row">
+                    <span class="detail-label">Amount Paid:</span>
+                    <span class="detail-value amount-value">₦${parseFloat(paymentData.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Reference:</span>
+                    <span class="detail-value">${paymentData.reference}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Email:</span>
+                    <span class="detail-value">${paymentData.email}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Date:</span>
+                    <span class="detail-value">${new Date(paymentData.paymentDate).toLocaleString('en-NG')}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Status:</span>
+                    <span class="detail-value" style="color: #10b981; font-weight: bold;">✓ CONFIRMED</span>
+                </div>
+                ${!emailSent ? '<div style="margin-top: 15px; padding: 10px; background: #fff3cd; color: #856404; border-radius: 5px; font-size: 12px;">⚠️ Email notification may be delayed</div>' : ''}
+            `;
+
+            document.getElementById('paymentDetails').innerHTML = detailsHtml;
+
+            // Start countdown and redirect
+            startCountdown();
+        }
+
+        // Show error state
+        function showError(message, details) {
+            document.getElementById('verifyingState').style.display = 'none';
+            document.getElementById('errorState').style.display = 'block';
+            document.getElementById('errorMessage').textContent = message;
+
+            if (details) {
+                const errorDetailsEl = document.getElementById('errorDetails');
+                errorDetailsEl.textContent = details;
+                errorDetailsEl.style.display = 'block';
+            }
+        }
+
+        // Countdown and redirect
+        function startCountdown() {
+            let seconds = 5;
+            const countdownEl = document.getElementById('countdown');
+
+            const interval = setInterval(() => {
+                seconds--;
+                countdownEl.textContent = seconds;
+
+                if (seconds <= 0) {
+                    clearInterval(interval);
+                    window.location.href = CONFIG.successRedirectUrl;
+                }
+            }, 1000);
+
+            // Allow manual navigation
+            document.getElementById('successButton').addEventListener('click', () => {
+                clearInterval(interval);
+            });
+        }
+
+        // Start verification when page loads
+        window.addEventListener('DOMContentLoaded', verifyPayment);
+    </script>
+</body>
+</html>
