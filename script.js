@@ -1,5 +1,5 @@
 // ===================================================
-// FortuneHub Frontend Script - FIXED VERIFICATION ENDPOINT
+// FortuneHub Frontend Script - WITH PRODUCT DETAIL MODAL & IMAGE ZOOM
 // ===================================================
 
 // ------------------------------
@@ -7,6 +7,8 @@
 // ------------------------------
 let products = [];
 let cart = JSON.parse(localStorage.getItem("cart")) || [];
+let currentProduct = null;
+let zoomEnabled = false;
 
 const PAYSTACK_PUBLIC_KEY = "pk_test_9f6a5cb45aeab4bd8bccd72129beda47f2609921";
 const API_BASE_URL = "https://fortunehub-backend.onrender.com";
@@ -40,6 +42,23 @@ const shippingStateSelect = document.getElementById("shippingState");
 const nameError = document.getElementById("nameError");
 const emailError = document.getElementById("emailError");
 const phoneError = document.getElementById("phoneError");
+
+// Product Detail Modal Elements
+const productDetailModal = document.getElementById("productDetailModal");
+const closeProductModal = document.getElementById("closeProductModal");
+const detailMainImage = document.getElementById("detailMainImage");
+const detailThumbnails = document.getElementById("detailThumbnails");
+const detailCategory = document.getElementById("detailCategory");
+const detailTitle = document.getElementById("detailTitle");
+const detailPrice = document.getElementById("detailPrice");
+const detailBadge = document.getElementById("detailBadge");
+const detailDescription = document.getElementById("detailDescription");
+const detailSpecsList = document.getElementById("detailSpecsList");
+const detailAddCart = document.getElementById("detailAddCart");
+const detailBuyNow = document.getElementById("detailBuyNow");
+const zoomToggle = document.getElementById("zoomToggle");
+const zoomLens = document.getElementById("zoomLens");
+const zoomResult = document.getElementById("zoomResult");
 
 // ------------------------------
 // 3) HELPERS
@@ -246,7 +265,223 @@ function validateCustomerInfo({ silent = false } = {}) {
 }
 
 // ------------------------------
-// 6) PRODUCTS UI
+// 6) PRODUCT DETAIL MODAL (NEW)
+// ------------------------------
+function openProductDetail(productId) {
+  const product = getProductById(productId);
+  if (!product) return;
+
+  currentProduct = product;
+  
+  // Disable zoom when opening modal
+  zoomEnabled = false;
+  const mainContainer = document.querySelector('.main-image-container');
+  if (mainContainer) mainContainer.classList.remove('zoom-active');
+
+  // Set category
+  if (detailCategory) {
+    detailCategory.textContent = product.category || "Product";
+  }
+
+  // Set title
+  if (detailTitle) {
+    detailTitle.textContent = product.name;
+  }
+
+  // Set price
+  if (detailPrice) {
+    detailPrice.textContent = formatCurrency(product.price);
+  }
+
+  // Set badge
+  if (detailBadge) {
+    detailBadge.textContent = "";
+    detailBadge.className = "detail-badge";
+    
+    if (product.sold) {
+      detailBadge.textContent = "SOLD";
+      detailBadge.classList.add("badge-sold");
+      detailBadge.style.display = "inline-block";
+    } else if (product.tag === "new") {
+      detailBadge.textContent = "NEW";
+      detailBadge.classList.add("badge-new");
+      detailBadge.style.display = "inline-block";
+    } else if (product.tag === "sale") {
+      detailBadge.textContent = "SALE";
+      detailBadge.classList.add("badge-sale");
+      detailBadge.style.display = "inline-block";
+    } else {
+      detailBadge.style.display = "none";
+    }
+  }
+
+  // Set description
+  if (detailDescription) {
+    detailDescription.textContent = product.description || "No description available.";
+  }
+
+  // Set specifications
+  if (detailSpecsList) {
+    detailSpecsList.innerHTML = "";
+    
+    const specs = product.specifications || {
+      "Category": product.category,
+      "Availability": product.outOfStock ? "Out of Stock" : "In Stock",
+      "Price": formatCurrency(product.price)
+    };
+
+    Object.entries(specs).forEach(([key, value]) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<i class="fas fa-check-circle"></i> <strong>${key}:</strong> ${value}`;
+      detailSpecsList.appendChild(li);
+    });
+  }
+
+  // Set images
+  const imgs = Array.isArray(product.images) && product.images.length
+    ? product.images.slice(0, 4)
+    : [product.image, product.image, product.image];
+
+  const images = imgs.map(img => resolveAssetUrl(img || product.image));
+
+  if (detailMainImage) {
+    detailMainImage.src = images[0];
+    detailMainImage.alt = product.name;
+  }
+
+  // Set thumbnails
+  if (detailThumbnails) {
+    detailThumbnails.innerHTML = "";
+    images.forEach((imgSrc, index) => {
+      const thumb = document.createElement("img");
+      thumb.src = imgSrc;
+      thumb.alt = `${product.name} ${index + 1}`;
+      thumb.classList.add("detail-thumb");
+      if (index === 0) thumb.classList.add("active");
+      thumb.addEventListener("click", () => {
+        detailMainImage.src = imgSrc;
+        detailThumbnails.querySelectorAll("img").forEach(t => t.classList.remove("active"));
+        thumb.classList.add("active");
+      });
+      detailThumbnails.appendChild(thumb);
+    });
+  }
+
+  // Set button states
+  const isSoldOrOutOfStock = product.sold || product.outOfStock;
+  
+  if (detailAddCart) {
+    detailAddCart.disabled = isSoldOrOutOfStock;
+    detailAddCart.textContent = isSoldOrOutOfStock ? "Out of Stock" : "Add to Cart";
+    detailAddCart.innerHTML = isSoldOrOutOfStock 
+      ? '<i class="fas fa-ban"></i> Out of Stock'
+      : '<i class="fas fa-cart-plus"></i> Add to Cart';
+  }
+
+  if (detailBuyNow) {
+    detailBuyNow.disabled = isSoldOrOutOfStock;
+    detailBuyNow.innerHTML = isSoldOrOutOfStock 
+      ? '<i class="fas fa-ban"></i> Out of Stock'
+      : '<i class="fas fa-bolt"></i> Buy Now';
+  }
+
+  // Show modal
+  if (productDetailModal) {
+    productDetailModal.style.display = "block";
+    document.body.style.overflow = "hidden";
+  }
+
+  // Initialize zoom
+  initImageZoom();
+}
+
+function closeProductDetail() {
+  if (productDetailModal) {
+    productDetailModal.style.display = "none";
+    document.body.style.overflow = "auto";
+  }
+  currentProduct = null;
+  zoomEnabled = false;
+  const mainContainer = document.querySelector('.main-image-container');
+  if (mainContainer) mainContainer.classList.remove('zoom-active');
+}
+
+// ------------------------------
+// 7) IMAGE ZOOM FUNCTIONALITY (NEW)
+// ------------------------------
+function initImageZoom() {
+  const mainImage = detailMainImage;
+  const lens = zoomLens;
+  const result = zoomResult;
+  const container = document.querySelector('.main-image-container');
+
+  if (!mainImage || !lens || !result || !container) return;
+
+  let cx, cy;
+
+  // Calculate zoom ratio
+  function updateZoomRatio() {
+    cx = result.offsetWidth / lens.offsetWidth;
+    cy = result.offsetHeight / lens.offsetHeight;
+    result.style.backgroundImage = `url('${mainImage.src}')`;
+    result.style.backgroundSize = `${mainImage.width * cx}px ${mainImage.height * cy}px`;
+  }
+
+  function moveLens(e) {
+    if (!zoomEnabled) return;
+
+    e.preventDefault();
+    
+    const pos = getCursorPos(e);
+    let x = pos.x - lens.offsetWidth / 2;
+    let y = pos.y - lens.offsetHeight / 2;
+
+    // Prevent lens from going outside image
+    if (x > mainImage.width - lens.offsetWidth) x = mainImage.width - lens.offsetWidth;
+    if (x < 0) x = 0;
+    if (y > mainImage.height - lens.offsetHeight) y = mainImage.height - lens.offsetHeight;
+    if (y < 0) y = 0;
+
+    lens.style.left = x + 'px';
+    lens.style.top = y + 'px';
+    result.style.backgroundPosition = `-${x * cx}px -${y * cy}px`;
+  }
+
+  function getCursorPos(e) {
+    const rect = mainImage.getBoundingClientRect();
+    const x = (e.pageX || e.touches[0].pageX) - rect.left - window.pageXOffset;
+    const y = (e.pageY || e.touches[0].pageY) - rect.top - window.pageYOffset;
+    return { x, y };
+  }
+
+  // Toggle zoom on button click
+  if (zoomToggle) {
+    zoomToggle.onclick = function() {
+      zoomEnabled = !zoomEnabled;
+      
+      if (zoomEnabled) {
+        container.classList.add('zoom-active');
+        updateZoomRatio();
+        this.querySelector('i').classList.remove('fa-search-plus');
+        this.querySelector('i').classList.add('fa-search-minus');
+      } else {
+        container.classList.remove('zoom-active');
+        this.querySelector('i').classList.remove('fa-search-minus');
+        this.querySelector('i').classList.add('fa-search-plus');
+      }
+    };
+  }
+
+  // Mouse/Touch events
+  container.addEventListener('mousemove', moveLens);
+  container.addEventListener('touchmove', moveLens);
+  
+  mainImage.addEventListener('load', updateZoomRatio);
+  window.addEventListener('resize', updateZoomRatio);
+}
+
+// ------------------------------
+// 8) PRODUCTS UI
 // ------------------------------
 function displayProducts(productsToShow) {
   if (!productsGrid) return;
@@ -312,7 +547,7 @@ function displayProducts(productsToShow) {
     ];
 
     const productHTML = `
-      <div class="product-card" data-category="${product.category}">
+      <div class="product-card" data-category="${product.category}" data-product-id="${product.id}">
         <div class="product-image-slider" data-images='${JSON.stringify(images)}'>
           <img src="${images[0]}" alt="${product.name}" class="product-main-img" loading="lazy">
 
@@ -369,7 +604,7 @@ function searchProducts(query) {
 }
 
 // ------------------------------
-// 7) EVENTS
+// 9) EVENTS
 // ------------------------------
 function setActiveFilterButton(category) {
   filterButtons.forEach((btn) => {
@@ -418,8 +653,30 @@ function setupEventListeners() {
   closeModal?.addEventListener("click", closeCartModal);
   continueShoppingButton?.addEventListener("click", closeCartModal);
 
+  // Product Detail Modal Events
+  closeProductModal?.addEventListener("click", closeProductDetail);
+
+  if (detailAddCart) {
+    detailAddCart.addEventListener("click", () => {
+      if (currentProduct && !currentProduct.sold && !currentProduct.outOfStock) {
+        addToCart(currentProduct.id);
+      }
+    });
+  }
+
+  if (detailBuyNow) {
+    detailBuyNow.addEventListener("click", () => {
+      if (currentProduct && !currentProduct.sold && !currentProduct.outOfStock) {
+        addToCart(currentProduct.id, 1);
+        closeProductDetail();
+        openCartModal();
+      }
+    });
+  }
+
   window.addEventListener("click", (e) => {
     if (cartModal && e.target === cartModal) closeCartModal();
+    if (productDetailModal && e.target === productDetailModal) closeProductDetail();
   });
 
   shippingStateSelect?.addEventListener("change", updateCartUI);
@@ -433,18 +690,29 @@ function setupEventListeners() {
   productsGrid?.addEventListener("click", (e) => {
     const target = e.target;
 
+    // Click on product card to view details (but not on buttons)
+    const card = target.closest(".product-card");
+    if (card && !target.closest("button") && !target.closest(".thumb")) {
+      const productId = parseInt(card.dataset.productId, 10);
+      openProductDetail(productId);
+      return;
+    }
+
     if (target?.classList?.contains("add-to-cart")) {
+      e.stopPropagation();
       addToCart(parseInt(target.dataset.id, 10));
       return;
     }
 
     if (target?.classList?.contains("buy-now")) {
+      e.stopPropagation();
       addToCart(parseInt(target.dataset.id, 10), 1);
       openCartModal();
       return;
     }
 
     if (target?.classList?.contains("thumb")) {
+      e.stopPropagation();
       const slider = target.closest(".product-image-slider");
       const mainImg = slider?.querySelector(".product-main-img");
       if (!slider || !mainImg) return;
@@ -461,21 +729,23 @@ function setupEventListeners() {
 }
 
 // ------------------------------
-// 8) MODAL
+// 10) MODAL
 // ------------------------------
 function openCartModal() {
   if (!cartModal) return;
   cartModal.style.display = "block";
+  document.body.style.overflow = "hidden";
   updateCartUI();
 }
 
 function closeCartModal() {
   if (!cartModal) return;
   cartModal.style.display = "none";
+  document.body.style.overflow = "auto";
 }
 
 // ------------------------------
-// 9) PAYSTACK - FIXED ENDPOINT
+// 11) PAYSTACK - FIXED ENDPOINT
 // ------------------------------
 function initiatePaystackPayment() {
   if (cart.length === 0) {
@@ -565,7 +835,7 @@ function initiatePaystackPayment() {
 }
 
 // ------------------------------
-// 10) INIT
+// 12) INIT
 // ------------------------------
 async function initializeApp() {
   try {

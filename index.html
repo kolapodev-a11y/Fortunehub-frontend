@@ -146,6 +146,63 @@
     </div>
   </section>
 
+  <!-- Product Detail Modal (NEW) -->
+  <div id="productDetailModal" class="modal product-detail-modal" aria-hidden="true" role="dialog" aria-label="Product details">
+    <div class="modal-content product-detail-content" role="document">
+      <button class="close" id="closeProductModal" type="button" aria-label="Close product details">&times;</button>
+      
+      <div class="product-detail-grid">
+        <!-- Left: Image Gallery with Zoom -->
+        <div class="product-detail-images">
+          <div class="main-image-container">
+            <img src="" alt="" id="detailMainImage" class="detail-main-image">
+            <div class="zoom-lens" id="zoomLens"></div>
+            <div class="zoom-result" id="zoomResult"></div>
+            <button class="zoom-toggle" id="zoomToggle" title="Toggle Zoom">
+              <i class="fas fa-search-plus"></i>
+            </button>
+          </div>
+          
+          <div class="detail-thumbnails" id="detailThumbnails">
+            <!-- Thumbnails will be injected here -->
+          </div>
+        </div>
+
+        <!-- Right: Product Information -->
+        <div class="product-detail-info">
+          <div class="detail-category" id="detailCategory"></div>
+          <h2 class="detail-title" id="detailTitle"></h2>
+          
+          <div class="detail-price-section">
+            <span class="detail-price" id="detailPrice"></span>
+            <span class="detail-badge" id="detailBadge"></span>
+          </div>
+
+          <div class="detail-description-section">
+            <h3><i class="fas fa-info-circle"></i> Product Description</h3>
+            <p class="detail-description" id="detailDescription"></p>
+          </div>
+
+          <div class="detail-specifications" id="detailSpecifications">
+            <h3><i class="fas fa-list"></i> Specifications</h3>
+            <ul id="detailSpecsList">
+              <!-- Specifications will be injected here -->
+            </ul>
+          </div>
+
+          <div class="detail-actions">
+            <button class="btn btn-add-to-cart detail-add-cart" id="detailAddCart">
+              <i class="fas fa-cart-plus"></i> Add to Cart
+            </button>
+            <button class="btn btn-buy-now detail-buy-now" id="detailBuyNow">
+              <i class="fas fa-bolt"></i> Buy Now
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Cart Modal -->
   <div id="cartModal" class="modal" aria-hidden="true" role="dialog" aria-label="Cart modal">
     <div class="modal-content" role="document">
@@ -264,7 +321,7 @@
           <ul class="footer-contact">
             <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span>123 Condolence street, Lagos</span></li>
             <li><i class="fas fa-phone" aria-hidden="true"></i><span>+234Xxxxxxxx</span></li>
-            <li><i class="fas fa-envelope" aria-hidden="true"></i><span>fortunehabib9@gmail.com</span></li>
+            <li><i class="fas fa-envelope" aria-hidden="true"></i><span><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="66000914121308030e07040f045f26010b070f0a4805090b">[email&#160;protected]</a></span></li>
           </ul>
 
           <div class="footer-mini-note">
@@ -287,8 +344,7 @@
     </div>
   </footer>
 
-  <script src="https://js.paystack.co/v1/inline.js"></script>
+  <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="https://js.paystack.co/v1/inline.js"></script>
   <script src="script.js"></script>
 </body>
-    </html>
-    
+</html>
