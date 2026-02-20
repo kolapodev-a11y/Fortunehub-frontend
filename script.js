@@ -747,436 +747,92 @@ function closeCartModal() {
 // ------------------------------
 // 11) PAYSTACK - FIXED ENDPOINT
 // ------------------------------
-// Enhanced script.js with IMPROVED LOADING STATES during payment verification
-
-// Find the Paystack payment handler section and replace with this:
-
-// ========================================
-// ENHANCED PAYSTACK PAYMENT WITH LOADING
-// ========================================
-
-function initializePayment() {
-  // Get form values
-  const customerName = customerNameInput.value.trim();
-  const customerEmail = customerEmailInput.value.trim();
-  const customerPhone = customerPhoneInput.value.trim();
-  const shippingState = shippingStateSelect.value;
-  
-  //  Validation
-  if (!validateCheckoutForm()) {
-    alert("Please fill in all required fields correctly");
+function initiatePaystackPayment() {
+  if (cart.length === 0) {
+    alert("Your cart is empty.");
     return;
   }
 
-  const { subtotal, shippingFee, total } = calculateCartTotal();
-  
-  // Generate unique reference
-  const reference = `FH-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const name = (customerNameInput?.value || "").trim();
+  const email = (customerEmailInput?.value || "").trim();
+  const phone = (customerPhoneInput?.value || "").trim();
 
-  // Show initial loading state
-  showPaymentStatus('initializing', 'Initializing payment...');
+  if (!validateCustomerInfo()) {
+    alert("Please complete all required information correctly.");
+    return;
+  }
 
-  // Configure Paystack
+  const shippingFeeNaira = parseInt(shippingStateSelect.value, 10) || 0;
+
+  const subtotalKobo = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const shippingKobo = shippingFeeNaira * 100;
+  const totalKobo = subtotalKobo + shippingKobo;
+
   const handler = PaystackPop.setup({
     key: PAYSTACK_PUBLIC_KEY,
-    email: customerEmail,
-    amount: total, // Already in kobo
-    currency: 'NGN',
-    ref: reference,
+    email,
+    amount: totalKobo,
     metadata: {
-      custom_fields: [
-        {
-          display_name: "Customer Name",
-          variable_name: "customer_name",
-          value: customerName
-        },
-        {
-          display_name: "Customer Phone",
-          variable_name: "customer_phone",
-          value: customerPhone
-        },
-        {
-          display_name: "Shipping State",
-          variable_name: "shipping_state",
-          value: shippingState
-        },
-        {
-          display_name: "Cart Items",
-          variable_name: "cart_items",
-          value: JSON.stringify(cart)
-        }
-      ]
+      customer_name: name,
+      customer_email: email,
+      customer_phone: phone,
+      cart_items: cart,
     },
-    callback: function(response) {
-      console.log('✅ Paystack payment successful:', response);
-      // START VERIFICATION PROCESS WITH LOADING STATE
-      verifyPaymentWithLoading(response.reference, customerEmail);
+    callback: function (response) {
+      // ========================================
+      // FIXED: Use correct verification endpoint
+      // ========================================
+      fetch(`${API_BASE_URL}/api/payment/verify`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json", 
+          "Accept": "application/json" 
+        },
+        body: JSON.stringify({ reference: response.reference }),
+      })
+        .then((r) => {
+          if (!r.ok) {
+            throw new Error(`HTTP error! status: ${r.status}`);
+          }
+          return r.json();
+        })
+        .then((data) => {
+          console.log("✅ Verification response:", data);
+          
+          if (data.success) {
+            alert("✅ Payment successful! Order confirmed. Check your email for details.");
+            
+            // Clear cart
+            cart = [];
+            localStorage.setItem("cart", JSON.stringify(cart));
+
+            // Clear form
+            if (customerNameInput) customerNameInput.value = "";
+            if (customerEmailInput) customerEmailInput.value = "";
+            if (customerPhoneInput) customerPhoneInput.value = "";
+            if (shippingStateSelect) shippingStateSelect.value = "";
+
+            updateCartUI();
+            closeCartModal();
+            
+            // Optional: Redirect to success page
+            // window.location.href = "success.html?reference=" + response.reference;
+          } else {
+            alert("⚠️ Payment verification failed: " + (data.message || "Unknown error"));
+          }
+        })
+        .catch((err) => {
+          console.error("❌ Verification error:", err);
+          alert("❌ Failed to verify payment. Please contact support with reference: " + response.reference);
+        });
     },
-    onClose: function() {
-      console.log('❌ Payment window closed');
-      hidePaymentStatus();
-      alert('Payment cancelled. Please try again if you wish to complete your order.');
-    }
+    onClose: function () {
+      console.log("Payment window closed");
+    },
   });
 
-  // Open Paystack popup
   handler.openIframe();
 }
-
-// ========================================
-// VERIFY PAYMENT WITH PROGRESS UPDATES
-// ========================================
-async function verifyPaymentWithLoading(reference, email) {
-  try {
-    // Show "Verifying..." message
-    showPaymentStatus('verifying', 
-      'Please wait while we verify your payment...',
-      'This usually takes 30-60 seconds. Please do not close this page.'
-    );
-
-    // Add timeout with progress updates
-    let progressPercent = 0;
-    const progressInterval = setInterval(() => {
-      progressPercent += 5;
-      if (progressPercent >= 95) {
-        clearInterval(progressInterval);
-      }
-      updateProgressBar(progressPercent);
-    }, 500);
-
-    // Call backend to verify payment
-    const response = await fetch(
-      `${API_BASE_URL}/api/payment/verify?reference=${reference}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    clearInterval(progressInterval);
-
-    const data = await response.json();
-    console.log('Verification response:', data);
-
-    if (data.success) {
-      // Payment verified successfully
-      updateProgressBar(100);
-      
-      setTimeout(() => {
-        showPaymentStatus('success', 
-          'Payment Successful! 🎉',
-          `Thank you for your purchase! A confirmation email has been sent to ${email}.`,
-          true // Show success state
-        );
-
-        // Clear cart after 3 seconds and close modal
-        setTimeout(() => {
-          cart = [];
-          localStorage.setItem('cart', JSON.stringify(cart));
-          updateCartUI();
-          hidePaymentStatus();
-          closeCartModal();
-          
-          // Show final success message
-          alert(`✅ Payment Successful!\\n\\nAmount: ₦${(data.data.amount).toLocaleString('en-NG')}\\nReference: ${data.data.reference}\\n\\nCheck your email for details.`);
-        }, 3000);
-      }, 500);
-
-    } else {
-      // Verification failed
-      clearInterval(progressInterval);
-      showPaymentStatus('error', 
-        'Payment Verification Failed',
-        data.message || 'We could not verify your payment. Please contact support with your reference number.',
-        false,
-        reference
-      );
-    }
-
-  } catch (error) {
-    console.error('❌ Verification error:', error);
-    showPaymentStatus('error', 
-      'Connection Error',
-      'Unable to verify payment. Please check your internet connection and try again.',
-      false,
-      reference
-    );
-  }
-}
-
-// ========================================
-// PAYMENT STATUS OVERLAY UI
-// ========================================
-function showPaymentStatus(type, title, message = '', isSuccess = false, reference = '') {
-  // Remove existing overlay if any
-  hidePaymentStatus();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'paymentStatusOverlay';
-  overlay.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 99999;
-    animation: fadeIn 0.3s ease;
-  `;
-
-  let iconHTML = '';
-  let progressHTML = '';
-  let actionsHTML = '';
-
-  if (type === 'initializing') {
-    iconHTML = `
-      <div class="payment-spinner"></div>
-    `;
-  } else if (type === 'verifying') {
-    iconHTML = `
-      <div class="payment-spinner"></div>
-    `;
-    progressHTML = `
-      <div class="progress-container">
-        <div class="progress-bar" id="verificationProgressBar">
-          <div class="progress-fill" style="width: 0%"></div>
-        </div>
-        <div class="progress-text" id="progressText">0%</div>
-      </div>
-    `;
-  } else if (type === 'success') {
-    iconHTML = `
-      <div class="success-checkmark">
-        <svg width="80" height="80" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" stroke="#10b981" stroke-width="2" fill="none"/>
-          <path d="M7 12l3 3 7-7" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-    `;
-  } else if (type === 'error') {
-    iconHTML = `
-      <div class="error-icon">
-        <svg width="80" height="80" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" stroke="#ef4444" stroke-width="2" fill="none"/>
-          <path d="M15 9l-6 6m0-6l6 6" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-      </div>
-    `;
-    actionsHTML = `
-      <div class="payment-actions">
-        ${reference ? `<p style="font-size: 12px; color: #999; margin-bottom: 15px;">Reference: ${reference}</p>` : ''}
-        <button onclick="hidePaymentStatus()" class="payment-btn">Close</button>
-      </div>
-    `;
-  }
-
-  overlay.innerHTML = `
-    <div class="payment-status-card">
-      ${iconHTML}
-      <h2 class="payment-status-title">${title}</h2>
-      ${message ? `<p class="payment-status-message">${message}</p>` : ''}
-      ${progressHTML}
-      ${actionsHTML}
-    </div>
-  `;
-
-  // Add styles
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    @keyframes scaleIn {
-      from { transform: scale(0.5); opacity: 0; }
-      to { transform: scale(1); opacity: 1; }
-    }
-
-    .payment-status-card {
-      background: white;
-      border-radius: 20px;
-      padding: 40px;
-      max-width: 500px;
-      width: 90%;
-      text-align: center;
-      animation: scaleIn 0.3s ease;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
-
-    .payment-spinner {
-      width: 80px;
-      height: 80px;
-      border: 6px solid #f3f3f3;
-      border-top: 6px solid #667eea;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 30px;
-    }
-
-    .success-checkmark svg,
-    .error-icon svg {
-      margin: 0 auto 20px;
-      animation: scaleIn 0.5s ease;
-    }
-
-    .payment-status-title {
-      font-size: 24px;
-      color: #333;
-      margin-bottom: 15px;
-      font-weight: 700;
-    }
-
-    .payment-status-message {
-      font-size: 16px;
-      color: #666;
-      line-height: 1.6;
-      margin-bottom: 20px;
-    }
-
-    .progress-container {
-      margin: 30px 0;
-    }
-
-    .progress-bar {
-      width: 100%;
-      height: 8px;
-      background: #e0e0e0;
-      border-radius: 10px;
-      overflow: hidden;
-      margin-bottom: 10px;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #667eea, #764ba2);
-      transition: width 0.5s ease;
-      border-radius: 10px;
-    }
-
-    .progress-text {
-      font-size: 14px;
-      color: #667eea;
-      font-weight: 600;
-    }
-
-    .payment-actions {
-      margin-top: 30px;
-    }
-
-    .payment-btn {
-      padding: 12px 40px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.2s;
-    }
-
-    .payment-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-    }
-
-    @media (max-width: 600px) {
-      .payment-status-card {
-        padding: 30px 20px;
-      }
-
-      .payment-status-title {
-        font-size: 20px;
-      }
-
-      .payment-status-message {
-        font-size: 14px;
-      }
-    }
-  `;
-
-  document.head.appendChild(style);
-  document.body.appendChild(overlay);
-}
-
-function hidePaymentStatus() {
-  const overlay = document.getElementById('paymentStatusOverlay');
-  if (overlay) {
-    overlay.remove();
-  }
-}
-
-function updateProgressBar(percent) {
-  const progressFill = document.querySelector('.progress-fill');
-  const progressText = document.getElementById('progressText');
-  
-  if (progressFill) {
-    progressFill.style.width = `${percent}%`;
-  }
-  
-  if (progressText) {
-    progressText.textContent = `${Math.round(percent)}%`;
-  }
-}
-
-// ========================================
-// VALIDATION HELPER
-// ========================================
-function validateCheckoutForm() {
-  let isValid = true;
-
-  // Name validation
-  if (!customerNameInput.value.trim()) {
-    nameError.textContent = "Name is required";
-    nameError.style.display = "block";
-    isValid = false;
-  } else {
-    nameError.style.display = "none";
-  }
-
-  // Email validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(customerEmailInput.value.trim())) {
-    emailError.textContent = "Valid email is required";
-    emailError.style.display = "block";
-    isValid = false;
-  } else {
-    emailError.style.display = "none";
-  }
-
-  // Phone validation
-  if (!customerPhoneInput.value.trim()) {
-    phoneError.textContent = "Phone number is required";
-    phoneError.style.display = "block";
-    isValid = false;
-  } else {
-    phoneError.style.display = "none";
-  }
-
-  return isValid;
-}
-
-// ========================================
-// EXPORT FUNCTION TO CALL
-// ========================================
-// Add this at the end of your existing script.js
-// Replace your existing checkout button handler with:
-
-if (checkoutButton) {
-  checkoutButton.addEventListener('click', initializePayment);
-}
-
-console.log('✅ Enhanced payment verification loaded');
 
 // ------------------------------
 // 12) INIT
