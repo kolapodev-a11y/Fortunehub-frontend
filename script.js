@@ -1,1047 +1,321 @@
-// ===================================================
-// FortuneHub Frontend Script - WITH PRODUCT DETAIL MODAL & IMAGE ZOOM
-// ===================================================
+// Admin Panel JavaScript
 
-// ------------------------------
-// 1) STATE
-// ------------------------------
-let products = [];
-let cart = JSON.parse(localStorage.getItem("cart")) || [];
-let currentProduct = null;
-let zoomEnabled = false;
+let adminPassword = '';
+let currentDeleteId = '';
 
-const PAYSTACK_PUBLIC_KEY = "pk_test_9f6a5cb45aeab4bd8bccd72129beda47f2609921";
-const API_BASE_URL = "https://fortunehub-backend.onrender.com";
+// DOM Elements
+const loginSection = document.getElementById('loginSection');
+const dashboardSection = document.getElementById('dashboardSection');
+const loginForm = document.getElementById('loginForm');
+const loginError = document.getElementById('loginError');
+const loginErrorText = document.getElementById('loginErrorText');
+const logoutBtn = document.getElementById('logoutBtn');
+const refreshBtn = document.getElementById('refreshBtn');
+const clearAllBtn = document.getElementById('clearAllBtn');
+const transactionsBody = document.getElementById('transactionsBody');
+const totalTransactionsEl = document.getElementById('totalTransactions');
+const completedTransactionsEl = document.getElementById('completedTransactions');
+const totalAmountEl = document.getElementById('totalAmount');
 
-// ------------------------------
-// 2) DOM ELEMENTS
-// ------------------------------
-const productsGrid = document.getElementById("productsGrid");
-const cartCount = document.getElementById("cartCount");
-const cartModal = document.getElementById("cartModal");
-const closeModal = document.getElementById("closeCartModal");
-const cartItemsContainer = document.getElementById("cartItems");
-const cartTotalElement = document.getElementById("cartTotal");
-const cartSubTotalElement = document.getElementById("cartSubTotal");
-const shippingFeeAmountElement = document.getElementById("shippingFeeAmount");
-const checkoutButton = document.getElementById("checkoutButton");
-const continueShoppingButton = document.getElementById("continueShoppingButton");
-const filterButtons = document.querySelectorAll(".filter-btn");
-const searchInput = document.getElementById("searchInput");
-const categoryCards = document.querySelectorAll(".category-card");
-const cartIcon = document.getElementById("cartIcon");
-const searchIconBtn = document.getElementById("searchIcon");
+// Modal Elements
+const clearConfirmModal = document.getElementById('clearConfirmModal');
+const clearConfirmInput = document.getElementById('clearConfirmInput');
+const confirmClearBtn = document.getElementById('confirmClearBtn');
+const cancelClearBtn = document.getElementById('cancelClearBtn');
 
-const footerOpenCart = document.getElementById("footerOpenCart");
+const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+const deleteTransactionId = document.getElementById('deleteTransactionId');
+const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
 
-const customerNameInput = document.getElementById("customerName");
-const customerEmailInput = document.getElementById("customerEmail");
-const customerPhoneInput = document.getElementById("customerPhone");
-const shippingStateSelect = document.getElementById("shippingState");
+// Alert Elements
+const alertSuccess = document.getElementById('alertSuccess');
+const alertSuccessText = document.getElementById('alertSuccessText');
+const alertError = document.getElementById('alertError');
+const alertErrorText = document.getElementById('alertErrorText');
 
-const nameError = document.getElementById("nameError");
-const emailError = document.getElementById("emailError");
-const phoneError = document.getElementById("phoneError");
+// API Base URL
+const API_BASE_URL = window.location.origin;
 
-// Product Detail Modal Elements
-const productDetailModal = document.getElementById("productDetailModal");
-const closeProductModal = document.getElementById("closeProductModal");
-const detailMainImage = document.getElementById("detailMainImage");
-const detailThumbnails = document.getElementById("detailThumbnails");
-const detailCategory = document.getElementById("detailCategory");
-const detailTitle = document.getElementById("detailTitle");
-const detailPrice = document.getElementById("detailPrice");
-const detailBadge = document.getElementById("detailBadge");
-const detailDescription = document.getElementById("detailDescription");
-const detailSpecsList = document.getElementById("detailSpecsList");
-const detailAddCart = document.getElementById("detailAddCart");
-const detailBuyNow = document.getElementById("detailBuyNow");
-const zoomToggle = document.getElementById("zoomToggle");
-const zoomLens = document.getElementById("zoomLens");
-const zoomResult = document.getElementById("zoomResult");
-
-// ------------------------------
-// 3) HELPERS
-// ------------------------------
-function formatCurrency(amountInKobo) {
-  return `₦${(amountInKobo / 100).toLocaleString("en-NG", {
-    minimumFractionDigits: 2,
-  })}`;
-}
-
-function getProductById(id) {
-  return products.find((p) => p.id === id);
-}
-
-// Always fetch products.json from the repo root on GitHub Pages
-function getProductsJsonUrl() {
-  return new URL("products.json", window.location.href).toString();
-}
-
-/**
- * Repo base URL for GitHub Pages project sites.
- * Example:
- * origin: https://kolapodev-a11y.github.io
- * pathname: /Fortunehub-frontend/...
- * base => https://kolapodev-a11y.github.io/Fortunehub-frontend/
- */
-function getRepoBaseUrl() {
-  const parts = window.location.pathname.split("/").filter(Boolean);
-  const repoName = parts.length ? parts[0] : "";
-  return `${window.location.origin}/${repoName}/`;
-}
-
-function resolveAssetUrl(path) {
-  if (!path) return "";
-  if (/^https?:\/\//i.test(path)) return path;
-
-  const base = getRepoBaseUrl();
-
-  if (path.startsWith("/")) return `${window.location.origin}${path}`;
-  return new URL(path, base).toString();
-}
-
-// ------------------------------
-// 4) LOADING OVERLAY - NEW
-// ------------------------------
-function showLoadingOverlay(message = "Processing payment...") {
-  // Remove existing overlay if any
-  hideLoadingOverlay();
-
-  const overlay = document.createElement("div");
-  overlay.id = "paymentLoadingOverlay";
-  overlay.innerHTML = `
-    <div class="loading-content">
-      <div class="loading-spinner"></div>
-      <h3 class="loading-title">${message}</h3>
-      <p class="loading-subtitle">Please wait, this may take up to a minute...</p>
-      <div class="loading-progress">
-        <div class="loading-progress-bar"></div>
-      </div>
-      <p class="loading-info">
-        <i class="fas fa-info-circle"></i> 
-        Do not close this window or press the back button
-      </p>
-    </div>
-    <style>
-      #paymentLoadingOverlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.85);
-        backdrop-filter: blur(8px);
-        z-index: 99999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        animation: fadeIn 0.3s ease;
-      }
-      
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      
-      .loading-content {
-        background: white;
-        border-radius: 20px;
-        padding: 40px 50px;
-        max-width: 450px;
-        width: 90%;
-        text-align: center;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-        animation: slideUp 0.4s ease;
-      }
-      
-      @keyframes slideUp {
-        from {
-          opacity: 0;
-          transform: translateY(30px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-      
-      .loading-spinner {
-        width: 60px;
-        height: 60px;
-        border: 5px solid #f0f0f0;
-        border-top: 5px solid #667eea;
-        border-radius: 50%;
-        margin: 0 auto 25px;
-        animation: spin 1s linear infinite;
-      }
-      
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-      
-      .loading-title {
-        font-size: 22px;
-        font-weight: 700;
-        color: #1f2937;
-        margin: 0 0 10px;
-      }
-      
-      .loading-subtitle {
-        font-size: 15px;
-        color: #6b7280;
-        margin: 0 0 25px;
-        line-height: 1.5;
-      }
-      
-      .loading-progress {
-        width: 100%;
-        height: 6px;
-        background: #f0f0f0;
-        border-radius: 10px;
-        overflow: hidden;
-        margin-bottom: 20px;
-      }
-      
-      .loading-progress-bar {
-        height: 100%;
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        border-radius: 10px;
-        animation: progressBar 60s ease-in-out;
-        width: 0%;
-      }
-      
-      @keyframes progressBar {
-        0% { width: 0%; }
-        50% { width: 75%; }
-        100% { width: 95%; }
-      }
-      
-      .loading-info {
-        font-size: 13px;
-        color: #9ca3af;
-        margin: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-      }
-      
-      .loading-info i {
-        color: #667eea;
-      }
-      
-      @media (max-width: 480px) {
-        .loading-content {
-          padding: 30px 25px;
-        }
-        
-        .loading-title {
-          font-size: 18px;
-        }
-        
-        .loading-subtitle {
-          font-size: 14px;
-        }
-      }
-    </style>
-  `;
-
-  document.body.appendChild(overlay);
-  document.body.style.overflow = "hidden";
-}
-
-function hideLoadingOverlay() {
-  const overlay = document.getElementById("paymentLoadingOverlay");
-  if (overlay) {
-    overlay.style.animation = "fadeOut 0.3s ease";
-    setTimeout(() => {
-      overlay.remove();
-      document.body.style.overflow = "auto";
-    }, 300);
-  }
-}
-
-// Add fadeOut animation
-const style = document.createElement("style");
-style.textContent = `
-  @keyframes fadeOut {
-    from { opacity: 1; }
-    to { opacity: 0; }
-  }
-`;
-document.head.appendChild(style);
-
-// ------------------------------
-// 5) CART UI + LOGIC
-// ------------------------------
-function updateCartUI() {
-  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-  if (cartCount) cartCount.textContent = totalItems;
-
-  if (!cartItemsContainer) return;
-
-  cartItemsContainer.innerHTML = "";
-  if (cart.length === 0) {
-    cartItemsContainer.innerHTML =
-      '<p style="text-align:center;color:#555;">Your cart is empty.</p>';
-    if (checkoutButton) checkoutButton.disabled = true;
-    return;
-  }
-
-  cart.forEach((item) => {
-    const itemHTML = `
-      <div class="cart-item">
-        <div class="item-details">
-          <img src="${resolveAssetUrl(item.image)}" alt="${item.name}">
-          <div class="item-info">
-            <h4>${item.name}</h4>
-            <span class="item-price">${formatCurrency(item.price)}</span>
-          </div>
-        </div>
-        <div class="item-quantity">
-          <button class="btn-quantity minus" data-id="${item.id}" data-change="-1">-</button>
-          <span>${item.quantity}</span>
-          <button class="btn-quantity plus" data-id="${item.id}" data-change="1">+</button>
-          <i class="fas fa-trash-alt remove-item" data-id="${item.id}"></i>
-        </div>
-      </div>
-    `;
-    cartItemsContainer.insertAdjacentHTML("beforeend", itemHTML);
-  });
-
-  document.querySelectorAll(".btn-quantity").forEach((button) => {
-    button.addEventListener("click", (e) => {
-      const id = parseInt(e.currentTarget.dataset.id, 10);
-      const change = parseInt(e.currentTarget.dataset.change, 10);
-      updateQuantity(id, change);
-    });
-  });
-
-  document.querySelectorAll(".remove-item").forEach((button) => {
-    button.addEventListener("click", (e) => {
-      const id = parseInt(e.currentTarget.dataset.id, 10);
-      removeItem(id);
-    });
-  });
-
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const selectedShippingFeeNaira = parseInt(shippingStateSelect?.value || "0", 10);
-  const shippingFee = cart.length > 0 ? selectedShippingFeeNaira * 100 : 0;
-  const grandTotal = subtotal + shippingFee;
-
-  if (cartSubTotalElement) cartSubTotalElement.textContent = formatCurrency(subtotal);
-  if (shippingFeeAmountElement) shippingFeeAmountElement.textContent = formatCurrency(shippingFee);
-  if (cartTotalElement) cartTotalElement.textContent = formatCurrency(grandTotal);
-
-  if (checkoutButton) {
-    const isValid = validateCustomerInfo({ silent: true });
-    const name = customerNameInput?.value?.trim() || "";
-    const email = customerEmailInput?.value?.trim() || "";
-    const phone = customerPhoneInput?.value?.trim() || "";
-
-    if (!isValid || !name || !email || !phone) {
-      checkoutButton.disabled = true;
-      checkoutButton.innerHTML = '<i class="fas fa-info-circle"></i> Complete Info to Continue';
+// Show Alert
+function showAlert(type, message) {
+    if (type === 'success') {
+        alertSuccessText.textContent = message;
+        alertSuccess.classList.add('active');
+        alertError.classList.remove('active');
+        setTimeout(() => {
+            alertSuccess.classList.remove('active');
+        }, 5000);
     } else {
-      checkoutButton.disabled = false;
-      checkoutButton.innerHTML = '<i class="fas fa-credit-card"></i> Proceed to Checkout';
+        alertErrorText.textContent = message;
+        alertError.classList.add('active');
+        alertSuccess.classList.remove('active');
+        setTimeout(() => {
+            alertError.classList.remove('active');
+        }, 5000);
     }
-  }
 }
 
-function addToCart(productId, quantity = 1) {
-  const product = getProductById(productId);
-  if (!product || product.outOfStock) {
-    alert("Product is out of stock.");
-    return;
-  }
-
-  const cartItem = cart.find((item) => item.id === productId);
-  if (cartItem) cartItem.quantity += quantity;
-  else {
-    cart.push({
-      id: productId,
-      name: product.name,
-      price: product.price,
-      quantity,
-      image: product.image,
-    });
-  }
-
-  localStorage.setItem("cart", JSON.stringify(cart));
-  updateCartUI();
-  alert(`${product.name} added to cart!`);
-}
-
-function updateQuantity(productId, change) {
-  const cartItem = cart.find((item) => item.id === productId);
-  if (cartItem) {
-    cartItem.quantity += change;
-    if (cartItem.quantity <= 0) cart = cart.filter((item) => item.id !== productId);
-  }
-  localStorage.setItem("cart", JSON.stringify(cart));
-  updateCartUI();
-}
-
-function removeItem(productId) {
-  cart = cart.filter((item) => item.id !== productId);
-  localStorage.setItem("cart", JSON.stringify(cart));
-  updateCartUI();
-}
-
-// ------------------------------
-// 6) VALIDATION
-// ------------------------------
-function validateCustomerInfo({ silent = false } = {}) {
-  let isValid = true;
-
-  if (nameError) nameError.style.display = "none";
-  if (emailError) emailError.style.display = "none";
-  if (phoneError) phoneError.style.display = "none";
-
-  const name = customerNameInput?.value?.trim() || "";
-  const email = customerEmailInput?.value?.trim() || "";
-  const phone = customerPhoneInput?.value?.trim() || "";
-  const stateValue = shippingStateSelect?.value || "";
-
-  if (!name || name.length < 3 || name.includes("@") || name.includes(".")) {
-    if (!silent && nameError) {
-      nameError.textContent = "Please enter your full name (not email).";
-      nameError.style.display = "block";
-    }
-    isValid = false;
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!email || !emailRegex.test(email)) {
-    if (!silent && emailError) {
-      emailError.textContent = "Enter a valid email (e.g., name@example.com).";
-      emailError.style.display = "block";
-    }
-    isValid = false;
-  }
-
-  const phoneRegex = /^(0[789][01])\d{8}$/;
-  if (!phone || !phoneRegex.test(phone)) {
-    if (!silent && phoneError) {
-      phoneError.textContent = "Enter a valid Nigerian phone number (e.g., 08031234567).";
-      phoneError.style.display = "block";
-    }
-    isValid = false;
-  }
-
-  if (!stateValue) isValid = false;
-  return isValid;
-}
-
-// ------------------------------
-// 7) PRODUCT DETAIL MODAL
-// ------------------------------
-function openProductDetail(productId) {
-  const product = getProductById(productId);
-  if (!product) return;
-
-  currentProduct = product;
-  
-  // Disable zoom when opening modal
-  zoomEnabled = false;
-  const mainContainer = document.querySelector('.main-image-container');
-  if (mainContainer) mainContainer.classList.remove('zoom-active');
-
-  // Set category
-  if (detailCategory) {
-    detailCategory.textContent = product.category || "Product";
-  }
-
-  // Set title
-  if (detailTitle) {
-    detailTitle.textContent = product.name;
-  }
-
-  // Set price
-  if (detailPrice) {
-    detailPrice.textContent = formatCurrency(product.price);
-  }
-
-  // Set badge
-  if (detailBadge) {
-    detailBadge.textContent = "";
-    detailBadge.className = "detail-badge";
-    
-    if (product.sold) {
-      detailBadge.textContent = "SOLD";
-      detailBadge.classList.add("badge-sold");
-      detailBadge.style.display = "inline-block";
-    } else if (product.tag === "new") {
-      detailBadge.textContent = "NEW";
-      detailBadge.classList.add("badge-new");
-      detailBadge.style.display = "inline-block";
-    } else if (product.tag === "sale") {
-      detailBadge.textContent = "SALE";
-      detailBadge.classList.add("badge-sale");
-      detailBadge.style.display = "inline-block";
-    } else {
-      detailBadge.style.display = "none";
-    }
-  }
-
-  // Set description
-  if (detailDescription) {
-    detailDescription.textContent = product.description || "No description available.";
-  }
-
-  // Set specifications
-  if (detailSpecsList) {
-    detailSpecsList.innerHTML = "";
-    
-    const specs = product.specifications || {
-      "Category": product.category,
-      "Availability": product.outOfStock ? "Out of Stock" : "In Stock",
-      "Price": formatCurrency(product.price)
-    };
-
-    Object.entries(specs).forEach(([key, value]) => {
-      const li = document.createElement("li");
-      li.innerHTML = `<i class="fas fa-check-circle"></i> <strong>${key}:</strong> ${value}`;
-      detailSpecsList.appendChild(li);
-    });
-  }
-
-  // Set images
-  const imgs = Array.isArray(product.images) && product.images.length
-    ? product.images.slice(0, 4)
-    : [product.image, product.image, product.image];
-
-  const images = imgs.map(img => resolveAssetUrl(img || product.image));
-
-  if (detailMainImage) {
-    detailMainImage.src = images[0];
-    detailMainImage.alt = product.name;
-  }
-
-  // Set thumbnails
-  if (detailThumbnails) {
-    detailThumbnails.innerHTML = "";
-    images.forEach((imgSrc, index) => {
-      const thumb = document.createElement("img");
-      thumb.src = imgSrc;
-      thumb.alt = `${product.name} ${index + 1}`;
-      thumb.classList.add("detail-thumb");
-      if (index === 0) thumb.classList.add("active");
-      thumb.addEventListener("click", () => {
-        detailMainImage.src = imgSrc;
-        detailThumbnails.querySelectorAll("img").forEach(t => t.classList.remove("active"));
-        thumb.classList.add("active");
-      });
-      detailThumbnails.appendChild(thumb);
-    });
-  }
-
-  // Set button states
-  const isSoldOrOutOfStock = product.sold || product.outOfStock;
-  
-  if (detailAddCart) {
-    detailAddCart.disabled = isSoldOrOutOfStock;
-    detailAddCart.textContent = isSoldOrOutOfStock ? "Out of Stock" : "Add to Cart";
-    detailAddCart.innerHTML = isSoldOrOutOfStock 
-      ? '<i class="fas fa-ban"></i> Out of Stock'
-      : '<i class="fas fa-cart-plus"></i> Add to Cart';
-  }
-
-  if (detailBuyNow) {
-    detailBuyNow.disabled = isSoldOrOutOfStock;
-    detailBuyNow.innerHTML = isSoldOrOutOfStock 
-      ? '<i class="fas fa-ban"></i> Out of Stock'
-      : '<i class="fas fa-bolt"></i> Buy Now';
-  }
-
-  // Show modal
-  if (productDetailModal) {
-    productDetailModal.style.display = "block";
-    document.body.style.overflow = "hidden";
-  }
-
-  // Initialize zoom
-  initImageZoom();
-}
-
-function closeProductDetail() {
-  if (productDetailModal) {
-    productDetailModal.style.display = "none";
-    document.body.style.overflow = "auto";
-  }
-  currentProduct = null;
-  zoomEnabled = false;
-  const mainContainer = document.querySelector('.main-image-container');
-  if (mainContainer) mainContainer.classList.remove('zoom-active');
-}
-
-// ------------------------------
-// 8) IMAGE ZOOM FUNCTIONALITY
-// ------------------------------
-function initImageZoom() {
-  const mainImage = detailMainImage;
-  const lens = zoomLens;
-  const result = zoomResult;
-  const container = document.querySelector('.main-image-container');
-
-  if (!mainImage || !lens || !result || !container) return;
-
-  let cx, cy;
-
-  // Calculate zoom ratio
-  function updateZoomRatio() {
-    cx = result.offsetWidth / lens.offsetWidth;
-    cy = result.offsetHeight / lens.offsetHeight;
-    result.style.backgroundImage = `url('${mainImage.src}')`;
-    result.style.backgroundSize = `${mainImage.width * cx}px ${mainImage.height * cy}px`;
-  }
-
-  function moveLens(e) {
-    if (!zoomEnabled) return;
-
+// Login Form Handler
+loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const password = document.getElementById('adminPassword').value;
     
-    const pos = getCursorPos(e);
-    let x = pos.x - lens.offsetWidth / 2;
-    let y = pos.y - lens.offsetHeight / 2;
+    try {
+        // Verify password by trying to fetch transactions
+        const response = await fetch(`${API_BASE_URL}/api/admin/transactions?password=${encodeURIComponent(password)}`);
+        
+        if (response.ok) {
+            adminPassword = password;
+            loginSection.style.display = 'none';
+            dashboardSection.classList.add('active');
+            loginError.classList.remove('active');
+            loadTransactions();
+        } else {
+            loginErrorText.textContent = 'Invalid password. Please try again.';
+            loginError.classList.add('active');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        loginErrorText.textContent = 'Connection error. Please try again.';
+        loginError.classList.add('active');
+    }
+});
 
-    // Prevent lens from going outside image
-    if (x > mainImage.width - lens.offsetWidth) x = mainImage.width - lens.offsetWidth;
-    if (x < 0) x = 0;
-    if (y > mainImage.height - lens.offsetHeight) y = mainImage.height - lens.offsetHeight;
-    if (y < 0) y = 0;
+// Logout Handler
+logoutBtn.addEventListener('click', () => {
+    adminPassword = '';
+    loginSection.style.display = 'block';
+    dashboardSection.classList.remove('active');
+    document.getElementById('adminPassword').value = '';
+    transactionsBody.innerHTML = '<tr><td colspan="7" class="empty-state"><i class="fas fa-inbox"></i><p>No transactions found</p></td></tr>';
+});
 
-    lens.style.left = x + 'px';
-    lens.style.top = y + 'px';
-    result.style.backgroundPosition = `-${x * cx}px -${y * cy}px`;
-  }
+// Refresh Button Handler
+refreshBtn.addEventListener('click', () => {
+    refreshBtn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Loading...';
+    loadTransactions();
+});
 
-  function getCursorPos(e) {
-    const rect = mainImage.getBoundingClientRect();
-    const x = (e.pageX || e.touches[0].pageX) - rect.left - window.pageXOffset;
-    const y = (e.pageY || e.touches[0].pageY) - rect.top - window.pageYOffset;
-    return { x, y };
-  }
+// Load Transactions
+async function loadTransactions() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/admin/transactions?password=${encodeURIComponent(adminPassword)}`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch transactions');
+        }
 
-  // Toggle zoom on button click
-  if (zoomToggle) {
-    zoomToggle.onclick = function() {
-      zoomEnabled = !zoomEnabled;
-      
-      if (zoomEnabled) {
-        container.classList.add('zoom-active');
-        updateZoomRatio();
-        this.querySelector('i').classList.remove('fa-search-plus');
-        this.querySelector('i').classList.add('fa-search-minus');
-      } else {
-        container.classList.remove('zoom-active');
-        this.querySelector('i').classList.remove('fa-search-minus');
-        this.querySelector('i').classList.add('fa-search-plus');
-      }
-    };
-  }
-
-  // Mouse/Touch events
-  container.addEventListener('mousemove', moveLens);
-  container.addEventListener('touchmove', moveLens);
-  
-  mainImage.addEventListener('load', updateZoomRatio);
-  window.addEventListener('resize', updateZoomRatio);
+        const data = await response.json();
+        displayTransactions(data);
+        updateStats(data);
+        
+        refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
+    } catch (error) {
+        console.error('Error loading transactions:', error);
+        showAlert('error', 'Failed to load transactions');
+        refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
+    }
 }
 
-// ------------------------------
-// 9) PRODUCTS UI
-// ------------------------------
-function displayProducts(productsToShow) {
-  if (!productsGrid) return;
-  productsGrid.innerHTML = "";
-
-  if (!productsToShow || productsToShow.length === 0) {
-    productsGrid.innerHTML = `
-      <div style="grid-column:1/-1;text-align:center;padding:40px;color:#555;">
-        <i class="fas fa-box-open" style="font-size:48px;color:#ccc;margin-bottom:15px;"></i>
-        <p style="font-size:18px;margin:0;">No products found</p>
-      </div>
-    `;
-    return;
-  }
-
-  productsToShow.forEach((product) => {
-    const isSold = !!product.sold;
-    const isOutOfStock = !!product.outOfStock;
-
-    let badgeClass = "";
-    let badgeText = "";
-
-    if (isSold) {
-      badgeClass = "badge-sold";
-      badgeText = "SOLD";
-    } else if (product.tag === "new") {
-      badgeClass = "badge-new";
-      badgeText = "NEW";
-    } else if (product.tag === "sale") {
-      badgeClass = "badge-sale";
-      badgeText = "SALE";
+// Display Transactions
+function displayTransactions(data) {
+    const { transactions } = data;
+    
+    if (!transactions || transactions.length === 0) {
+        transactionsBody.innerHTML = `
+            <tr>
+                <td colspan="7" class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <p>No transactions found</p>
+                </td>
+            </tr>
+        `;
+        return;
     }
 
-    let buttonText = "Add to Cart";
-    let buttonClass = "btn-add-to-cart add-to-cart";
-    let buyNowText = "Buy Now";
-    let buyNowClass = "btn-buy-now buy-now";
-    let isDisabled = "";
+    transactionsBody.innerHTML = transactions.map(transaction => {
+        const date = new Date(transaction.createdAt).toLocaleString();
+        const statusClass = transaction.status.toLowerCase();
+        const payerInfo = transaction.payerName || transaction.payerEmail || 'N/A';
+        
+        return `
+            <tr>
+                <td><code style="font-size: 12px;">${transaction.id}</code></td>
+                <td><strong>$${parseFloat(transaction.amount).toFixed(2)}</strong> ${transaction.currency || 'USD'}</td>
+                <td><span class="status-badge ${statusClass}">${transaction.status}</span></td>
+                <td>${transaction.description || 'Payment'}</td>
+                <td><small>${date}</small></td>
+                <td><small>${payerInfo}</small></td>
+                <td>
+                    <button class="btn btn-danger btn-sm delete-transaction" 
+                            data-transaction-id="${transaction.id}"
+                            title="Delete this transaction">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
 
-    if (isSold) {
-      buttonText = "SOLD";
-      buttonClass = "btn-secondary";
-      buyNowText = "SOLD";
-      buyNowClass = "btn-secondary";
-      isDisabled = "disabled";
-    } else if (isOutOfStock) {
-      buttonText = "Out of Stock";
-      buttonClass = "btn-secondary";
-      buyNowText = "Out of Stock";
-      buyNowClass = "btn-secondary";
-      isDisabled = "disabled";
+    // Attach delete event listeners
+    attachDeleteListeners();
+}
+
+// Update Stats
+function updateStats(data) {
+    const { transactions, totalAmount } = data;
+    const completedCount = transactions.filter(t => t.status === 'COMPLETED').length;
+    
+    totalTransactionsEl.textContent = transactions.length;
+    completedTransactionsEl.textContent = completedCount;
+    totalAmountEl.textContent = `$${totalAmount.toFixed(2)}`;
+}
+
+// Clear All Button Handler
+clearAllBtn.addEventListener('click', () => {
+    clearConfirmModal.classList.add('active');
+    clearConfirmInput.value = '';
+    clearConfirmInput.focus();
+});
+
+// Cancel Clear
+cancelClearBtn.addEventListener('click', () => {
+    clearConfirmModal.classList.remove('active');
+    clearConfirmInput.value = '';
+});
+
+// Confirm Clear All
+confirmClearBtn.addEventListener('click', async () => {
+    const confirmText = clearConfirmInput.value.trim();
+    
+    if (confirmText !== 'DELETE ALL') {
+        showAlert('error', 'Please type "DELETE ALL" exactly to confirm');
+        clearConfirmInput.focus();
+        return;
     }
 
-    const imgs =
-      Array.isArray(product.images) && product.images.length
-        ? product.images.slice(0, 3)
-        : [product.image, product.image, product.image];
+    try {
+        confirmClearBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+        confirmClearBtn.disabled = true;
 
-    const images = [
-      resolveAssetUrl(imgs[0] || product.image),
-      resolveAssetUrl(imgs[1] || product.image),
-      resolveAssetUrl(imgs[2] || product.image),
-    ];
-
-    const productHTML = `
-      <div class="product-card" data-category="${product.category}" data-product-id="${product.id}">
-        <div class="product-image-slider" data-images='${JSON.stringify(images)}'>
-          <img src="${images[0]}" alt="${product.name}" class="product-main-img" loading="lazy">
-
-          <div class="product-thumbnails">
-            <img src="${images[0]}" alt="1" class="thumb active" data-index="0" loading="lazy">
-            <img src="${images[1]}" alt="2" class="thumb" data-index="1" loading="lazy">
-            <img src="${images[2]}" alt="3" class="thumb" data-index="2" loading="lazy">
-          </div>
-
-          ${badgeText ? `<span class="product-badge ${badgeClass}">${badgeText}</span>` : ""}
-        </div>
-
-        <div class="product-info">
-          <p class="product-category">${product.category}</p>
-          <h3 class="product-title">${product.name}</h3>
-          <p class="product-price">${formatCurrency(product.price)}</p>
-          <p class="product-description">${product.description}</p>
-
-          <div class="product-actions">
-            <button class="btn ${buttonClass}" ${isDisabled} data-id="${product.id}">
-              ${buttonText}
-            </button>
-            <button class="btn ${buyNowClass}" ${isDisabled} data-id="${product.id}">
-              ${buyNowText}
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-
-    productsGrid.insertAdjacentHTML("beforeend", productHTML);
-  });
-}
-
-function filterProducts(category) {
-  const filtered =
-    category === "all"
-      ? products
-      : products.filter((p) => (p.category || "").toLowerCase() === category.toLowerCase());
-
-  displayProducts(filtered);
-}
-
-function searchProducts(query) {
-  const text = (query || "").toLowerCase();
-  const filtered = products.filter((p) => {
-    const name = (p.name || "").toLowerCase();
-    const category = (p.category || "").toLowerCase();
-    const desc = (p.description || "").toLowerCase();
-    return name.includes(text) || category.includes(text) || desc.includes(text);
-  });
-
-  displayProducts(filtered);
-}
-
-// ------------------------------
-// 10) EVENTS
-// ------------------------------
-function setActiveFilterButton(category) {
-  filterButtons.forEach((btn) => {
-    const isActive = btn.dataset.category === category;
-    btn.classList.toggle("active", isActive);
-    btn.setAttribute("aria-pressed", isActive ? "true" : "false");
-  });
-}
-
-function setupEventListeners() {
-  if (searchIconBtn) {
-    searchIconBtn.addEventListener("click", () => {
-      document.getElementById("products")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      setTimeout(() => searchInput?.focus(), 400);
-    });
-  }
-
-  if (searchInput) {
-    searchInput.addEventListener("input", (e) => searchProducts(e.target.value));
-  }
-
-  filterButtons.forEach((button) => {
-    button.setAttribute("aria-pressed", button.classList.contains("active") ? "true" : "false");
-    button.addEventListener("click", () => {
-      const category = button.dataset.category;
-      setActiveFilterButton(category);
-      filterProducts(category);
-    });
-  });
-
-  categoryCards.forEach((card) => {
-    card.addEventListener("click", () => {
-      const category = card.dataset.category;
-      setActiveFilterButton(category);
-      filterProducts(category);
-      document.getElementById("products")?.scrollIntoView({ behavior: "smooth" });
-    });
-  });
-
-  cartIcon?.addEventListener("click", openCartModal);
-  footerOpenCart?.addEventListener("click", (e) => {
-    e.preventDefault();
-    openCartModal();
-  });
-
-  closeModal?.addEventListener("click", closeCartModal);
-  continueShoppingButton?.addEventListener("click", closeCartModal);
-
-  // Product Detail Modal Events
-  closeProductModal?.addEventListener("click", closeProductDetail);
-
-  if (detailAddCart) {
-    detailAddCart.addEventListener("click", () => {
-      if (currentProduct && !currentProduct.sold && !currentProduct.outOfStock) {
-        addToCart(currentProduct.id);
-      }
-    });
-  }
-
-  if (detailBuyNow) {
-    detailBuyNow.addEventListener("click", () => {
-      if (currentProduct && !currentProduct.sold && !currentProduct.outOfStock) {
-        addToCart(currentProduct.id, 1);
-        closeProductDetail();
-        openCartModal();
-      }
-    });
-  }
-
-  window.addEventListener("click", (e) => {
-    if (cartModal && e.target === cartModal) closeCartModal();
-    if (productDetailModal && e.target === productDetailModal) closeProductDetail();
-  });
-
-  shippingStateSelect?.addEventListener("change", updateCartUI);
-
-  customerNameInput?.addEventListener("input", updateCartUI);
-  customerEmailInput?.addEventListener("input", updateCartUI);
-  customerPhoneInput?.addEventListener("input", updateCartUI);
-
-  checkoutButton?.addEventListener("click", initiatePaystackPayment);
-
-  productsGrid?.addEventListener("click", (e) => {
-    const target = e.target;
-
-    // Click on product card to view details (but not on buttons)
-    const card = target.closest(".product-card");
-    if (card && !target.closest("button") && !target.closest(".thumb")) {
-      const productId = parseInt(card.dataset.productId, 10);
-      openProductDetail(productId);
-      return;
-    }
-
-    if (target?.classList?.contains("add-to-cart")) {
-      e.stopPropagation();
-      addToCart(parseInt(target.dataset.id, 10));
-      return;
-    }
-
-    if (target?.classList?.contains("buy-now")) {
-      e.stopPropagation();
-      addToCart(parseInt(target.dataset.id, 10), 1);
-      openCartModal();
-      return;
-    }
-
-    if (target?.classList?.contains("thumb")) {
-      e.stopPropagation();
-      const slider = target.closest(".product-image-slider");
-      const mainImg = slider?.querySelector(".product-main-img");
-      if (!slider || !mainImg) return;
-
-      const images = JSON.parse(slider.dataset.images || "[]");
-      const index = parseInt(target.dataset.index, 10);
-
-      if (images[index]) mainImg.src = images[index];
-
-      slider.querySelectorAll(".thumb").forEach((t) => t.classList.remove("active"));
-      target.classList.add("active");
-    }
-  });
-}
-
-// ------------------------------
-// 11) MODAL
-// ------------------------------
-function openCartModal() {
-  if (!cartModal) return;
-  cartModal.style.display = "block";
-  document.body.style.overflow = "hidden";
-  updateCartUI();
-}
-
-function closeCartModal() {
-  if (!cartModal) return;
-  cartModal.style.display = "none";
-  document.body.style.overflow = "auto";
-}
-
-// ------------------------------
-// 12) PAYSTACK - WITH LOADING INDICATOR
-// ------------------------------
-function initiatePaystackPayment() {
-  if (cart.length === 0) {
-    alert("Your cart is empty.");
-    return;
-  }
-
-  const name = (customerNameInput?.value || "").trim();
-  const email = (customerEmailInput?.value || "").trim();
-  const phone = (customerPhoneInput?.value || "").trim();
-
-  if (!validateCustomerInfo()) {
-    alert("Please complete all required information correctly.");
-    return;
-  }
-
-  const shippingFeeNaira = parseInt(shippingStateSelect.value, 10) || 0;
-
-  const subtotalKobo = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shippingKobo = shippingFeeNaira * 100;
-  const totalKobo = subtotalKobo + shippingKobo;
-
-  const handler = PaystackPop.setup({
-    key: PAYSTACK_PUBLIC_KEY,
-    email,
-    amount: totalKobo,
-    metadata: {
-      customer_name: name,
-      customer_email: email,
-      customer_phone: phone,
-      cart_items: cart,
-      shipping_fee: shippingFeeNaira,
-      shipping_state: shippingStateSelect.options[shippingStateSelect.selectedIndex]?.text || ''
-    },
-    callback: function (response) {
-      console.log("✅ Paystack payment successful:", response.reference);
-      
-      // Show loading overlay immediately after payment
-      showLoadingOverlay("Verifying your payment...");
-      
-      // Add timeout fallback (90 seconds)
-      const timeoutId = setTimeout(() => {
-        hideLoadingOverlay();
-        alert("⏱️ Payment verification is taking longer than expected. Your payment was received. Please check your email for confirmation or contact support with reference: " + response.reference);
-      }, 90000); // 90 seconds
-      
-      // Verify payment
-      fetch(`${API_BASE_URL}/api/payment/verify`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json", 
-          "Accept": "application/json" 
-        },
-        body: JSON.stringify({ reference: response.reference }),
-      })
-        .then((r) => {
-          clearTimeout(timeoutId); // Clear timeout on response
-          
-          if (!r.ok) {
-            throw new Error(`HTTP error! status: ${r.status}`);
-          }
-          return r.json();
-        })
-        .then((data) => {
-          console.log("✅ Verification response:", data);
-          hideLoadingOverlay();
-          
-          if (data.success) {
-            alert("✅ Payment successful! Order confirmed. Check your email for details.");
-            
-            // Clear cart
-            cart = [];
-            localStorage.setItem("cart", JSON.stringify(cart));
-
-            // Clear form
-            if (customerNameInput) customerNameInput.value = "";
-            if (customerEmailInput) customerEmailInput.value = "";
-            if (customerPhoneInput) customerPhoneInput.value = "";
-            if (shippingStateSelect) shippingStateSelect.value = "";
-
-            updateCartUI();
-            closeCartModal();
-            
-            // Optional: Redirect to success page
-            // window.location.href = "success.html?reference=" + response.reference;
-          } else {
-            alert("⚠️ Payment verification failed: " + (data.message || "Unknown error"));
-          }
-        })
-        .catch((err) => {
-          clearTimeout(timeoutId); // Clear timeout on error
-          console.error("❌ Verification error:", err);
-          hideLoadingOverlay();
-          alert("❌ Failed to verify payment. Your payment was received. Please contact support with reference: " + response.reference);
+        const response = await fetch(`${API_BASE_URL}/api/admin/transactions/clear`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                password: adminPassword, 
+                confirmText: 'DELETE ALL' 
+            })
         });
-    },
-    onClose: function () {
-      console.log("Payment window closed");
-      // Don't show any message when user closes the payment window
-    },
-  });
 
-  handler.openIframe();
+        const data = await response.json();
+
+        if (response.ok) {
+            showAlert('success', data.message);
+            clearConfirmModal.classList.remove('active');
+            clearConfirmInput.value = '';
+            loadTransactions();
+        } else {
+            showAlert('error', data.error || 'Failed to clear transactions');
+        }
+    } catch (error) {
+        console.error('Error clearing transactions:', error);
+        showAlert('error', 'Error clearing transactions');
+    } finally {
+        confirmClearBtn.innerHTML = '<i class="fas fa-trash"></i> Confirm Delete';
+        confirmClearBtn.disabled = false;
+    }
+});
+
+// Attach Delete Listeners
+function attachDeleteListeners() {
+    const deleteButtons = document.querySelectorAll('.delete-transaction');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', (e) => {
+            const transactionId = e.currentTarget.dataset.transactionId;
+            currentDeleteId = transactionId;
+            deleteTransactionId.textContent = transactionId;
+            deleteConfirmModal.classList.add('active');
+        });
+    });
 }
 
-// ------------------------------
-// 13) INIT
-// ------------------------------
-async function initializeApp() {
-  try {
-    const response = await fetch(getProductsJsonUrl(), { cache: "no-store" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    products = await response.json();
-  } catch (e) {
-    console.error("❌ Failed to load products.json:", e);
-    products = [];
-  }
+// Cancel Delete
+cancelDeleteBtn.addEventListener('click', () => {
+    deleteConfirmModal.classList.remove('active');
+    currentDeleteId = '';
+});
 
-  displayProducts(products);
-  setupEventListeners();
-  updateCartUI();
+// Confirm Delete Single Transaction
+confirmDeleteBtn.addEventListener('click', async () => {
+    if (!currentDeleteId) return;
 
-  // Ensure default "All Products" active matches UI
-  setActiveFilterButton("all");
-}
+    try {
+        confirmDeleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+        confirmDeleteBtn.disabled = true;
 
-document.addEventListener("DOMContentLoaded", initializeApp);
+        const response = await fetch(`${API_BASE_URL}/api/admin/transactions/${currentDeleteId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ password: adminPassword })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showAlert('success', data.message);
+            deleteConfirmModal.classList.remove('active');
+            currentDeleteId = '';
+            loadTransactions();
+        } else {
+            showAlert('error', data.error || 'Failed to delete transaction');
+        }
+    } catch (error) {
+        console.error('Error deleting transaction:', error);
+        showAlert('error', 'Error deleting transaction');
+    } finally {
+        confirmDeleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+        confirmDeleteBtn.disabled = false;
+    }
+});
+
+// Close modals when clicking outside
+window.addEventListener('click', (e) => {
+    if (e.target === clearConfirmModal) {
+        clearConfirmModal.classList.remove('active');
+        clearConfirmInput.value = '';
+    }
+    if (e.target === deleteConfirmModal) {
+        deleteConfirmModal.classList.remove('active');
+        currentDeleteId = '';
+    }
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    // ESC to close modals
+    if (e.key === 'Escape') {
+        clearConfirmModal.classList.remove('active');
+        deleteConfirmModal.classList.remove('active');
+        clearConfirmInput.value = '';
+        currentDeleteId = '';
+    }
+    
+    // Enter in clear confirm input
+    if (e.key === 'Enter' && document.activeElement === clearConfirmInput) {
+        confirmClearBtn.click();
+    }
+});
+
+// Auto-refresh every 30 seconds (optional)
+setInterval(() => {
+    if (dashboardSection.classList.contains('active')) {
+        loadTransactions();
+    }
+}, 30000);
+
+console.log('Admin Panel loaded successfully');
