@@ -276,6 +276,31 @@
       cursor: pointer;
     }
 
+    .btn-danger {
+      padding: 10px 24px;
+      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-danger:hover {
+      transform: translateY(-2px);
+      background: linear-gradient(135deg, #ee5a6f 0%, #dc3545 100%);
+    }
+
+    .btn-danger:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
     /* Payments Table */
     .payments-card {
       background: white;
@@ -711,6 +736,10 @@
     <div class="payments-card">
       <div class="payments-header">
         <h2>Transaction History</h2>
+        <button class="btn-danger" id="clearAllBtn" onclick="clearAllTransactions()">
+          <i class="fas fa-trash-alt"></i>
+          Clear All Transactions
+        </button>
       </div>
 
       <div id="loadingIndicator" class="loading" style="display: none;">
@@ -1129,7 +1158,69 @@
       alert(message);
     }
 
-    // Make viewPayment global
+    // Clear All Transactions Function
+    async function clearAllTransactions() {
+      // Confirmation dialog
+      const confirmation = confirm(
+        "⚠️ WARNING: This will permanently delete ALL transactions from the database.\n\n" +
+        "This action CANNOT be undone!\n\n" +
+        "Are you sure you want to continue?"
+      );
+
+      if (!confirmation) {
+        return; // User cancelled
+      }
+
+      // Second confirmation for safety
+      const doubleConfirm = confirm(
+        "⚠️ FINAL CONFIRMATION\n\n" +
+        "You are about to delete ALL transaction records.\n\n" +
+        "Click OK to proceed or Cancel to abort."
+      );
+
+      if (!doubleConfirm) {
+        return; // User cancelled
+      }
+
+      // Disable the button to prevent multiple clicks
+      const clearBtn = document.getElementById('clearAllBtn');
+      clearBtn.disabled = true;
+      clearBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Clearing...';
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/admin/payments/clear-all`, {
+          method: 'DELETE',
+          headers: {
+            "Authorization": `Basic ${authToken}`
+          }
+        });
+
+        if (response.status === 401) {
+          localStorage.removeItem("adminToken");
+          showLogin();
+          return;
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+          alert(`✅ Success!\n\nCleared ${result.deletedCount} transaction(s) from the database.`);
+          // Reload the payments list to show empty state
+          loadPayments(1);
+        } else {
+          alert(`❌ Error: ${result.message}`);
+        }
+      } catch (error) {
+        alert(`❌ Connection Error: ${error.message}`);
+      } finally {
+        // Re-enable the button
+        clearBtn.disabled = false;
+        clearBtn.innerHTML = '<i class="fas fa-trash-alt"></i> Clear All Transactions';
+      }
+    }
+
+    // Make functions global
+    window.clearAllTransactions = clearAllTransactions;
     window.viewPayment = viewPayment;
   </script>
 
