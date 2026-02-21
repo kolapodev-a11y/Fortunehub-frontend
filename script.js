@@ -102,7 +102,179 @@ function resolveAssetUrl(path) {
 }
 
 // ------------------------------
-// 4) CART UI + LOGIC
+// 4) LOADING OVERLAY - NEW
+// ------------------------------
+function showLoadingOverlay(message = "Processing payment...") {
+  // Remove existing overlay if any
+  hideLoadingOverlay();
+
+  const overlay = document.createElement("div");
+  overlay.id = "paymentLoadingOverlay";
+  overlay.innerHTML = `
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <h3 class="loading-title">${message}</h3>
+      <p class="loading-subtitle">Please wait, this may take up to a minute...</p>
+      <div class="loading-progress">
+        <div class="loading-progress-bar"></div>
+      </div>
+      <p class="loading-info">
+        <i class="fas fa-info-circle"></i> 
+        Do not close this window or press the back button
+      </p>
+    </div>
+    <style>
+      #paymentLoadingOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(8px);
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: fadeIn 0.3s ease;
+      }
+      
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      
+      .loading-content {
+        background: white;
+        border-radius: 20px;
+        padding: 40px 50px;
+        max-width: 450px;
+        width: 90%;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        animation: slideUp 0.4s ease;
+      }
+      
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      
+      .loading-spinner {
+        width: 60px;
+        height: 60px;
+        border: 5px solid #f0f0f0;
+        border-top: 5px solid #667eea;
+        border-radius: 50%;
+        margin: 0 auto 25px;
+        animation: spin 1s linear infinite;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      .loading-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: #1f2937;
+        margin: 0 0 10px;
+      }
+      
+      .loading-subtitle {
+        font-size: 15px;
+        color: #6b7280;
+        margin: 0 0 25px;
+        line-height: 1.5;
+      }
+      
+      .loading-progress {
+        width: 100%;
+        height: 6px;
+        background: #f0f0f0;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: 20px;
+      }
+      
+      .loading-progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        animation: progressBar 60s ease-in-out;
+        width: 0%;
+      }
+      
+      @keyframes progressBar {
+        0% { width: 0%; }
+        50% { width: 75%; }
+        100% { width: 95%; }
+      }
+      
+      .loading-info {
+        font-size: 13px;
+        color: #9ca3af;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      
+      .loading-info i {
+        color: #667eea;
+      }
+      
+      @media (max-width: 480px) {
+        .loading-content {
+          padding: 30px 25px;
+        }
+        
+        .loading-title {
+          font-size: 18px;
+        }
+        
+        .loading-subtitle {
+          font-size: 14px;
+        }
+      }
+    </style>
+  `;
+
+  document.body.appendChild(overlay);
+  document.body.style.overflow = "hidden";
+}
+
+function hideLoadingOverlay() {
+  const overlay = document.getElementById("paymentLoadingOverlay");
+  if (overlay) {
+    overlay.style.animation = "fadeOut 0.3s ease";
+    setTimeout(() => {
+      overlay.remove();
+      document.body.style.overflow = "auto";
+    }, 300);
+  }
+}
+
+// Add fadeOut animation
+const style = document.createElement("style");
+style.textContent = `
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+`;
+document.head.appendChild(style);
+
+// ------------------------------
+// 5) CART UI + LOGIC
 // ------------------------------
 function updateCartUI() {
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -220,7 +392,7 @@ function removeItem(productId) {
 }
 
 // ------------------------------
-// 5) VALIDATION
+// 6) VALIDATION
 // ------------------------------
 function validateCustomerInfo({ silent = false } = {}) {
   let isValid = true;
@@ -265,7 +437,7 @@ function validateCustomerInfo({ silent = false } = {}) {
 }
 
 // ------------------------------
-// 6) PRODUCT DETAIL MODAL (NEW)
+// 7) PRODUCT DETAIL MODAL
 // ------------------------------
 function openProductDetail(productId) {
   const product = getProductById(productId);
@@ -407,7 +579,7 @@ function closeProductDetail() {
 }
 
 // ------------------------------
-// 7) IMAGE ZOOM FUNCTIONALITY (NEW)
+// 8) IMAGE ZOOM FUNCTIONALITY
 // ------------------------------
 function initImageZoom() {
   const mainImage = detailMainImage;
@@ -481,7 +653,7 @@ function initImageZoom() {
 }
 
 // ------------------------------
-// 8) PRODUCTS UI
+// 9) PRODUCTS UI
 // ------------------------------
 function displayProducts(productsToShow) {
   if (!productsGrid) return;
@@ -604,7 +776,7 @@ function searchProducts(query) {
 }
 
 // ------------------------------
-// 9) EVENTS
+// 10) EVENTS
 // ------------------------------
 function setActiveFilterButton(category) {
   filterButtons.forEach((btn) => {
@@ -729,7 +901,7 @@ function setupEventListeners() {
 }
 
 // ------------------------------
-// 10) MODAL
+// 11) MODAL
 // ------------------------------
 function openCartModal() {
   if (!cartModal) return;
@@ -745,7 +917,7 @@ function closeCartModal() {
 }
 
 // ------------------------------
-// 11) PAYSTACK - FIXED ENDPOINT
+// 12) PAYSTACK - WITH LOADING INDICATOR
 // ------------------------------
 function initiatePaystackPayment() {
   if (cart.length === 0) {
@@ -777,11 +949,22 @@ function initiatePaystackPayment() {
       customer_email: email,
       customer_phone: phone,
       cart_items: cart,
+      shipping_fee: shippingFeeNaira,
+      shipping_state: shippingStateSelect.options[shippingStateSelect.selectedIndex]?.text || ''
     },
     callback: function (response) {
-      // ========================================
-      // FIXED: Use correct verification endpoint
-      // ========================================
+      console.log("✅ Paystack payment successful:", response.reference);
+      
+      // Show loading overlay immediately after payment
+      showLoadingOverlay("Verifying your payment...");
+      
+      // Add timeout fallback (90 seconds)
+      const timeoutId = setTimeout(() => {
+        hideLoadingOverlay();
+        alert("⏱️ Payment verification is taking longer than expected. Your payment was received. Please check your email for confirmation or contact support with reference: " + response.reference);
+      }, 90000); // 90 seconds
+      
+      // Verify payment
       fetch(`${API_BASE_URL}/api/payment/verify`, {
         method: "POST",
         headers: { 
@@ -791,6 +974,8 @@ function initiatePaystackPayment() {
         body: JSON.stringify({ reference: response.reference }),
       })
         .then((r) => {
+          clearTimeout(timeoutId); // Clear timeout on response
+          
           if (!r.ok) {
             throw new Error(`HTTP error! status: ${r.status}`);
           }
@@ -798,6 +983,7 @@ function initiatePaystackPayment() {
         })
         .then((data) => {
           console.log("✅ Verification response:", data);
+          hideLoadingOverlay();
           
           if (data.success) {
             alert("✅ Payment successful! Order confirmed. Check your email for details.");
@@ -822,12 +1008,15 @@ function initiatePaystackPayment() {
           }
         })
         .catch((err) => {
+          clearTimeout(timeoutId); // Clear timeout on error
           console.error("❌ Verification error:", err);
-          alert("❌ Failed to verify payment. Please contact support with reference: " + response.reference);
+          hideLoadingOverlay();
+          alert("❌ Failed to verify payment. Your payment was received. Please contact support with reference: " + response.reference);
         });
     },
     onClose: function () {
       console.log("Payment window closed");
+      // Don't show any message when user closes the payment window
     },
   });
 
@@ -835,7 +1024,7 @@ function initiatePaystackPayment() {
 }
 
 // ------------------------------
-// 12) INIT
+// 13) INIT
 // ------------------------------
 async function initializeApp() {
   try {
