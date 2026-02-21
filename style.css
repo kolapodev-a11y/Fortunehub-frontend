@@ -208,7 +208,7 @@ img { max-width: 100%; display: block; }
 }
 
 .logo {
-  font-size: clamp(1.25rem, 2.2vw, 1.8rem);
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
   font-weight: 900;
   color: var(--brand-blue);
   white-space: nowrap;
