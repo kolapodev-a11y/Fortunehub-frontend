@@ -1,1225 +1,1396 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FortuneHub — Product Manager</title>
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>FortuneHub – Product Manager</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    /* ═══════════════ RESET & BASE ═══════════════ */
+    /* ================================================
+       RESET & BASE
+    ================================================ */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --primary:   #4f46e5;
-      --primary-d: #3730a3;
-      --success:   #16a34a;
-      --danger:    #dc2626;
-      --warning:   #d97706;
-      --bg:        #f8fafc;
-      --card:      #ffffff;
-      --border:    #e2e8f0;
-      --text:      #1e293b;
-      --muted:     #64748b;
+      --primary:   #667eea;
+      --primary2:  #764ba2;
+      --success:   #10b981;
+      --danger:    #ef4444;
+      --warning:   #f59e0b;
+      --info:      #3b82f6;
+      --dark:      #1f2937;
+      --mid:       #6b7280;
+      --light:     #f3f4f6;
+      --white:     #ffffff;
+      --border:    #e5e7eb;
       --radius:    12px;
-      --shadow:    0 4px 24px rgba(0,0,0,.08);
+      --shadow:    0 4px 24px rgba(0,0,0,0.12);
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
     }
+    html { scroll-behavior: smooth; }
     body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary2) 100%);
       min-height: 100vh;
+      color: var(--dark);
     }
 
-    /* ═══════════════ LOGIN SCREEN ═══════════════ */
-    #loginScreen {
-      display: flex; align-items: center; justify-content: center;
-      min-height: 100vh;
-      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    /* ================================================
+       TOAST NOTIFICATIONS
+    ================================================ */
+    #toastContainer {
+      position: fixed; top: 20px; right: 20px;
+      z-index: 99999; display: flex; flex-direction: column; gap: 10px;
+      max-width: 320px; width: calc(100vw - 40px);
     }
-    .login-card {
-      background: #fff; border-radius: 20px;
-      padding: 2.5rem; width: 100%; max-width: 400px;
-      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    .toast {
+      background: var(--white); border-radius: 10px;
+      padding: 14px 16px; box-shadow: var(--shadow);
+      display: flex; align-items: center; gap: 12px;
+      animation: slideIn .3s ease; border-left: 4px solid var(--primary);
+      font-size: 14px; line-height: 1.4;
+    }
+    .toast.success { border-color: var(--success); }
+    .toast.error   { border-color: var(--danger);  }
+    .toast.warning { border-color: var(--warning); }
+    .toast i       { font-size: 18px; flex-shrink: 0; }
+    .toast.success i { color: var(--success); }
+    .toast.error   i { color: var(--danger);  }
+    .toast.warning i { color: var(--warning); }
+    .toast-msg { flex: 1; color: var(--dark); font-weight: 500; }
+    @keyframes slideIn  { from { transform: translateX(120%); opacity:0; } to { transform: translateX(0); opacity:1; } }
+    @keyframes slideOut { from { transform: translateX(0);   opacity:1; } to { transform: translateX(120%); opacity:0; } }
+
+    /* ================================================
+       LOGIN SCREEN
+    ================================================ */
+    .login-wrapper {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .login-box {
+      background: var(--white); border-radius: 20px;
+      padding: 40px 36px; width: 100%; max-width: 420px;
+      box-shadow: var(--shadow);
     }
     .login-logo {
-      text-align: center; margin-bottom: 1.5rem;
+      text-align: center; margin-bottom: 28px;
     }
-    .login-logo h1 { font-size: 2rem; color: var(--primary); }
-    .login-logo h1 span { color: var(--text); }
-    .login-logo p { color: var(--muted); font-size: .9rem; }
-    .login-card label { display: block; margin-bottom: .4rem; font-weight: 600; font-size: .9rem; }
-    .login-card input {
-      width: 100%; padding: .75rem 1rem; border: 2px solid var(--border);
-      border-radius: 8px; font-size: 1rem; transition: border .2s;
-      margin-bottom: 1rem;
+    .login-logo .icon-wrap {
+      width: 70px; height: 70px;
+      background: linear-gradient(135deg, var(--primary), var(--primary2));
+      border-radius: 20px; display: inline-flex;
+      align-items: center; justify-content: center;
+      margin-bottom: 14px; box-shadow: 0 8px 20px rgba(102,126,234,.4);
     }
-    .login-card input:focus { outline: none; border-color: var(--primary); }
+    .login-logo .icon-wrap i { font-size: 30px; color: var(--white); }
+    .login-logo h1 { font-size: 24px; color: var(--dark); font-weight: 800; }
+    .login-logo p  { font-size: 13px; color: var(--mid); margin-top: 4px; }
+    .form-field { margin-bottom: 18px; }
+    .form-field label {
+      display: block; margin-bottom: 7px;
+      font-size: 13px; font-weight: 600; color: var(--dark);
+    }
+    .input-wrap { position: relative; }
+    .input-wrap i.prefix {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      color: var(--mid); font-size: 15px;
+    }
+    .input-wrap input {
+      width: 100%; padding: 12px 14px 12px 40px;
+      border: 2px solid var(--border); border-radius: 10px;
+      font-size: 14px; transition: border .2s;
+      background: var(--white); color: var(--dark);
+    }
+    .input-wrap input:focus { outline: none; border-color: var(--primary); }
+    .toggle-pw {
+      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      color: var(--mid); cursor: pointer; font-size: 15px;
+    }
     .btn-login {
-      width: 100%; padding: .85rem; background: var(--primary); color: #fff;
-      border: none; border-radius: 8px; font-size: 1rem; font-weight: 700;
-      cursor: pointer; transition: background .2s;
+      width: 100%; padding: 14px;
+      background: linear-gradient(135deg, var(--primary), var(--primary2));
+      color: var(--white); border: none; border-radius: 10px;
+      font-size: 16px; font-weight: 700; cursor: pointer;
+      transition: opacity .2s, transform .1s; margin-top: 8px;
     }
-    .btn-login:hover { background: var(--primary-d); }
-    #loginError {
-      color: var(--danger); font-size: .85rem; margin-top: .5rem; text-align: center;
-    }
+    .btn-login:hover { opacity: .9; }
+    .btn-login:active { transform: scale(.98); }
+    .btn-login:disabled { opacity: .6; cursor: not-allowed; }
+    .login-footer { text-align: center; margin-top: 18px; font-size: 12px; color: var(--mid); }
 
-    /* ═══════════════ MAIN APP ═══════════════ */
-    #appScreen { display: none; }
+    /* ================================================
+       MAIN APP
+    ================================================ */
+    #app { display: none; }
 
-    /* TOPBAR */
-    .topbar {
+    /* Top Nav */
+    .top-nav {
+      background: var(--white); box-shadow: var(--shadow-sm);
       position: sticky; top: 0; z-index: 100;
-      background: var(--primary);
-      color: #fff; padding: .9rem 1.5rem;
+      padding: 0 20px;
+    }
+    .nav-inner {
+      max-width: 1200px; margin: 0 auto;
       display: flex; align-items: center; justify-content: space-between;
-      box-shadow: 0 2px 12px rgba(79,70,229,.3);
+      height: 64px;
     }
-    .topbar h1 { font-size: 1.2rem; font-weight: 700; }
-    .topbar h1 span { opacity: .75; }
-    .topbar-actions { display: flex; gap: .6rem; align-items: center; }
-    .btn-icon {
-      background: rgba(255,255,255,.2); border: none; color: #fff;
-      padding: .5rem .8rem; border-radius: 8px; cursor: pointer; font-size: .85rem;
-      transition: background .2s; display: flex; align-items: center; gap: .4rem;
+    .nav-brand {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 800; font-size: 18px; color: var(--dark);
     }
-    .btn-icon:hover { background: rgba(255,255,255,.35); }
+    .nav-brand .dot {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--primary), var(--primary2));
+      border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    }
+    .nav-brand .dot i { color: var(--white); font-size: 16px; }
+    .nav-right { display: flex; align-items: center; gap: 12px; }
+    .nav-right a {
+      font-size: 13px; color: var(--mid); text-decoration: none;
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 14px; border-radius: 8px;
+      transition: background .2s, color .2s;
+    }
+    .nav-right a:hover { background: var(--light); color: var(--dark); }
+    .nav-logout {
+      padding: 8px 16px; border: 1.5px solid var(--border);
+      border-radius: 8px; font-size: 13px; font-weight: 600;
+      color: var(--mid); cursor: pointer; background: transparent;
+      display: flex; align-items: center; gap: 6px;
+      transition: all .2s;
+    }
+    .nav-logout:hover { border-color: var(--danger); color: var(--danger); background: #fef2f2; }
 
-    /* MAIN LAYOUT */
-    .app-layout {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 1.5rem; padding: 1.5rem;
-      max-width: 1400px; margin: 0 auto;
-    }
-    @media (min-width: 1024px) {
-      .app-layout { grid-template-columns: 1fr 420px; }
-    }
-
-    /* ═══════════════ CARDS ═══════════════ */
-    .card {
-      background: var(--card); border-radius: var(--radius);
-      box-shadow: var(--shadow); padding: 1.5rem;
-    }
-    .card-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 1.2rem; padding-bottom: .8rem;
-      border-bottom: 2px solid var(--border);
-    }
-    .card-header h2 {
-      font-size: 1.05rem; color: var(--primary); display: flex;
-      align-items: center; gap: .5rem;
+    /* Page wrapper */
+    .page {
+      max-width: 1200px; margin: 30px auto; padding: 0 20px 60px;
     }
 
-    /* ═══════════════ STATS ROW ═══════════════ */
-    .stats-row {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;
-      margin-bottom: 1.5rem;
+    /* Stats bar */
+    .stats-bar {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px; margin-bottom: 28px;
     }
-    .stat-box {
-      background: var(--card); border-radius: var(--radius);
-      padding: 1rem; text-align: center; box-shadow: var(--shadow);
-      border-top: 4px solid var(--primary);
+    .stat-card {
+      background: var(--white); border-radius: var(--radius);
+      padding: 20px; box-shadow: var(--shadow-sm);
+      display: flex; align-items: center; gap: 14px;
     }
-    .stat-box.success { border-top-color: var(--success); }
-    .stat-box.warning { border-top-color: var(--warning); }
-    .stat-val { font-size: 1.8rem; font-weight: 800; color: var(--text); }
-    .stat-lbl { font-size: .78rem; color: var(--muted); margin-top: .2rem; }
-
-    /* ═══════════════ FORM ═══════════════ */
-    .form-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: .9rem;
-    }
-    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
-    .form-group { display: flex; flex-direction: column; gap: .35rem; }
-    .form-group.full { grid-column: 1 / -1; }
-    .form-group label {
-      font-size: .82rem; font-weight: 600; color: var(--muted);
-      text-transform: uppercase; letter-spacing: .04em;
-    }
-    .form-group label span.req { color: var(--danger); }
-    .form-control {
-      padding: .65rem .9rem; border: 2px solid var(--border);
-      border-radius: 8px; font-size: .95rem; transition: border .2s;
-      background: #fafbff; width: 100%;
-    }
-    .form-control:focus { outline: none; border-color: var(--primary); background: #fff; }
-    textarea.form-control { resize: vertical; min-height: 80px; }
-
-    /* ═══════════════ CHECKBOXES (flags) ═══════════════ */
-    .flags-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
-    .flag-label {
-      display: flex; align-items: center; gap: .45rem;
-      font-size: .9rem; cursor: pointer; user-select: none;
-      background: #f1f5f9; padding: .5rem .9rem; border-radius: 8px;
-      border: 2px solid transparent; transition: all .2s;
-    }
-    .flag-label input[type=checkbox] { accent-color: var(--primary); width: 16px; height: 16px; }
-    .flag-label:has(input:checked) { border-color: var(--primary); background: #eef2ff; }
-
-    /* ═══════════════ IMAGE UPLOAD SLOTS ══════════════
-       FIXED: file input is always z-index:6 (top layer)
-       so mobile taps on slots always open the file picker
-       regardless of whether a preview image is showing.
-       accept="image/*" — NO capture — shows Camera+Gallery.
-    ══════════════════════════════════════════════════ */
-    .image-slots {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: .7rem;
-    }
-    @media (max-width: 480px) { .image-slots { grid-template-columns: repeat(2, 1fr); } }
-
-    .img-slot {
-      position: relative; aspect-ratio: 1;
-      border: 2.5px dashed var(--border); border-radius: 10px;
-      overflow: hidden; cursor: pointer; background: #f8faff;
-      transition: border .2s, background .2s;
-    }
-    .img-slot:hover { border-color: var(--primary); background: #eef2ff; }
-    .img-slot.has-image { border-style: solid; border-color: var(--primary); }
-
-    /*
-     * KEY FIX #1 — z-index: 6 on the file input
-     * This ensures the invisible <input type=file> is ALWAYS
-     * the top-most tappable layer on the slot — even when a
-     * preview image is visible underneath it.
-     * Without this, the preview img (or its onclick) steals
-     * the tap on Android/iOS and the file picker never opens.
-     */
-    .img-slot input[type=file] {
-      position: absolute; inset: 0;
-      opacity: 0; cursor: pointer;
-      width: 100%; height: 100%;
-      z-index: 6;          /* ABOVE preview image — tap ALWAYS opens picker */
-      -webkit-appearance: none;
-    }
-    .slot-placeholder {
-      pointer-events: none;
-      position: absolute; inset: 0; z-index: 2;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      gap: .3rem; color: var(--muted);
-    }
-    .slot-placeholder i { font-size: 1.4rem; }
-    .slot-placeholder .slot-lbl { font-size: .7rem; font-weight: 700; text-transform: uppercase; }
-    .slot-placeholder .slot-hint { font-size: .65rem; text-align: center; padding: 0 4px; }
-    /* ── "Tap to change" overlay shown when slot has image ── */
-    .slot-change-hint {
-      pointer-events: none;
-      display: none;
-      position: absolute; bottom: 0; left: 0; right: 0; z-index: 5;
-      background: rgba(0,0,0,.55);
-      color: #fff; font-size: .6rem; font-weight: 700;
-      text-align: center; padding: 4px 2px;
-      text-transform: uppercase; letter-spacing: .04em;
-    }
-    .img-slot.has-image .slot-change-hint { display: block; }
-    .slot-preview {
-      position: absolute; inset: 0; z-index: 3;
-      object-fit: cover; width: 100%; height: 100%;
-      display: none; pointer-events: none; /* preview must NOT intercept taps */
-    }
-    .slot-remove {
-      position: absolute; top: 4px; right: 4px; z-index: 10; /* highest */
-      background: var(--danger); color: #fff; border: none;
-      width: 26px; height: 26px; border-radius: 50%;
-      font-size: .75rem; cursor: pointer; display: none;
-      align-items: center; justify-content: center;
-      touch-action: manipulation; /* fast tap on mobile */
-    }
-    .img-slot.has-image .slot-preview { display: block; }
-    .img-slot.has-image .slot-placeholder { display: none; }
-    .img-slot.has-image .slot-remove { display: flex; }
-
-    /* MAIN badge on first slot */
-    .slot-badge {
-      position: absolute; bottom: 4px; left: 4px; z-index: 4;
-      background: var(--primary); color: #fff; font-size: .6rem;
-      font-weight: 700; padding: 2px 6px; border-radius: 4px;
-      text-transform: uppercase; pointer-events: none;
-    }
-
-    /* ═══════════════ IMAGE MAGNIFY OVERLAY (FIX #1) ═══════════════ */
-    #imgMagnifyOverlay {
-      display: none; position: fixed; inset: 0; z-index: 9999;
-      background: rgba(0,0,0,.85);
-      align-items: center; justify-content: center;
-    }
-    #imgMagnifyOverlay.active { display: flex; }
-    #imgMagnifyOverlay img {
-      max-width: 92vw; max-height: 88vh;
-      object-fit: contain; border-radius: 12px;
-      box-shadow: 0 8px 40px rgba(0,0,0,.6);
-    }
-    #imgMagnifyClose {
-      position: fixed; top: 1rem; right: 1rem;
-      background: #fff; border: none; width: 40px; height: 40px;
-      border-radius: 50%; font-size: 1.2rem; cursor: pointer;
+    .stat-icon {
+      width: 48px; height: 48px; border-radius: 12px;
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 2px 12px rgba(0,0,0,.3);
+      flex-shrink: 0; font-size: 20px;
     }
+    .stat-icon.purple { background: #f0edff; color: var(--primary); }
+    .stat-icon.green  { background: #d1fae5; color: var(--success); }
+    .stat-icon.red    { background: #fee2e2; color: var(--danger);  }
+    .stat-icon.amber  { background: #fef3c7; color: var(--warning); }
+    .stat-value { font-size: 26px; font-weight: 800; color: var(--dark); line-height: 1; }
+    .stat-label { font-size: 12px; color: var(--mid); margin-top: 3px; }
 
-    /* ═══════════════ FORM ACTIONS ═══════════════ */
-    .form-actions {
-      display: flex; gap: .8rem; flex-wrap: wrap;
-      margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);
+    /* Section header */
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
     }
+    .section-title { font-size: 20px; font-weight: 800; color: var(--dark); }
+
+    /* Buttons */
     .btn {
-      padding: .65rem 1.3rem; border-radius: 8px; font-size: .9rem;
-      font-weight: 600; cursor: pointer; border: none; transition: all .2s;
-      display: flex; align-items: center; gap: .4rem;
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 10px 18px; border-radius: 10px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      border: none; transition: all .2s; text-decoration: none;
     }
-    .btn-primary { background: var(--primary); color: #fff; }
-    .btn-primary:hover { background: var(--primary-d); }
-    .btn-success { background: var(--success); color: #fff; }
-    .btn-success:hover { filter: brightness(.9); }
-    .btn-danger  { background: var(--danger);  color: #fff; }
-    .btn-danger:hover  { filter: brightness(.9); }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--primary2));
+      color: var(--white); box-shadow: 0 4px 12px rgba(102,126,234,.3);
+    }
+    .btn-primary:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-danger  { background: var(--danger); color: var(--white); }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-success { background: var(--success); color: var(--white); }
+    .btn-success:hover { background: #059669; }
     .btn-outline {
-      background: transparent; color: var(--primary);
-      border: 2px solid var(--primary);
+      background: transparent; border: 1.5px solid var(--border);
+      color: var(--mid);
     }
-    .btn-outline:hover { background: #eef2ff; }
-    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); background: #f8f7ff; }
+    .btn:disabled { opacity: .6; cursor: not-allowed; transform: none !important; }
+    .btn-sm { padding: 7px 12px; font-size: 12px; }
 
-    /* ═══════════════ PRODUCT LIST ═══════════════ */
-    .product-list { display: flex; flex-direction: column; gap: .8rem; }
-
-    .product-item {
-      display: flex; align-items: center; gap: .8rem;
-      padding: .8rem; border-radius: 10px; border: 1px solid var(--border);
-      background: #fafbff; transition: box-shadow .2s;
+    /* Search & filter toolbar */
+    .toolbar {
+      background: var(--white); border-radius: var(--radius);
+      padding: 16px 20px; box-shadow: var(--shadow-sm);
+      display: flex; flex-wrap: wrap; gap: 12px;
+      align-items: center; margin-bottom: 20px;
     }
-    .product-item:hover { box-shadow: 0 2px 12px rgba(79,70,229,.12); }
-
-    /* FIX #1: Product thumbnail is clickable/zoomable */
-    .product-item-img {
-      width: 56px; height: 56px; object-fit: cover;
-      border-radius: 8px; flex-shrink: 0;
-      cursor: zoom-in; border: 2px solid var(--border);
-      transition: border-color .2s;
+    .search-wrap { position: relative; flex: 1; min-width: 180px; }
+    .search-wrap i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--mid); }
+    .search-wrap input {
+      width: 100%; padding: 10px 12px 10px 36px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 14px; background: var(--light);
     }
-    .product-item-img:hover { border-color: var(--primary); }
-
-    .product-item-info { flex: 1; min-width: 0; }
-    .product-item-name {
-      font-weight: 600; font-size: .9rem;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    .search-wrap input:focus { outline: none; border-color: var(--primary); background: var(--white); }
+    .filter-select {
+      padding: 10px 14px; border: 1.5px solid var(--border);
+      border-radius: 8px; font-size: 13px; background: var(--light);
+      color: var(--dark); cursor: pointer;
     }
-    .product-item-meta { font-size: .78rem; color: var(--muted); margin-top: .2rem; }
-    .product-item-price { font-weight: 700; color: var(--primary); font-size: .88rem; }
+    .filter-select:focus { outline: none; border-color: var(--primary); }
 
-    .product-item-actions { display: flex; gap: .4rem; flex-shrink: 0; }
-    .btn-sm {
-      padding: .4rem .7rem; font-size: .78rem; border-radius: 6px;
+    /* Products grid */
+    .products-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
     }
 
-    /* Badges in list */
-    .tag-badge {
-      display: inline-block; font-size: .65rem; font-weight: 700;
-      padding: 2px 7px; border-radius: 4px; text-transform: uppercase; margin-left: .3rem;
+    /* Product card */
+    .product-card {
+      background: var(--white); border-radius: var(--radius);
+      box-shadow: var(--shadow-sm); overflow: hidden;
+      transition: transform .2s, box-shadow .2s;
+      display: flex; flex-direction: column;
     }
-    .tag-new  { background: #d1fae5; color: #065f46; }
-    .tag-sale { background: #fee2e2; color: #991b1b; }
-    .tag-none { display: none; }
-    .badge-oos  { background: #fef3c7; color: #92400e; }
-    .badge-sold { background: #e0e7ff; color: #3730a3; }
+    .product-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+    .card-img-wrap {
+      position: relative; height: 200px; overflow: hidden;
+      background: var(--light);
+    }
+    .card-img-wrap img {
+      width: 100%; height: 100%; object-fit: cover;
+      transition: transform .3s;
+    }
+    .product-card:hover .card-img-wrap img { transform: scale(1.04); }
+    .card-thumbnails {
+      position: absolute; bottom: 8px; left: 0; right: 0;
+      display: flex; justify-content: center; gap: 6px;
+    }
+    .card-thumb {
+      width: 32px; height: 32px; border-radius: 6px;
+      object-fit: cover; border: 2px solid var(--white);
+      cursor: pointer; transition: border-color .15s;
+    }
+    .card-thumb:hover, .card-thumb.active { border-color: var(--primary); }
+    .card-badge {
+      position: absolute; top: 10px; left: 10px;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+    }
+    .badge-new  { background: var(--success); color: var(--white); }
+    .badge-sale { background: var(--danger);  color: var(--white); }
+    .badge-oos  { background: var(--mid);     color: var(--white); }
+    .card-status {
+      position: absolute; top: 10px; right: 10px;
+      width: 10px; height: 10px; border-radius: 50%;
+      border: 2px solid var(--white);
+    }
+    .status-available { background: var(--success); }
+    .status-oos       { background: var(--danger);  }
+    .status-sold      { background: var(--mid);     }
+    .card-body { padding: 16px; flex: 1; display: flex; flex-direction: column; }
+    .card-cat {
+      font-size: 11px; text-transform: uppercase; font-weight: 700;
+      color: var(--primary); letter-spacing: .6px; margin-bottom: 4px;
+    }
+    .card-name { font-size: 15px; font-weight: 700; color: var(--dark); margin-bottom: 6px; line-height: 1.3; }
+    .card-price { font-size: 16px; font-weight: 800; color: var(--primary2); margin-bottom: 6px; }
+    .card-desc {
+      font-size: 12px; color: var(--mid); line-height: 1.5;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; flex: 1;
+    }
+    .card-footer {
+      padding: 12px 16px; border-top: 1px solid var(--border);
+      display: flex; gap: 8px;
+    }
+    .card-footer .btn { flex: 1; justify-content: center; }
 
-    /* ═══════════════ SEARCH BAR ═══════════════ */
-    .search-bar {
-      display: flex; gap: .6rem; margin-bottom: 1rem;
+    /* Empty state */
+    .empty-state {
+      grid-column: 1/-1; text-align: center; padding: 60px 20px;
+      background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-sm);
     }
-    .search-bar input {
-      flex: 1; padding: .55rem .9rem;
-      border: 2px solid var(--border); border-radius: 8px; font-size: .9rem;
-    }
-    .search-bar input:focus { outline: none; border-color: var(--primary); }
+    .empty-state i { font-size: 48px; color: var(--border); margin-bottom: 16px; }
+    .empty-state h3 { font-size: 18px; color: var(--dark); margin-bottom: 8px; }
+    .empty-state p  { color: var(--mid); font-size: 14px; }
 
-    /* ═══════════════ EMPTY / LOADING ═══════════════ */
-    .list-empty {
-      text-align: center; padding: 2.5rem 1rem; color: var(--muted);
+    /* Loading skeleton */
+    .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    /* ================================================
+       MODAL / DRAWER
+    ================================================ */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.55); backdrop-filter: blur(4px);
+      z-index: 1000; display: none;
+      align-items: flex-start; justify-content: center;
+      overflow-y: auto; padding: 20px;
     }
-    .list-empty i { font-size: 2.5rem; margin-bottom: .6rem; opacity: .4; }
-    .list-loading {
-      text-align: center; padding: 2rem; color: var(--muted); font-size: .9rem;
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+      background: var(--white); border-radius: 20px;
+      width: 100%; max-width: 640px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+      margin: auto; animation: popIn .25s ease;
+    }
+    @keyframes popIn { from { transform: scale(.94) translateY(20px); opacity:0; } to { transform: scale(1) translateY(0); opacity:1; } }
+    .modal-header {
+      padding: 22px 26px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-header h2 { font-size: 18px; font-weight: 800; color: var(--dark); display: flex; align-items: center; gap: 10px; }
+    .modal-header h2 i { color: var(--primary); }
+    .modal-close {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--light); border: none; cursor: pointer;
+      font-size: 16px; color: var(--mid); display: flex; align-items: center; justify-content: center;
+      transition: background .2s, color .2s;
+    }
+    .modal-close:hover { background: #fee2e2; color: var(--danger); }
+    .modal-body { padding: 24px 26px; }
+    .modal-footer {
+      padding: 18px 26px; border-top: 1px solid var(--border);
+      display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;
     }
 
-    /* ═══════════════ TOAST ═══════════════ */
-    .toast {
-      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 10000;
-      background: #1e293b; color: #fff; padding: .8rem 1.3rem;
-      border-radius: 10px; font-size: .9rem; max-width: 320px;
-      transform: translateY(100px); opacity: 0;
-      transition: all .3s; box-shadow: 0 4px 20px rgba(0,0,0,.25);
+    /* Form inside modal */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .form-grid .full { grid-column: 1 / -1; }
+    .fld label {
+      display: block; margin-bottom: 6px;
+      font-size: 13px; font-weight: 600; color: var(--dark);
     }
-    .toast.show { transform: translateY(0); opacity: 1; }
-    .toast.success { background: var(--success); }
-    .toast.error   { background: var(--danger);  }
+    .fld label span { color: var(--danger); }
+    .fld input, .fld select, .fld textarea {
+      width: 100%; padding: 11px 13px;
+      border: 1.5px solid var(--border); border-radius: 9px;
+      font-size: 14px; background: var(--white); color: var(--dark);
+      transition: border .2s;
+    }
+    .fld input:focus, .fld select:focus, .fld textarea:focus {
+      outline: none; border-color: var(--primary);
+    }
+    .fld textarea { resize: vertical; min-height: 80px; }
+    .fld .hint { font-size: 11px; color: var(--mid); margin-top: 4px; }
 
-    /* ═══════════════ PROGRESS BAR ═══════════════ */
-    .upload-progress {
-      display: none; margin-top: .5rem;
-      background: #e2e8f0; border-radius: 4px; height: 6px; overflow: hidden;
+    /* Price input with ₦ prefix */
+    .price-wrap { position: relative; }
+    .price-wrap .currency-sign {
+      position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+      font-weight: 700; color: var(--mid); font-size: 14px;
     }
-    .upload-progress.active { display: block; }
-    .upload-progress-bar {
-      height: 100%; background: var(--primary);
-      border-radius: 4px; transition: width .3s;
-    }
+    .price-wrap input { padding-left: 28px; }
 
-    /* ═══════════════ CONFIRM MODAL ═══════════════ */
-    .confirm-overlay {
-      display: none; position: fixed; inset: 0; z-index: 8000;
-      background: rgba(0,0,0,.5); align-items: center; justify-content: center;
+    /* Tag / status selects with colored options */
+    .toggle-row {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     }
-    .confirm-overlay.active { display: flex; }
-    .confirm-box {
-      background: #fff; border-radius: 16px; padding: 2rem;
-      max-width: 360px; width: 90%; box-shadow: var(--shadow);
-      text-align: center;
+    .toggle-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 14px; border: 1.5px solid var(--border);
+      border-radius: 9px; cursor: pointer; transition: all .2s;
+      user-select: none; font-size: 13px; font-weight: 600; color: var(--mid);
     }
-    .confirm-box i { font-size: 2.5rem; color: var(--danger); margin-bottom: .8rem; }
-    .confirm-box h3 { font-size: 1.1rem; margin-bottom: .5rem; }
-    .confirm-box p  { color: var(--muted); font-size: .9rem; margin-bottom: 1.2rem; }
-    .confirm-btns   { display: flex; gap: .7rem; justify-content: center; }
+    .toggle-item.active-oos    { border-color: var(--danger);  background: #fef2f2; color: var(--danger); }
+    .toggle-item.active-sold   { border-color: var(--mid);     background: #f3f4f6; color: var(--dark); }
+    .toggle-item input[type="checkbox"] { display: none; }
 
-    /* Mobile tweaks */
+    /* ================================================
+       IMAGE UPLOAD ZONE
+    ================================================ */
+    .img-upload-section { margin-top: 4px; }
+    .img-upload-section > label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--dark); }
+    .img-slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .img-slot {
+      aspect-ratio: 1; border-radius: 10px;
+      border: 2px dashed var(--border); overflow: hidden;
+      position: relative; cursor: pointer; background: var(--light);
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color .2s, background .2s;
+    }
+    .img-slot:hover { border-color: var(--primary); background: #f8f7ff; }
+    .img-slot.has-img { border-style: solid; border-color: var(--primary); }
+    .img-slot .placeholder {
+      text-align: center; pointer-events: none;
+    }
+    .img-slot .placeholder i { font-size: 22px; color: var(--border); display: block; margin-bottom: 4px; }
+    .img-slot .placeholder span { font-size: 10px; color: var(--mid); font-weight: 600; }
+    .img-slot .slot-label {
+      position: absolute; top: 4px; left: 6px;
+      font-size: 10px; font-weight: 700; background: var(--primary);
+      color: var(--white); border-radius: 4px; padding: 1px 5px; opacity: .85;
+    }
+    .img-slot img.preview {
+      width: 100%; height: 100%; object-fit: cover; display: none;
+    }
+    .img-slot.has-img img.preview { display: block; }
+    .img-slot.has-img .placeholder { display: none; }
+    .img-slot .remove-img {
+      position: absolute; top: 4px; right: 4px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--danger); color: var(--white);
+      font-size: 10px; border: none; cursor: pointer;
+      display: none; align-items: center; justify-content: center;
+      z-index: 2;
+    }
+    .img-slot.has-img .remove-img { display: flex; }
+    .img-slot input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; z-index: 1;
+    }
+    .img-upload-note { font-size: 11px; color: var(--mid); margin-top: 6px; line-height: 1.5; }
+
+    /* Upload progress bar */
+    .upload-progress { display: none; margin-top: 10px; }
+    .upload-progress.show { display: block; }
+    .progress-bar-wrap { height: 6px; background: var(--border); border-radius: 10px; overflow: hidden; }
+    .progress-bar-fill {
+      height: 100%; background: linear-gradient(90deg, var(--primary), var(--primary2));
+      border-radius: 10px; transition: width .3s; width: 0%;
+    }
+    .progress-label { font-size: 11px; color: var(--mid); margin-top: 4px; }
+
+    /* ================================================
+       DELETE CONFIRM MODAL
+    ================================================ */
+    .confirm-modal-box {
+      background: var(--white); border-radius: 20px;
+      width: 100%; max-width: 400px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+      margin: auto; animation: popIn .25s ease;
+      text-align: center; padding: 36px 28px;
+    }
+    .confirm-icon {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: #fee2e2; margin: 0 auto 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; color: var(--danger);
+    }
+    .confirm-modal-box h2 { font-size: 20px; color: var(--dark); margin-bottom: 8px; }
+    .confirm-modal-box p  { font-size: 14px; color: var(--mid); margin-bottom: 24px; line-height: 1.5; }
+    .confirm-actions { display: flex; gap: 10px; justify-content: center; }
+    .confirm-actions .btn { min-width: 120px; justify-content: center; }
+
+    /* ================================================
+       RESPONSIVE
+    ================================================ */
     @media (max-width: 600px) {
-      .app-layout { padding: 1rem; gap: 1rem; }
-      .card { padding: 1rem; }
-      .topbar { padding: .75rem 1rem; }
-      .stats-row { grid-template-columns: 1fr 1fr 1fr; }
-      .stat-val { font-size: 1.3rem; }
+      .page { padding: 0 12px 60px; margin-top: 20px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-grid .full { grid-column: 1; }
+      .img-slots { grid-template-columns: repeat(2, 1fr); }
+      .stats-bar { grid-template-columns: repeat(2, 1fr); }
+      .modal-body { padding: 20px 16px; }
+      .modal-header, .modal-footer { padding: 16px; }
+      .nav-right a span { display: none; }
+    }
+    @media (max-width: 400px) {
+      .img-slots { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
 <body>
 
-<!-- ═══════════════ IMAGE MAGNIFY OVERLAY (FIX #1) ═══════════════ -->
-<div id="imgMagnifyOverlay" role="dialog" aria-label="Image preview">
-  <button id="imgMagnifyClose" aria-label="Close preview">×</button>
-  <img id="imgMagnifyImg" src="" alt="Product preview" />
-</div>
+<!-- ══════════════════════════════════════════════
+     TOAST CONTAINER
+══════════════════════════════════════════════ -->
+<div id="toastContainer"></div>
 
-<!-- ═══════════════ DELETE CONFIRM MODAL ═══════════════ -->
-<div class="confirm-overlay" id="confirmOverlay">
-  <div class="confirm-box">
-    <i class="fas fa-exclamation-triangle"></i>
-    <h3>Delete Product?</h3>
-    <p id="confirmText">This action cannot be undone.</p>
-    <div class="confirm-btns">
-      <button class="btn btn-outline" id="confirmCancel">Cancel</button>
-      <button class="btn btn-danger"  id="confirmOk">
-        <i class="fas fa-trash"></i> Delete
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════════ TOAST ═══════════════ -->
-<div class="toast" id="toast"></div>
-
-<!-- ══════════════════════════════════════
+<!-- ══════════════════════════════════════════════
      LOGIN SCREEN
-══════════════════════════════════════════ -->
-<div id="loginScreen">
-  <div class="login-card">
+══════════════════════════════════════════════ -->
+<div id="loginScreen" class="login-wrapper">
+  <div class="login-box">
     <div class="login-logo">
-      <h1>Fortune<span>Hub</span></h1>
-      <p>Product Manager — Admin Access</p>
+      <div class="icon-wrap"><i class="fas fa-store"></i></div>
+      <h1>Product Manager</h1>
+      <p>FortuneHub Admin — Sign in to manage products</p>
     </div>
-    <label for="loginUser">Username</label>
-    <input type="text" id="loginUser" placeholder="admin" autocomplete="username" />
-    <label for="loginPass">Password</label>
-    <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" />
+    <div class="form-field">
+      <label>Username</label>
+      <div class="input-wrap">
+        <i class="fas fa-user prefix"></i>
+        <input type="text" id="loginUser" placeholder="Enter username" autocomplete="username">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>Password</label>
+      <div class="input-wrap">
+        <i class="fas fa-lock prefix"></i>
+        <input type="password" id="loginPass" placeholder="Enter password" autocomplete="current-password">
+        <i class="fas fa-eye toggle-pw" id="togglePw"></i>
+      </div>
+    </div>
     <button class="btn-login" id="loginBtn">
-      <i class="fas fa-sign-in-alt"></i> Sign In
+      <i class="fas fa-sign-in-alt"></i>&nbsp; Sign In
     </button>
-    <p id="loginError"></p>
+    <div class="login-footer">FortuneHub &copy; 2026 · Admin Dashboard</div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════
+<!-- ══════════════════════════════════════════════
      MAIN APP
-══════════════════════════════════════════ -->
-<div id="appScreen">
+══════════════════════════════════════════════ -->
+<div id="app">
+  <!-- Top Nav -->
+  <nav class="top-nav">
+    <div class="nav-inner">
+      <div class="nav-brand">
+        <div class="dot"><i class="fas fa-boxes"></i></div>
+        <span>Product Manager</span>
+      </div>
+      <div class="nav-right">
+        <a href="admin.html"><i class="fas fa-chart-bar"></i><span>Payments</span></a>
+        <a href="index.html" target="_blank"><i class="fas fa-external-link-alt"></i><span>Live Store</span></a>
+        <button class="nav-logout" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+      </div>
+    </div>
+  </nav>
 
-  <!-- TOP BAR -->
-  <div class="topbar">
-    <h1>Fortune<span>Hub</span> — Product Manager</h1>
-    <div class="topbar-actions">
-      <a href="index.html" class="btn-icon" target="_blank">
-        <i class="fas fa-store"></i> View Store
-      </a>
-      <button class="btn-icon" id="logoutBtn">
-        <i class="fas fa-sign-out-alt"></i> Logout
+  <!-- Page Content -->
+  <div class="page">
+    <!-- Stats Bar -->
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-card">
+        <div class="stat-icon purple"><i class="fas fa-box"></i></div>
+        <div><div class="stat-value" id="stat-total">0</div><div class="stat-label">Total Products</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
+        <div><div class="stat-value" id="stat-available">0</div><div class="stat-label">Available</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon red"><i class="fas fa-times-circle"></i></div>
+        <div><div class="stat-value" id="stat-oos">0</div><div class="stat-label">Out of Stock</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon amber"><i class="fas fa-tag"></i></div>
+        <div><div class="stat-value" id="stat-sale">0</div><div class="stat-label">On Sale</div></div>
+      </div>
+    </div>
+
+    <!-- Section Header -->
+    <div class="section-header">
+      <div class="section-title"><i class="fas fa-boxes" style="color:var(--primary);margin-right:8px;"></i>All Products</div>
+      <button class="btn btn-primary" id="addProductBtn">
+        <i class="fas fa-plus"></i> Add Product
       </button>
     </div>
-  </div>
 
-  <div class="app-layout">
-
-    <!-- ════════════ LEFT: PRODUCT LIST ════════════ -->
-    <div>
-      <!-- Stats -->
-      <div class="stats-row" id="statsRow">
-        <div class="stat-box">
-          <div class="stat-val" id="statTotal">—</div>
-          <div class="stat-lbl">Total Products</div>
-        </div>
-        <div class="stat-box success">
-          <div class="stat-val" id="statAvail">—</div>
-          <div class="stat-lbl">Available</div>
-        </div>
-        <div class="stat-box warning">
-          <div class="stat-val" id="statSold">—</div>
-          <div class="stat-lbl">Sold / OOS</div>
-        </div>
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="search-wrap">
+        <i class="fas fa-search"></i>
+        <input type="search" id="searchProducts" placeholder="Search products…">
       </div>
-
-      <!-- Product list card -->
-      <div class="card">
-        <div class="card-header">
-          <h2><i class="fas fa-boxes"></i> All Products</h2>
-          <button class="btn btn-primary btn-sm" id="refreshListBtn">
-            <i class="fas fa-sync-alt"></i> Refresh
-          </button>
-        </div>
-
-        <div class="search-bar">
-          <input type="search" id="listSearch" placeholder="Search products by name…" autocomplete="off" />
-        </div>
-
-        <div id="productList" class="product-list">
-          <div class="list-loading"><i class="fas fa-spinner fa-spin"></i> Loading products…</div>
-        </div>
-      </div>
+      <select class="filter-select" id="filterCategory">
+        <option value="all">All Categories</option>
+        <option value="phones">Phones</option>
+        <option value="accessories">Accessories</option>
+        <option value="laptops">Laptops</option>
+        <option value="speakers">Speakers</option>
+        <option value="watches">Watches</option>
+        <option value="games">Games</option>
+        <option value="others">Others</option>
+      </select>
+      <select class="filter-select" id="filterStatus">
+        <option value="all">All Status</option>
+        <option value="available">Available</option>
+        <option value="outofstock">Out of Stock</option>
+        <option value="sale">On Sale</option>
+        <option value="new">New</option>
+      </select>
+      <button class="btn btn-outline btn-sm" id="refreshBtn"><i class="fas fa-sync-alt"></i> Refresh</button>
     </div>
 
-    <!-- ════════════ RIGHT: ADD / EDIT FORM ════════════ -->
-    <div>
-      <div class="card" id="formCard">
-        <div class="card-header">
-          <h2 id="formTitle"><i class="fas fa-plus-circle"></i> Add New Product</h2>
-          <button class="btn btn-outline btn-sm" id="clearFormBtn" title="Clear form">
-            <i class="fas fa-times"></i> Clear
-          </button>
-        </div>
+    <!-- Products Grid -->
+    <div class="products-grid" id="productsGrid">
+      <!-- Injected by JS -->
+    </div>
+  </div>
+</div>
 
-        <form id="productForm" novalidate>
-          <input type="hidden" id="editId" value="" />
+<!-- ══════════════════════════════════════════════
+     ADD / EDIT PRODUCT MODAL
+══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="productModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2><i class="fas fa-box"></i> <span id="modalTitle">Add New Product</span></h2>
+      <button class="modal-close" id="closeProductModal"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <form id="productForm" novalidate>
+        <input type="hidden" id="editProductId">
 
-          <div class="form-grid">
+        <div class="form-grid">
 
-            <!-- Name -->
-            <div class="form-group full">
-              <label for="fName">Product Name <span class="req">*</span></label>
-              <input type="text" id="fName" class="form-control"
-                     placeholder="e.g. iPhone 15 Pro Max" required />
-            </div>
-
-            <!-- Price -->
-            <div class="form-group">
-              <label for="fPrice">Price (₦ Naira) <span class="req">*</span></label>
-              <input type="number" id="fPrice" class="form-control"
-                     placeholder="e.g. 59999 = ₦59,999" min="0" required />
-              <small style="color:var(--muted);font-size:.75rem;">Enter in Naira (e.g. 59999 = ₦59,999)</small>
-            </div>
-
-            <!-- Category -->
-            <div class="form-group">
-              <label for="fCategory">Category <span class="req">*</span></label>
-              <select id="fCategory" class="form-control" required>
-                <option value="">— Select category —</option>
-                <option value="phones">Phones</option>
-                <option value="accessories">Phone Accessories</option>
-                <option value="laptops">Laptops</option>
-                <option value="games">Games</option>
-                <option value="speakers">Speakers</option>
-                <option value="watches">Watches</option>
-              </select>
-            </div>
-
-            <!-- Description -->
-            <div class="form-group full">
-              <label for="fDesc">Description</label>
-              <textarea id="fDesc" class="form-control"
-                        placeholder="Describe the product features, specs…"></textarea>
-            </div>
-
-            <!-- Tag / Label -->
-            <div class="form-group">
-              <label for="fTag">Tag / Label</label>
-              <select id="fTag" class="form-control">
-                <option value="none">None</option>
-                <option value="new">🆕 New</option>
-                <option value="sale">🔥 Sale</option>
-                <option value="featured">⭐ Featured</option>
-              </select>
-            </div>
-
-            <!-- Status Indicator -->
-            <div class="form-group">
-              <label for="fStatus">Status Indicator</label>
-              <select id="fStatus" class="form-control">
-                <option value="available">✅ Available</option>
-                <option value="new">🆕 New</option>
-                <option value="sale">🔥 Sale</option>
-                <option value="outofstock">⛔ Out of Stock</option>
-                <option value="sold">✔️ Sold</option>
-              </select>
-            </div>
-
-            <!-- Availability Flags -->
-            <div class="form-group full">
-              <label>Availability Flags</label>
-              <div class="flags-row">
-                <label class="flag-label">
-                  <input type="checkbox" id="fOutOfStock" />
-                  <i class="fas fa-ban" style="color:var(--warning)"></i> Out of Stock
-                </label>
-                <label class="flag-label">
-                  <input type="checkbox" id="fSold" />
-                  <i class="fas fa-check-double" style="color:var(--success)"></i> Sold
-                </label>
-              </div>
-            </div>
-
-            <!-- ─── IMAGE UPLOAD SLOTS (FIXED) ───────────────────────────
-                 FIXES APPLIED:
-                 1. input[type=file] has z-index:6 → always on top → tap works
-                 2. slot-preview has pointer-events:none → never steals taps
-                 3. "Tap to change" hint on filled slots for clear UX
-                 4. accept="image/*" only, NO capture attr → Camera + Gallery
-            ────────────────────────────────────────────────────────────── -->
-            <div class="form-group full">
-              <label>
-                Product Images
-                <span style="font-weight:400;color:var(--muted);font-size:.8rem;">
-                  (tap / click to upload — up to 4)
-                </span>
-              </label>
-
-              <div class="image-slots" id="imageSlots">
-
-                <!-- SLOT 1 — Main Photo -->
-                <div class="img-slot" id="slot0">
-                  <input type="file"
-                         accept="image/*"
-                         id="imgInput0"
-                         aria-label="Upload main product photo"
-                         onchange="handleImageSelect(0, this)" />
-                  <div class="slot-placeholder">
-                    <i class="fas fa-camera"></i>
-                    <span class="slot-lbl">Main</span>
-                    <span class="slot-hint">📷 Camera or 🖼️ Gallery</span>
-                  </div>
-                  <img class="slot-preview" id="slotPreview0" alt="Main Photo" />
-                  <div class="slot-change-hint">📷 Tap to change</div>
-                  <button type="button" class="slot-remove" onclick="event.stopPropagation();removeSlotImage(0)"
-                          aria-label="Remove main photo">✕</button>
-                  <span class="slot-badge">Main</span>
-                </div>
-
-                <!-- SLOT 2 -->
-                <div class="img-slot" id="slot1">
-                  <input type="file"
-                         accept="image/*"
-                         id="imgInput1"
-                         aria-label="Upload second product photo"
-                         onchange="handleImageSelect(1, this)" />
-                  <div class="slot-placeholder">
-                    <i class="fas fa-image"></i>
-                    <span class="slot-lbl">2nd</span>
-                    <span class="slot-hint">📷 Camera or 🖼️ Gallery</span>
-                  </div>
-                  <img class="slot-preview" id="slotPreview1" alt="Photo 2" />
-                  <div class="slot-change-hint">📷 Tap to change</div>
-                  <button type="button" class="slot-remove" onclick="event.stopPropagation();removeSlotImage(1)"
-                          aria-label="Remove second photo">✕</button>
-                </div>
-
-                <!-- SLOT 3 -->
-                <div class="img-slot" id="slot2">
-                  <input type="file"
-                         accept="image/*"
-                         id="imgInput2"
-                         aria-label="Upload third product photo"
-                         onchange="handleImageSelect(2, this)" />
-                  <div class="slot-placeholder">
-                    <i class="fas fa-image"></i>
-                    <span class="slot-lbl">3rd</span>
-                    <span class="slot-hint">📷 Camera or 🖼️ Gallery</span>
-                  </div>
-                  <img class="slot-preview" id="slotPreview2" alt="Photo 3" />
-                  <div class="slot-change-hint">📷 Tap to change</div>
-                  <button type="button" class="slot-remove" onclick="event.stopPropagation();removeSlotImage(2)"
-                          aria-label="Remove third photo">✕</button>
-                </div>
-
-                <!-- SLOT 4 -->
-                <div class="img-slot" id="slot3">
-                  <input type="file"
-                         accept="image/*"
-                         id="imgInput3"
-                         aria-label="Upload fourth product photo"
-                         onchange="handleImageSelect(3, this)" />
-                  <div class="slot-placeholder">
-                    <i class="fas fa-image"></i>
-                    <span class="slot-lbl">4th</span>
-                    <span class="slot-hint">📷 Camera or 🖼️ Gallery</span>
-                  </div>
-                  <img class="slot-preview" id="slotPreview3" alt="Photo 4" />
-                  <div class="slot-change-hint">📷 Tap to change</div>
-                  <button type="button" class="slot-remove" onclick="event.stopPropagation();removeSlotImage(3)"
-                          aria-label="Remove fourth photo">✕</button>
-                </div>
-
-              </div><!-- /image-slots -->
-
-              <!-- Upload progress indicator -->
-              <div class="upload-progress" id="uploadProgress">
-                <div class="upload-progress-bar" id="uploadProgressBar" style="width:0%"></div>
-              </div>
-              <small style="color:var(--muted);font-size:.75rem;margin-top:.4rem;display:block;">
-                📱 Tap empty slot → choose <strong>Camera</strong> or <strong>Gallery</strong>. Tap filled slot → replace photo. ✕ removes it.<br>
-                💡 Images are auto-compressed for fast saving.
-              </small>
-            </div>
-
-          </div><!-- /form-grid -->
-
-          <div class="form-actions">
-            <button type="submit" class="btn btn-success" id="submitBtn">
-              <i class="fas fa-plus-circle"></i>
-              <span id="submitBtnText">Add Product</span>
-            </button>
-            <button type="button" class="btn btn-outline" id="cancelEditBtn" style="display:none">
-              <i class="fas fa-times"></i> Cancel Edit
-            </button>
+          <!-- Product Name -->
+          <div class="fld full">
+            <label>Product Name <span>*</span></label>
+            <input type="text" id="fName" placeholder="e.g. iPhone 15 Pro Max" required>
           </div>
 
-        </form>
-      </div><!-- /formCard -->
-    </div><!-- /right column -->
+          <!-- Price -->
+          <div class="fld">
+            <label>Price (₦ Naira) <span>*</span></label>
+            <div class="price-wrap">
+              <span class="currency-sign">₦</span>
+              <input type="number" id="fPrice" placeholder="0.00" min="0" step="0.01" required>
+            </div>
+            <div class="hint">Enter the price in Naira (e.g. 59999 = ₦59,999)</div>
+          </div>
 
-  </div><!-- /app-layout -->
-</div><!-- /appScreen -->
+          <!-- Category -->
+          <div class="fld">
+            <label>Category <span>*</span></label>
+            <select id="fCategory" required>
+              <option value="">— Select category —</option>
+              <option value="phones">Phones</option>
+              <option value="accessories">Accessories</option>
+              <option value="laptops">Laptops</option>
+              <option value="speakers">Speakers</option>
+              <option value="watches">Watches</option>
+              <option value="games">Games</option>
+              <option value="others">Others</option>
+            </select>
+          </div>
 
+          <!-- Description -->
+          <div class="fld full">
+            <label>Description</label>
+            <textarea id="fDescription" placeholder="Describe the product features, specs…" rows="3"></textarea>
+          </div>
+
+          <!-- Tag -->
+          <div class="fld">
+            <label>Tag / Label</label>
+            <select id="fTag">
+              <option value="none">None</option>
+              <option value="new">🆕 New</option>
+              <option value="sale">🔥 Sale</option>
+            </select>
+          </div>
+
+          <!-- Status Indicator -->
+          <div class="fld">
+            <label>Status Indicator</label>
+            <select id="fStatusIndicator">
+              <option value="available">✅ Available</option>
+              <option value="new">🆕 New</option>
+              <option value="sale">🔥 Sale</option>
+              <option value="outofstock">❌ Out of Stock</option>
+            </select>
+          </div>
+
+          <!-- Toggles -->
+          <div class="fld full">
+            <label>Availability Flags</label>
+            <div class="toggle-row">
+              <label class="toggle-item" id="toggleOos">
+                <input type="checkbox" id="fOutOfStock">
+                <i class="fas fa-ban"></i> Out of Stock
+              </label>
+              <label class="toggle-item" id="toggleSold">
+                <input type="checkbox" id="fSold">
+                <i class="fas fa-check-double"></i> Sold
+              </label>
+            </div>
+          </div>
+
+          <!-- Image Upload -->
+          <div class="fld full img-upload-section">
+            <label>Product Images (tap/click to upload — up to 4)</label>
+            <div class="img-slots" id="imgSlots">
+              <!-- Slot 0 (Primary) -->
+              <div class="img-slot" id="slot-0" data-slot="0">
+                <span class="slot-label">Main</span>
+                <input type="file" accept="image/*" id="fileInput-0" capture="environment">
+                <div class="placeholder">
+                  <i class="fas fa-camera"></i>
+                  <span>Main Photo</span>
+                </div>
+                <img class="preview" id="preview-0" src="" alt="">
+                <button type="button" class="remove-img" data-slot="0"><i class="fas fa-times"></i></button>
+              </div>
+              <!-- Slot 1 -->
+              <div class="img-slot" id="slot-1" data-slot="1">
+                <span class="slot-label">2nd</span>
+                <input type="file" accept="image/*" id="fileInput-1" capture="environment">
+                <div class="placeholder">
+                  <i class="fas fa-image"></i>
+                  <span>Photo 2</span>
+                </div>
+                <img class="preview" id="preview-1" src="" alt="">
+                <button type="button" class="remove-img" data-slot="1"><i class="fas fa-times"></i></button>
+              </div>
+              <!-- Slot 2 -->
+              <div class="img-slot" id="slot-2" data-slot="2">
+                <span class="slot-label">3rd</span>
+                <input type="file" accept="image/*" id="fileInput-2" capture="environment">
+                <div class="placeholder">
+                  <i class="fas fa-image"></i>
+                  <span>Photo 3</span>
+                </div>
+                <img class="preview" id="preview-2" src="" alt="">
+                <button type="button" class="remove-img" data-slot="2"><i class="fas fa-times"></i></button>
+              </div>
+              <!-- Slot 3 -->
+              <div class="img-slot" id="slot-3" data-slot="3">
+                <span class="slot-label">4th</span>
+                <input type="file" accept="image/*" id="fileInput-3" capture="environment">
+                <div class="placeholder">
+                  <i class="fas fa-image"></i>
+                  <span>Photo 4</span>
+                </div>
+                <img class="preview" id="preview-3" src="" alt="">
+                <button type="button" class="remove-img" data-slot="3"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+            <div class="img-upload-note">
+              📱 On mobile: tap a slot to take a photo or pick from your gallery.<br>
+              💡 Images are automatically compressed to save space. Recommended: clear, well-lit photos.
+            </div>
+            <!-- Compression progress -->
+            <div class="upload-progress" id="compressProgress">
+              <div class="progress-bar-wrap"><div class="progress-bar-fill" id="compressBar"></div></div>
+              <div class="progress-label" id="compressLabel">Compressing images…</div>
+            </div>
+          </div>
+
+        </div><!-- /form-grid -->
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="cancelProductBtn">Cancel</button>
+      <button class="btn btn-primary" id="saveProductBtn">
+        <i class="fas fa-save"></i> <span>Save Product</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     DELETE CONFIRM MODAL
+══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="confirm-modal-box">
+    <div class="confirm-icon"><i class="fas fa-trash-alt"></i></div>
+    <h2>Delete Product?</h2>
+    <p id="deleteProductName">This action cannot be undone. The product will be permanently removed from your store.</p>
+    <div class="confirm-actions">
+      <button class="btn btn-outline" id="cancelDeleteBtn">Cancel</button>
+      <button class="btn btn-danger" id="confirmDeleteBtn"><i class="fas fa-trash"></i> Delete</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════ -->
 <script>
 'use strict';
 
-// ═══════════════════════════════════════════════════════════
-// CONFIG
-// ═══════════════════════════════════════════════════════════
-const BACKEND = 'https://fortunehub-backend.onrender.com';
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CONFIG  —  Change these if your backend URL changes
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const API_BASE = 'https://fortunehub-backend.onrender.com';
 
-// ═══════════════════════════════════════════════════════════
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // STATE
-// ═══════════════════════════════════════════════════════════
-let authToken      = sessionStorage.getItem('pm_token') || '';
-let allProducts    = [];
-let imageDataURLs  = [null, null, null, null]; // base64 strings for 4 slots
-let pendingDelete  = null; // product _id waiting for confirmation
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let authToken   = localStorage.getItem('pm_token')   || '';
+let authUser    = localStorage.getItem('pm_user')    || '';
+let allProducts = [];                     // master list from API
+let imgDataUrls = ['', '', '', ''];       // base64 strings for 4 slots
+let editingId   = null;                  // null = new product, string = edit
+let deleteTargetId   = null;
+let deleteTargetName = '';
 
-// ─── DOM shortcuts ───
-const $ = id => document.getElementById(id);
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TOAST
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function toast(msg, type = 'success') {
+  const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<i class="fas ${icons[type] || icons.success}"></i><span class="toast-msg">${msg}</span>`;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => {
+    el.style.animation = 'slideOut .3s ease forwards';
+    setTimeout(() => el.remove(), 300);
+  }, 3500);
+}
 
-// ═══════════════════════════════════════════════════════════
-// AUTH HEADERS
-// ═══════════════════════════════════════════════════════════
-function authHeaders() {
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// AUTH HELPERS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function getAuthHeaders() {
   return {
-    'Content-Type':  'application/json',
-    'Authorization': `Basic ${authToken}`
+    'Content-Type': 'application/json',
+    'Authorization': 'Basic ' + authToken
   };
 }
 
-// ═══════════════════════════════════════════════════════════
-// TOAST
-// ═══════════════════════════════════════════════════════════
-function toast(msg, type = '') {
-  const el = $('toast');
-  el.textContent = msg;
-  el.className = `toast show${type ? ' ' + type : ''}`;
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), 3800);
+function logout() {
+  authToken = '';
+  authUser  = '';
+  localStorage.removeItem('pm_token');
+  localStorage.removeItem('pm_user');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  toast('Logged out successfully', 'success');
 }
 
-// ═══════════════════════════════════════════════════════════
-// FORMAT PRICE  (naira value stored × 100 = kobo in DB)
-// ═══════════════════════════════════════════════════════════
-function fmtPrice(kobo) {
-  return '₦' + (kobo / 100).toLocaleString('en-NG', {
-    minimumFractionDigits: 2, maximumFractionDigits: 2
-  });
-}
-
-// ═══════════════════════════════════════════════════════════
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // LOGIN
-// ═══════════════════════════════════════════════════════════
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 async function doLogin() {
-  const username = $('loginUser').value.trim();
-  const password = $('loginPass').value.trim();
-  $('loginError').textContent = '';
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+  if (!username || !password) { toast('Please enter username and password', 'warning'); return; }
 
-  if (!username || !password) {
-    $('loginError').textContent = 'Please enter username and password.';
-    return;
-  }
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>&nbsp; Signing in…';
 
   try {
-    const res  = await fetch(`${BACKEND}/api/admin/login`, {
-      method:  'POST',
+    const res = await fetch(`${API_BASE}/api/admin/login`, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ username, password })
+      body: JSON.stringify({ username, password })
     });
     const data = await res.json();
-
-    if (data.success) {
+    if (data.success && data.token) {
       authToken = data.token;
-      sessionStorage.setItem('pm_token', authToken);
+      authUser  = username;
+      localStorage.setItem('pm_token', authToken);
+      localStorage.setItem('pm_user',  authUser);
       showApp();
     } else {
-      $('loginError').textContent = data.message || 'Invalid credentials.';
+      toast(data.message || 'Invalid credentials', 'error');
     }
   } catch (e) {
-    $('loginError').textContent = 'Cannot connect to server. Try again.';
+    toast('Connection error — check your internet', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-sign-in-alt"></i>&nbsp; Sign In';
   }
 }
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SHOW APP
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function showApp() {
-  $('loginScreen').style.display = 'none';
-  $('appScreen').style.display   = 'block';
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
   loadProducts();
 }
 
-function doLogout() {
-  authToken = '';
-  sessionStorage.removeItem('pm_token');
-  $('appScreen').style.display   = 'none';
-  $('loginScreen').style.display = 'flex';
-  $('loginPass').value = '';
-}
-
-// Auto-login if token exists
-if (authToken) showApp();
-
-// ═══════════════════════════════════════════════════════════
-// LOAD & RENDER PRODUCTS
-// ═══════════════════════════════════════════════════════════
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// LOAD PRODUCTS FROM API
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 async function loadProducts() {
-  $('productList').innerHTML = '<div class="list-loading"><i class="fas fa-spinner fa-spin"></i> Loading…</div>';
+  const grid = document.getElementById('productsGrid');
+  grid.innerHTML = `
+    ${Array(6).fill(`
+      <div class="product-card">
+        <div class="skeleton" style="height:200px;"></div>
+        <div style="padding:16px;">
+          <div class="skeleton" style="height:12px;width:60%;margin-bottom:10px;"></div>
+          <div class="skeleton" style="height:18px;width:85%;margin-bottom:8px;"></div>
+          <div class="skeleton" style="height:14px;width:40%;"></div>
+        </div>
+      </div>
+    `).join('')}
+  `;
 
   try {
-    const res  = await fetch(`${BACKEND}/api/products`);
+    const res = await fetch(`${API_BASE}/api/products`, {
+      headers: getAuthHeaders(),
+      cache: 'no-store'
+    });
+    if (res.status === 401) { logout(); return; }
     const data = await res.json();
-
-    if (!data.success) throw new Error(data.message);
-    allProducts = data.data || [];
-    renderList(allProducts);
-    updateStats(allProducts);
+    if (data.success) {
+      allProducts = data.data || [];
+      renderProducts(allProducts);
+      updateStats(allProducts);
+    } else {
+      toast(data.message || 'Failed to load products', 'error');
+      grid.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-circle"></i><h3>Failed to load</h3><p>Could not fetch products from server.</p></div>`;
+    }
   } catch (e) {
-    $('productList').innerHTML = `<div class="list-empty">
-      <i class="fas fa-exclamation-circle"></i>
-      <p>Failed to load products.<br>${e.message}</p>
-    </div>`;
+    grid.innerHTML = `<div class="empty-state"><i class="fas fa-wifi"></i><h3>Connection Error</h3><p>Check your internet and try refreshing.</p></div>`;
+    toast('Could not reach server', 'error');
   }
 }
 
-function updateStats(list) {
-  $('statTotal').textContent = list.length;
-  $('statAvail').textContent = list.filter(p => !p.outOfStock && !p.sold).length;
-  $('statSold').textContent  = list.filter(p => p.outOfStock  || p.sold).length;
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// STATS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function updateStats(products) {
+  document.getElementById('stat-total').textContent     = products.length;
+  document.getElementById('stat-available').textContent = products.filter(p => !p.outOfStock && !p.sold).length;
+  document.getElementById('stat-oos').textContent       = products.filter(p => p.outOfStock).length;
+  document.getElementById('stat-sale').textContent      = products.filter(p => p.tag === 'sale').length;
 }
 
-function renderList(list) {
-  if (!list.length) {
-    $('productList').innerHTML = `<div class="list-empty">
-      <i class="fas fa-box-open"></i>
-      <p>No products yet.<br>Add your first product using the form →</p>
-    </div>`;
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FORMAT CURRENCY
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function fmt(kobo) {
+  return '₦' + (kobo / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// RENDER PRODUCT CARDS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderProducts(products) {
+  const grid = document.getElementById('productsGrid');
+  if (!products.length) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-box-open"></i>
+        <h3>No products found</h3>
+        <p>Add your first product using the "Add Product" button above.</p>
+      </div>`;
     return;
   }
 
-  $('productList').innerHTML = list.map(p => {
-    const imgSrc = p.image || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56"><rect width="56" height="56" fill="%23e2e8f0"/><text x="50%" y="55%" text-anchor="middle" fill="%2364748b" font-size="20">📦</text></svg>';
-    const tagBadge = p.tag && p.tag !== 'none'
-      ? `<span class="tag-badge tag-${p.tag}">${p.tag}</span>` : '';
-    const oosBadge  = p.outOfStock ? '<span class="tag-badge badge-oos">OOS</span>'  : '';
-    const soldBadge = p.sold       ? '<span class="tag-badge badge-sold">SOLD</span>' : '';
-    const pid       = p._id || p.id;
+  grid.innerHTML = products.map(p => {
+    const imgs  = Array.isArray(p.images) && p.images.length ? p.images : [p.image, p.image, p.image];
+    const main  = imgs[0] || '';
+    const badgeMap = { new: 'badge-new', sale: 'badge-sale' };
+    const badgeClass = badgeMap[p.tag] || '';
+    const badgeText  = p.tag !== 'none' ? p.tag : '';
+    const statusClass = p.outOfStock ? 'status-oos' : (p.sold ? 'status-sold' : 'status-available');
+    const dbId = p._id;
 
-    return `<div class="product-item" data-id="${pid}">
-      <!-- FIX #1: thumbnail click → magnify overlay -->
-      <img src="${imgSrc}" alt="${p.name}" class="product-item-img"
-           onclick="magnifyImg('${imgSrc}', '${p.name}')"
-           onerror="this.src='data:image/svg+xml,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'56\\' height=\\'56\\'><rect width=\\'56\\' height=\\'56\\' fill=\\'%23e2e8f0\\'/><text x=\\'50%\\' y=\\'55%\\' text-anchor=\\'middle\\' fill=\\'%2364748b\\' font-size=\\'20\\'>📦</text></svg>'"
-           title="Click to zoom" />
-      <div class="product-item-info">
-        <div class="product-item-name">${p.name}${tagBadge}${oosBadge}${soldBadge}</div>
-        <div class="product-item-meta">${p.category}</div>
-        <div class="product-item-price">${fmtPrice(p.price)}</div>
-      </div>
-      <div class="product-item-actions">
-        <button class="btn btn-primary btn-sm" onclick="editProduct('${pid}')" title="Edit">
-          <i class="fas fa-pen"></i>
-        </button>
-        <button class="btn btn-danger btn-sm" onclick="confirmDelete('${pid}', '${p.name.replace(/'/g,"\\'")}',)" title="Delete">
-          <i class="fas fa-trash"></i>
-        </button>
-      </div>
-    </div>`;
+    const thumbsHTML = imgs.slice(0,4).map((src, i) => src
+      ? `<img class="card-thumb${i===0?' active':''}" src="${src}" data-src="${src}" data-main-slot="${i}">`
+      : '').join('');
+
+    return `
+      <div class="product-card" data-id="${dbId}">
+        <div class="card-img-wrap">
+          <img src="${main || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Crect fill=\'%23f3f4f6\' width=\'200\' height=\'200\'/%3E%3Ctext fill=\'%23aaa\' font-size=\'14\' x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dominant-baseline=\'middle\'%3ENo Image%3C/text%3E%3C/svg%3E'}" 
+               class="card-main-img" id="main-img-${dbId}" alt="${p.name}">
+          <div class="card-thumbnails" id="thumbs-${dbId}">${thumbsHTML}</div>
+          ${badgeText ? `<span class="card-badge ${badgeClass}">${badgeText.toUpperCase()}</span>` : ''}
+          <span class="card-status ${statusClass}"></span>
+        </div>
+        <div class="card-body">
+          <div class="card-cat">${p.category}</div>
+          <div class="card-name">${p.name}</div>
+          <div class="card-price">${fmt(p.price)}</div>
+          <div class="card-desc">${p.description || ''}</div>
+        </div>
+        <div class="card-footer">
+          <button class="btn btn-outline btn-sm edit-btn" data-id="${dbId}"><i class="fas fa-edit"></i> Edit</button>
+          <button class="btn btn-danger btn-sm delete-btn" data-id="${dbId}" data-name="${p.name}"><i class="fas fa-trash"></i> Delete</button>
+        </div>
+      </div>`;
   }).join('');
+
+  // Thumbnail click to swap main image
+  grid.querySelectorAll('.card-thumb').forEach(thumb => {
+    thumb.addEventListener('click', e => {
+      e.stopPropagation();
+      const wrap   = thumb.closest('.card-img-wrap');
+      const mainEl = wrap.querySelector('.card-main-img');
+      mainEl.src   = thumb.dataset.src;
+      wrap.querySelectorAll('.card-thumb').forEach(t => t.classList.remove('active'));
+      thumb.classList.add('active');
+    });
+  });
 }
 
-// ─── Search filter ───
-$('listSearch').addEventListener('input', function() {
-  const q = this.value.trim().toLowerCase();
-  const filtered = q
-    ? allProducts.filter(p => p.name.toLowerCase().includes(q))
-    : allProducts;
-  renderList(filtered);
-});
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FILTER & SEARCH
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function applyFilter() {
+  const q   = document.getElementById('searchProducts').value.toLowerCase().trim();
+  const cat = document.getElementById('filterCategory').value;
+  const sts = document.getElementById('filterStatus').value;
 
-// ═══════════════════════════════════════════════════════════
-// IMAGE UPLOAD — FULLY FIXED
-// Fix 1: z-index on file input (CSS) ensures tap always opens picker
-// Fix 2: pointer-events:none on preview so it never steals taps
-// Fix 3: aggressive compression (max 700px, quality 0.72) keeps
-//         base64 payload small → avoids server 413 / timeout errors
-// Fix 4: better error messages with HTTP status shown
-// ═══════════════════════════════════════════════════════════
-function handleImageSelect(slotIndex, input) {
-  const file = input.files[0];
-  if (!file) return;
-
-  // Validate it is actually an image
-  if (!file.type.startsWith('image/')) {
-    toast('Please select an image file.', 'error');
-    input.value = '';
-    return;
+  let result = allProducts;
+  if (cat !== 'all') result = result.filter(p => p.category === cat);
+  if (sts !== 'all') {
+    if      (sts === 'available')  result = result.filter(p => !p.outOfStock && !p.sold);
+    else if (sts === 'outofstock') result = result.filter(p => p.outOfStock);
+    else if (sts === 'sale')       result = result.filter(p => p.tag === 'sale');
+    else if (sts === 'new')        result = result.filter(p => p.tag === 'new');
   }
+  if (q) result = result.filter(p =>
+    (p.name||'').toLowerCase().includes(q) ||
+    (p.description||'').toLowerCase().includes(q) ||
+    (p.category||'').toLowerCase().includes(q)
+  );
+  renderProducts(result);
+}
 
-  // Show progress
-  const prog    = $('uploadProgress');
-  const progBar = $('uploadProgressBar');
-  prog.classList.add('active');
-  progBar.style.width = '0%';
-
-  const reader = new FileReader();
-
-  reader.onprogress = e => {
-    if (e.lengthComputable) {
-      progBar.style.width = Math.round((e.loaded / e.total) * 60) + '%';
-    }
-  };
-
-  reader.onload = e => {
-    progBar.style.width = '75%';
-
-    // Compress image via canvas — max 700px, quality 0.72
-    // keeps each image ~60–80 KB in base64 → safe for server limits
-    const img = new Image();
-    img.onload = () => {
-      const MAX = 700; // reduced from 800 to keep payload smaller
-      let { width, height } = img;
-      if (width > MAX || height > MAX) {
-        if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
-        else                { width  = Math.round(width  * MAX / height); height = MAX; }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width  = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
-      // quality 0.72 (was 0.82) — still looks great, much smaller payload
-      const dataURL = canvas.toDataURL('image/jpeg', 0.72);
-
-      // Warn if a single image is still suspiciously large
-      const sizeKB = Math.round(dataURL.length * 0.75 / 1024);
-      if (sizeKB > 300) {
-        console.warn(`Image ${slotIndex} is ${sizeKB}KB after compression.`);
-      }
-
-      imageDataURLs[slotIndex] = dataURL;
-
-      const slotEl    = $(`slot${slotIndex}`);
-      const previewEl = $(`slotPreview${slotIndex}`);
-      previewEl.src = dataURL;
-      slotEl.classList.add('has-image');
-
-      progBar.style.width = '100%';
-      setTimeout(() => { prog.classList.remove('active'); progBar.style.width = '0%'; }, 600);
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// IMAGE COMPRESSION (Canvas)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function compressImage(file, maxPx = 900, quality = 0.78) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload  = e => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload  = () => {
+        let { width: w, height: h } = img;
+        if (w > maxPx || h > maxPx) {
+          if (w > h) { h = Math.round(h * maxPx / w); w = maxPx; }
+          else       { w = Math.round(w * maxPx / h); h = maxPx; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
     };
-    img.onerror = () => {
-      toast('Could not decode image. Try a different photo.', 'error');
-      prog.classList.remove('active');
-      input.value = '';
-    };
-    img.src = e.target.result;
-  };
-
-  reader.onerror = () => {
-    toast('Failed to read image. Try again.', 'error');
-    prog.classList.remove('active');
-    input.value = '';
-  };
-
-  reader.readAsDataURL(file);
+    reader.readAsDataURL(file);
+  });
 }
 
-function removeSlotImage(slotIndex) {
-  imageDataURLs[slotIndex] = null;
-  const slotEl    = $(`slot${slotIndex}`);
-  const previewEl = $(`slotPreview${slotIndex}`);
-  const inputEl   = $(`imgInput${slotIndex}`);
-  previewEl.src = '';
-  slotEl.classList.remove('has-image');
-  // Reset file input by replacing it to clear cached file reference
-  try { inputEl.value = ''; } catch(e) {}
-  // Force re-clone on some Android browsers that don't clear properly
-  const clone = inputEl.cloneNode(true);
-  inputEl.parentNode.replaceChild(clone, inputEl);
-  // Re-attach onchange handler on the new clone
-  clone.addEventListener('change', function() { handleImageSelect(slotIndex, this); });
-}
-
-// ═══════════════════════════════════════════════════════════
-// IMAGE MAGNIFY (opened via a dedicated button, not via preview)
-// ═══════════════════════════════════════════════════════════
-function magnifyImg(src, alt) {
-  if (!src || src === 'undefined') return;
-  $('imgMagnifyImg').src = src;
-  $('imgMagnifyImg').alt = alt || 'Product image';
-  $('imgMagnifyOverlay').classList.add('active');
-}
-
-function magnifySlot(idx) {
-  const src = imageDataURLs[idx];
-  if (!src) return;
-  magnifyImg(src, `Product image ${idx + 1}`);
-}
-
-$('imgMagnifyClose').addEventListener('click', () => {
-  $('imgMagnifyOverlay').classList.remove('active');
-});
-$('imgMagnifyOverlay').addEventListener('click', e => {
-  if (e.target === $('imgMagnifyOverlay')) $('imgMagnifyOverlay').classList.remove('active');
-});
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') $('imgMagnifyOverlay').classList.remove('active');
-});
-
-// ═══════════════════════════════════════════════════════════
-// FORM — CLEAR
-// ═══════════════════════════════════════════════════════════
-function clearForm() {
-  $('editId').value    = '';
-  $('fName').value     = '';
-  $('fPrice').value    = '';
-  $('fCategory').value = '';
-  $('fDesc').value     = '';
-  $('fTag').value      = 'none';
-  $('fStatus').value   = 'available';
-  $('fOutOfStock').checked = false;
-  $('fSold').checked       = false;
-
-  for (let i = 0; i < 4; i++) removeSlotImage(i);
-
-  $('formTitle').innerHTML     = '<i class="fas fa-plus-circle"></i> Add New Product';
-  $('submitBtnText').textContent = 'Add Product';
-  $('cancelEditBtn').style.display = 'none';
-  $('fName').focus();
-}
-
-// ═══════════════════════════════════════════════════════════
-// FORM — POPULATE FOR EDIT
-// ═══════════════════════════════════════════════════════════
-function editProduct(pid) {
-  const product = allProducts.find(p => (p._id || p.id) == pid);
-  if (!product) return;
-
-  $('editId').value    = pid;
-  $('fName').value     = product.name        || '';
-  $('fPrice').value    = product.price != null ? (product.price / 100) : '';
-  $('fCategory').value = product.category    || '';
-  $('fDesc').value     = product.description || '';
-  $('fTag').value      = product.tag         || 'none';
-  $('fStatus').value   = product.statusIndicator || 'available';
-  $('fOutOfStock').checked = !!product.outOfStock;
-  $('fSold').checked       = !!product.sold;
-
-  // Load existing images into slots
-  const imgs = Array.isArray(product.images) && product.images.length
-    ? product.images : [product.image];
-
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// IMAGE SLOT HANDLERS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function setupImageSlots() {
   for (let i = 0; i < 4; i++) {
-    removeSlotImage(i);
-    if (imgs[i]) {
-      imageDataURLs[i] = imgs[i];
-      const slotEl    = $(`slot${i}`);
-      const previewEl = $(`slotPreview${i}`);
-      previewEl.src = imgs[i];
-      slotEl.classList.add('has-image');
+    const input = document.getElementById(`fileInput-${i}`);
+    if (!input) continue;
+    input.addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      // Show progress
+      document.getElementById('compressProgress').classList.add('show');
+      setProgress(30);
+      document.getElementById('compressLabel').textContent = `Compressing image ${i+1}…`;
+      try {
+        const dataUrl = await compressImage(file);
+        imgDataUrls[i] = dataUrl;
+        setProgress(90);
+        const preview = document.getElementById(`preview-${i}`);
+        preview.src = dataUrl;
+        document.getElementById(`slot-${i}`).classList.add('has-img');
+        setProgress(100);
+        setTimeout(() => {
+          document.getElementById('compressProgress').classList.remove('show');
+          setProgress(0);
+        }, 600);
+      } catch(err) {
+        toast('Failed to process image', 'error');
+        document.getElementById('compressProgress').classList.remove('show');
+      }
+      input.value = ''; // reset so same file can be reselected
+    });
+  }
+
+  // Remove image buttons
+  document.querySelectorAll('.remove-img').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      const slot = btn.dataset.slot;
+      imgDataUrls[slot] = '';
+      document.getElementById(`preview-${slot}`).src = '';
+      document.getElementById(`slot-${slot}`).classList.remove('has-img');
+      document.getElementById(`fileInput-${slot}`).value = '';
+    });
+  });
+}
+
+function setProgress(pct) {
+  document.getElementById('compressBar').style.width = pct + '%';
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// OPEN ADD MODAL
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openAddModal() {
+  editingId = null;
+  imgDataUrls = ['', '', '', ''];
+  document.getElementById('productForm').reset();
+  document.getElementById('editProductId').value = '';
+  document.getElementById('modalTitle').textContent = 'Add New Product';
+  document.getElementById('saveProductBtn').innerHTML = '<i class="fas fa-plus-circle"></i> Add Product';
+
+  // Clear image slots
+  for (let i = 0; i < 4; i++) {
+    document.getElementById(`preview-${i}`).src = '';
+    document.getElementById(`slot-${i}`).classList.remove('has-img');
+  }
+
+  // Reset toggles
+  document.getElementById('fOutOfStock').checked = false;
+  document.getElementById('fSold').checked = false;
+  updateToggleUI();
+
+  openModal('productModal');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// OPEN EDIT MODAL
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openEditModal(id) {
+  const p = allProducts.find(x => String(x._id) === String(id));
+  if (!p) { toast('Product not found', 'error'); return; }
+
+  editingId = id;
+  imgDataUrls = ['', '', '', ''];
+
+  document.getElementById('modalTitle').textContent = 'Edit Product';
+  document.getElementById('saveProductBtn').innerHTML = '<i class="fas fa-save"></i> Update Product';
+  document.getElementById('editProductId').value = id;
+
+  document.getElementById('fName').value        = p.name || '';
+  document.getElementById('fPrice').value       = p.price ? (p.price / 100).toFixed(2) : '';
+  document.getElementById('fCategory').value    = p.category || '';
+  document.getElementById('fDescription').value = p.description || '';
+  document.getElementById('fTag').value         = p.tag || 'none';
+  document.getElementById('fStatusIndicator').value = p.statusIndicator || 'available';
+  document.getElementById('fOutOfStock').checked    = Boolean(p.outOfStock);
+  document.getElementById('fSold').checked          = Boolean(p.sold);
+  updateToggleUI();
+
+  // Populate image slots
+  const imgs = Array.isArray(p.images) && p.images.length ? p.images : [p.image];
+  for (let i = 0; i < 4; i++) {
+    const src = imgs[i] || '';
+    imgDataUrls[i] = src;
+    if (src) {
+      document.getElementById(`preview-${i}`).src = src;
+      document.getElementById(`slot-${i}`).classList.add('has-img');
+    } else {
+      document.getElementById(`preview-${i}`).src = '';
+      document.getElementById(`slot-${i}`).classList.remove('has-img');
     }
   }
 
-  $('formTitle').innerHTML       = '<i class="fas fa-pen"></i> Edit Product';
-  $('submitBtnText').textContent = 'Save Changes';
-  $('cancelEditBtn').style.display = 'inline-flex';
-
-  // Scroll to form on mobile
-  $('formCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  openModal('productModal');
 }
 
-// ═══════════════════════════════════════════════════════════
-// FORM SUBMIT — ADD or EDIT
-// ═══════════════════════════════════════════════════════════
-$('productForm').addEventListener('submit', async e => {
-  e.preventDefault();
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SAVE PRODUCT (Create or Update)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function saveProduct() {
+  const name     = document.getElementById('fName').value.trim();
+  const priceStr = document.getElementById('fPrice').value.trim();
+  const cat      = document.getElementById('fCategory').value;
 
-  const name     = $('fName').value.trim();
-  const priceNaira = parseFloat($('fPrice').value);
-  const category = $('fCategory').value;
+  if (!name)     { toast('Product name is required',   'warning'); document.getElementById('fName').focus(); return; }
+  if (!priceStr) { toast('Price is required',           'warning'); document.getElementById('fPrice').focus(); return; }
+  if (!cat)      { toast('Please select a category',   'warning'); document.getElementById('fCategory').focus(); return; }
 
-  if (!name || !category || isNaN(priceNaira) || priceNaira < 0) {
-    toast('Please fill in Name, Price, and Category.', 'error');
-    return;
-  }
+  const priceNaira = parseFloat(priceStr);
+  if (isNaN(priceNaira) || priceNaira < 0) { toast('Enter a valid price', 'warning'); return; }
 
-  // Convert naira → kobo (same as products.json format)
   const priceKobo = Math.round(priceNaira * 100);
 
-  // Build images array (non-null slots)
-  const imagesArr = imageDataURLs.filter(Boolean);
-  const mainImg   = imagesArr[0] || '';
+  // Check at least one image
+  const validImgs = imgDataUrls.filter(Boolean);
+  if (!validImgs.length) { toast('Please upload at least one product image', 'warning'); return; }
 
   const payload = {
     name,
     price:           priceKobo,
-    category:        category.toLowerCase(),
-    description:     $('fDesc').value.trim(),
-    image:           mainImg,
-    images:          imagesArr,
-    tag:             $('fTag').value,
-    outOfStock:      $('fOutOfStock').checked,
-    sold:            $('fSold').checked,
-    statusIndicator: $('fStatus').value
+    category:        cat,
+    description:     document.getElementById('fDescription').value.trim(),
+    image:           imgDataUrls[0] || '',
+    images:          imgDataUrls.filter(Boolean),
+    tag:             document.getElementById('fTag').value,
+    outOfStock:      document.getElementById('fOutOfStock').checked,
+    sold:            document.getElementById('fSold').checked,
+    statusIndicator: document.getElementById('fStatusIndicator').value
   };
 
-  const editId = $('editId').value;
-  const isEdit = Boolean(editId);
-
-  const url    = isEdit ? `${BACKEND}/api/products/${editId}` : `${BACKEND}/api/products`;
-  const method = isEdit ? 'PUT' : 'POST';
-
-  const btn = $('submitBtn');
+  const btn = document.getElementById('saveProductBtn');
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
 
-  // ══ PAYLOAD SIZE GUARD ══
-  // Warn if total JSON is very large (server may reject > 1MB)
-  const payloadStr = JSON.stringify(payload);
-  const payloadKB  = Math.round(payloadStr.length / 1024);
-  if (payloadKB > 900) {
-    toast(`⚠️ Payload is ${payloadKB}KB. Consider using fewer/smaller images.`, 'error');
-    btn.disabled = false;
-    btn.innerHTML = `<i class="fas fa-${isEdit ? 'save' : 'plus-circle'}"></i> <span id="submitBtnText">${isEdit ? 'Save Changes' : 'Add Product'}</span>`;
-    return;
-  }
-
   try {
+    const url    = editingId ? `${API_BASE}/api/products/${editingId}` : `${API_BASE}/api/products`;
+    const method = editingId ? 'PUT' : 'POST';
+
     const res  = await fetch(url, {
       method,
-      headers: authHeaders(),
-      body:    payloadStr
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
     });
 
-    // Handle non-OK HTTP status explicitly
-    if (!res.ok) {
-      const statusText = res.status === 413
-        ? '413 — Images too large for server. Try removing one or more images.'
-        : res.status === 401
-        ? '401 — Session expired. Please log out and back in.'
-        : res.status === 403
-        ? '403 — Not authorised.'
-        : `HTTP ${res.status} error from server.`;
-      toast(statusText, 'error');
-      btn.disabled = false;
-      btn.innerHTML = `<i class="fas fa-${isEdit ? 'save' : 'plus-circle'}"></i> <span id="submitBtnText">${isEdit ? 'Save Changes' : 'Add Product'}</span>`;
-      return;
-    }
-
+    if (res.status === 401) { logout(); return; }
     const data = await res.json();
 
     if (data.success) {
-      toast(isEdit ? '✅ Product updated!' : '✅ Product added!', 'success');
-      clearForm();
+      toast(editingId ? '✅ Product updated!' : '✅ Product added!', 'success');
+      closeModal('productModal');
       loadProducts();
     } else {
-      toast(data.message || 'Save failed.', 'error');
+      toast(data.message || 'Save failed', 'error');
     }
-  } catch (err) {
-    toast('Network error: ' + err.message, 'error');
+  } catch (e) {
+    toast('Network error — please try again', 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = `<i class="fas fa-${isEdit ? 'save' : 'plus-circle'}"></i> <span id="submitBtnText">${isEdit ? 'Save Changes' : 'Add Product'}</span>`;
+    btn.innerHTML = editingId
+      ? '<i class="fas fa-save"></i> Update Product'
+      : '<i class="fas fa-plus-circle"></i> Add Product';
   }
-});
-
-// ═══════════════════════════════════════════════════════════
-// DELETE with CONFIRM MODAL
-// ═══════════════════════════════════════════════════════════
-function confirmDelete(pid, name) {
-  pendingDelete = pid;
-  $('confirmText').textContent = `Delete "${name}"? This cannot be undone.`;
-  $('confirmOverlay').classList.add('active');
 }
 
-$('confirmCancel').addEventListener('click', () => {
-  $('confirmOverlay').classList.remove('active');
-  pendingDelete = null;
-});
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// DELETE PRODUCT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function promptDelete(id, name) {
+  deleteTargetId   = id;
+  deleteTargetName = name;
+  document.getElementById('deleteProductName').textContent =
+    `"${name}" will be permanently removed from your store. This cannot be undone.`;
+  openModal('deleteModal');
+}
 
-$('confirmOk').addEventListener('click', async () => {
-  if (!pendingDelete) return;
-  $('confirmOverlay').classList.remove('active');
+async function executeDelete() {
+  if (!deleteTargetId) return;
+  const btn = document.getElementById('confirmDeleteBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting…';
 
   try {
-    const res  = await fetch(`${BACKEND}/api/products/${pendingDelete}`, {
-      method:  'DELETE',
-      headers: authHeaders()
+    const res  = await fetch(`${API_BASE}/api/products/${deleteTargetId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
     });
+    if (res.status === 401) { logout(); return; }
     const data = await res.json();
 
     if (data.success) {
-      toast('🗑️ Product deleted.', 'success');
+      toast(`🗑️ "${deleteTargetName}" deleted`, 'success');
+      closeModal('deleteModal');
       loadProducts();
-      // If we were editing this product, clear the form
-      if ($('editId').value === pendingDelete) clearForm();
     } else {
-      toast(data.message || 'Delete failed.', 'error');
+      toast(data.message || 'Delete failed', 'error');
     }
-  } catch (err) {
-    toast('Network error: ' + err.message, 'error');
+  } catch (e) {
+    toast('Network error', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+    deleteTargetId = null;
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// MODAL HELPERS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openModal(id)  {
+  document.getElementById(id).classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TOGGLE CHECKBOXES UI FEEDBACK
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function updateToggleUI() {
+  const oos  = document.getElementById('fOutOfStock').checked;
+  const sold = document.getElementById('fSold').checked;
+  document.getElementById('toggleOos').classList.toggle('active-oos',  oos);
+  document.getElementById('toggleSold').classList.toggle('active-sold', sold);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// INIT — EVENT LISTENERS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+document.addEventListener('DOMContentLoaded', () => {
+
+  // Check existing session
+  if (authToken) {
+    showApp();
   }
 
-  pendingDelete = null;
-});
+  // Login
+  document.getElementById('loginBtn').addEventListener('click', doLogin);
+  document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('loginUser').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('loginPass').focus(); });
 
-// ═══════════════════════════════════════════════════════════
-// MISC EVENT LISTENERS
-// ═══════════════════════════════════════════════════════════
-$('loginBtn').addEventListener('click', doLogin);
-$('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-$('logoutBtn').addEventListener('click', doLogout);
-$('refreshListBtn').addEventListener('click', loadProducts);
-$('clearFormBtn').addEventListener('click', clearForm);
-$('cancelEditBtn').addEventListener('click', clearForm);
+  // Toggle password visibility
+  document.getElementById('togglePw').addEventListener('click', () => {
+    const inp = document.getElementById('loginPass');
+    const eye = document.getElementById('togglePw');
+    if (inp.type === 'password') { inp.type = 'text'; eye.classList.replace('fa-eye', 'fa-eye-slash'); }
+    else                         { inp.type = 'password'; eye.classList.replace('fa-eye-slash', 'fa-eye'); }
+  });
+
+  // Logout
+  document.getElementById('logoutBtn').addEventListener('click', logout);
+
+  // Add product
+  document.getElementById('addProductBtn').addEventListener('click', openAddModal);
+
+  // Save product
+  document.getElementById('saveProductBtn').addEventListener('click', saveProduct);
+
+  // Cancel / close modals
+  document.getElementById('cancelProductBtn').addEventListener('click', () => closeModal('productModal'));
+  document.getElementById('closeProductModal').addEventListener('click', () => closeModal('productModal'));
+  document.getElementById('cancelDeleteBtn').addEventListener('click', () => closeModal('deleteModal'));
+  document.getElementById('confirmDeleteBtn').addEventListener('click', executeDelete);
+
+  // Close modal on overlay click
+  document.getElementById('productModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('productModal')) closeModal('productModal');
+  });
+  document.getElementById('deleteModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('deleteModal')) closeModal('deleteModal');
+  });
+
+  // Refresh
+  document.getElementById('refreshBtn').addEventListener('click', loadProducts);
+
+  // Search & Filter
+  document.getElementById('searchProducts').addEventListener('input', applyFilter);
+  document.getElementById('filterCategory').addEventListener('change', applyFilter);
+  document.getElementById('filterStatus').addEventListener('change', applyFilter);
+
+  // Product grid — edit & delete (event delegation)
+  document.getElementById('productsGrid').addEventListener('click', e => {
+    const editBtn   = e.target.closest('.edit-btn');
+    const deleteBtn = e.target.closest('.delete-btn');
+    if (editBtn)   openEditModal(editBtn.dataset.id);
+    if (deleteBtn) promptDelete(deleteBtn.dataset.id, deleteBtn.dataset.name);
+  });
+
+  // Toggle checkboxes
+  document.getElementById('fOutOfStock').addEventListener('change', updateToggleUI);
+  document.getElementById('fSold').addEventListener('change', updateToggleUI);
+
+  // Tag auto-update statusIndicator
+  document.getElementById('fTag').addEventListener('change', () => {
+    const tag = document.getElementById('fTag').value;
+    const si  = document.getElementById('fStatusIndicator');
+    if (tag === 'new')  si.value = 'new';
+    if (tag === 'sale') si.value = 'sale';
+    if (tag === 'none') si.value = 'available';
+  });
+
+  // Image slots
+  setupImageSlots();
+});
 </script>
 </body>
 </html>
