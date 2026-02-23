@@ -1027,14 +1027,37 @@ function initiatePaystackPayment() {
 // 13) INIT
 // ------------------------------
 async function initializeApp() {
+  // Load from products.json (static) AND from DB API (dynamic), then merge
+  let staticProducts = [];
+  let dbProducts = [];
+
+  // 1) Load static products.json (always)
   try {
     const response = await fetch(getProductsJsonUrl(), { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    products = await response.json();
+    staticProducts = await response.json();
   } catch (e) {
     console.error("❌ Failed to load products.json:", e);
-    products = [];
   }
+
+  // 2) Load products from backend DB (non-blocking — if fails, just skip)
+  try {
+    const dbRes = await fetch(`${API_BASE_URL}/api/products`, { cache: "no-store" });
+    if (dbRes.ok) {
+      const dbData = await dbRes.json();
+      if (dbData.success && Array.isArray(dbData.data)) {
+        dbProducts = dbData.data;
+      }
+    }
+  } catch (e) {
+    console.warn("⚠️ Could not load DB products (using static only):", e.message);
+  }
+
+  // 3) Merge: DB products come first (they are newest), then static products
+  //    Avoid duplicates by checking if same _id exists
+  const dbIds = new Set(dbProducts.map(p => String(p._id)));
+  const filteredStatic = staticProducts.filter(p => !dbIds.has(String(p._id)));
+  products = [...dbProducts, ...filteredStatic];
 
   displayProducts(products);
   setupEventListeners();
