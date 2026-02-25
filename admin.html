@@ -791,18 +791,36 @@
       .btn-hamburger { display: flex; }
     }
 
+    @media (max-width: 768px) {
+      /* Table responsive: hide less-important columns */
+      .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      table { min-width: 620px; }
+      .section-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+      .section-header > div, .section-header > button { width: 100%; }
+      .filter-bar { flex-direction: column; gap: 10px; }
+      .filter-bar .search-input-wrap { width: 100%; }
+      .filter-bar .filter-select { width: 100%; }
+    }
+
     @media (max-width: 600px) {
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
       .products-grid { grid-template-columns: 1fr 1fr; }
-      .page-content { padding: 16px; }
-      .topbar { padding: 0 16px; }
-      .modal-body, .modal-header, .modal-footer { padding: 18px 18px; }
+      .page-content { padding: 12px; }
+      .topbar { padding: 0 12px; height: 56px; }
+      .modal-body, .modal-header, .modal-footer { padding: 14px 16px; }
       .preview-grid { grid-template-columns: repeat(2, 1fr); }
+      .form-row { grid-template-columns: 1fr !important; }
+      .modal { width: 96vw !important; max-width: 96vw !important; }
+      th, td { padding: 8px 10px !important; font-size: 12px !important; }
+      .pcard-actions { flex-direction: row; flex-wrap: wrap; }
     }
 
     @media (max-width: 420px) {
       .products-grid { grid-template-columns: 1fr; }
-      .stats-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .page-content { padding: 10px 8px; }
+      .topbar-badge { display: none; }
+      code { font-size: 10px !important; }
     }
 
     /* Scrollbar */
@@ -1019,60 +1037,105 @@
            VIEW: PAYMENTS
       ============================================= -->
       <div class="view" id="view-payments">
-        <div class="section-header">
-          <h2>Payment Transactions</h2>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <div class="search-input-wrap" style="min-width:200px;">
-              <i class="fas fa-search"></i>
-              <input type="text" id="paymentSearch" placeholder="Search reference or email..." />
-            </div>
-            <select class="filter-select" id="paymentStatusFilter">
-              <option value="all">All Status</option>
-              <option value="success">Success</option>
-              <option value="pending">Pending</option>
-              <option value="failed">Failed</option>
-            </select>
-          </div>
+
+        <!-- Header -->
+        <div class="section-header" style="margin-bottom:16px;">
+          <h2>Transaction History</h2>
+          <button class="btn btn-danger" id="clearAllBtn" onclick="clearAllTransactions()">
+            <i class="fas fa-trash-alt"></i> Clear All
+          </button>
         </div>
 
+        <!-- Stats -->
         <div class="stats-grid" style="margin-bottom:20px;">
+          <div class="stat-card">
+            <div class="stat-icon blue"><i class="fas fa-receipt"></i></div>
+            <div class="stat-info">
+              <div class="stat-value" id="payStatTotal">0</div>
+              <div class="stat-label">Total Transactions</div>
+            </div>
+          </div>
           <div class="stat-card">
             <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
             <div class="stat-info">
-              <div class="stat-value" id="payStatSuccess">–</div>
+              <div class="stat-value" id="payStatSuccess">0</div>
               <div class="stat-label">Successful</div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-icon orange"><i class="fas fa-clock"></i></div>
             <div class="stat-info">
-              <div class="stat-value" id="payStatPending">–</div>
+              <div class="stat-value" id="payStatPending">0</div>
               <div class="stat-label">Pending</div>
             </div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon blue"><i class="fas fa-naira-sign"></i></div>
+            <div class="stat-icon purple"><i class="fas fa-naira-sign"></i></div>
             <div class="stat-info">
-              <div class="stat-value" id="payStatTotal">–</div>
+              <div class="stat-value" id="payStatRevenue">₦0</div>
               <div class="stat-label">Total Revenue</div>
             </div>
           </div>
         </div>
 
-        <div class="table-wrap">
-          <table>
+        <!-- Filters -->
+        <div class="table-wrap" style="padding:20px;margin-bottom:16px;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;">
+            <div class="field">
+              <label style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;display:block;">Status</label>
+              <select class="filter-select" id="paymentStatusFilter" style="width:100%;">
+                <option value="all">All Status</option>
+                <option value="success">Success</option>
+                <option value="pending">Pending</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+            <div class="field">
+              <label style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;display:block;">Search</label>
+              <div class="search-input-wrap">
+                <i class="fas fa-search"></i>
+                <input type="text" id="paymentSearch" placeholder="Reference or Email..." />
+              </div>
+            </div>
+            <div class="field">
+              <label style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;display:block;">Start Date</label>
+              <input type="date" id="payStartDate" class="filter-select" style="width:100%;" />
+            </div>
+            <div class="field">
+              <label style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;display:block;">End Date</label>
+              <input type="date" id="payEndDate" class="filter-select" style="width:100%;" />
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="applyPayFilters">
+              <i class="fas fa-filter"></i> Apply Filters
+            </button>
+            <button class="btn btn-secondary" id="resetPayFilters">
+              <i class="fas fa-redo"></i> Reset
+            </button>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="table-wrap" style="overflow-x:auto;">
+          <div id="payLoadingIndicator" style="display:none;text-align:center;padding:30px;">
+            <div class="spinner dark" style="margin:0 auto 12px;"></div>
+            <p style="color:var(--text-muted);">Loading transactions...</p>
+          </div>
+          <table id="paymentsTable" style="width:100%;">
             <thead>
               <tr>
+                <th>Date</th>
                 <th>Reference</th>
                 <th>Customer</th>
+                <th>Email</th>
                 <th>Amount</th>
                 <th>Status</th>
-                <th>Email Sent</th>
-                <th>Date</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody id="paymentsTableBody">
-              <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted);">Loading payments…</td></tr>
+              <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted);">Loading payments…</td></tr>
             </tbody>
           </table>
           <div class="pagination" id="paymentPagination" style="display:none;">
@@ -1085,6 +1148,23 @@
     </main><!-- /page-content -->
   </div><!-- /main-content -->
 </div><!-- /appShell -->
+
+<!-- =====================================================
+     PAYMENT DETAIL MODAL
+===================================================== -->
+<div class="modal-backdrop" id="payDetailModal">
+  <div class="modal" role="dialog" aria-modal="true" style="max-width:560px;">
+    <div class="modal-header">
+      <h3><i class="fas fa-receipt" style="margin-right:8px;"></i>Transaction Details</h3>
+      <button class="btn-close-modal" id="closePayDetailModal" title="Close">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body" id="payDetailBody" style="padding:20px 24px;">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+</div>
 
 <!-- =====================================================
      PRODUCT FORM MODAL
@@ -1128,7 +1208,7 @@
           <div class="field">
             <label>Price (₦) <span class="req">*</span></label>
             <input type="number" id="fPrice" placeholder="e.g. 39999" min="0" step="1" required />
-            <p class="hint">Enter amount in Naira (e.g. 39999 = ₦39,999.00)</p>
+            <p class="hint">Enter amount in Naira (e.g. 39999 = ₦39,999)</p>
           </div>
           <div class="field">
             <label>Product Tag</label>
@@ -1263,14 +1343,15 @@ let allProducts  = [];
 let editMode     = false;
 let imageSlots   = [null, null, null]; // base64 or URL strings
 let pendingDelete = null;
-let currentPayPage = 1;
 let currentImageTab = 'upload';
 
 // =========================================================
 // 2) HELPERS
 // =========================================================
 function fmt(n) {
-  return '₦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const num = Number(n || 0);
+  const hasCents = num % 1 !== 0;
+  return '₦' + num.toLocaleString('en-NG', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: 2 });
 }
 
 function authHeaders() {
@@ -1795,21 +1876,29 @@ document.getElementById('confirmYes').addEventListener('click', async () => {
 });
 
 // =========================================================
-// 11) PAYMENTS
+// 11) PAYMENTS — FULL TRANSACTION HISTORY
 // =========================================================
-async function loadPayments(page = 1, search = '', status = 'all') {
+let currentPayPage = 1;
+let currentPayFilters = {};
+
+async function loadPayments(page = 1) {
   currentPayPage = page;
+  const loadingEl = document.getElementById('payLoadingIndicator');
   const tbody = document.getElementById('paymentsTableBody');
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted);"><div class="spinner dark" style="margin:0 auto;"></div></td></tr>';
+  if (loadingEl) loadingEl.style.display = 'block';
+  tbody.innerHTML = '';
 
   try {
-    const params = new URLSearchParams({ page, limit: 20 });
-    if (search)           params.set('search', search);
-    if (status !== 'all') params.set('status', status);
+    const params = new URLSearchParams({ page, limit: 20, ...currentPayFilters });
+    // Remove 'all' status from params
+    if (params.get('status') === 'all') params.delete('status');
 
     const res = await fetch(`${API_BASE}/api/admin/payments?${params}`, {
       headers: authHeaders()
     });
+
+    if (res.status === 401) { logout(); return; }
+
     const data = await res.json();
     if (!data.success) throw new Error(data.message);
 
@@ -1818,45 +1907,53 @@ async function loadPayments(page = 1, search = '', status = 'all') {
     const pagination = data.pagination || {};
 
     // Stats
-    document.getElementById('payStatSuccess').textContent = stats.successCount || 0;
-    document.getElementById('payStatPending').textContent = stats.pendingCount  || 0;
-    document.getElementById('payStatTotal').textContent   = fmt(stats.totalAmount || 0);
+    const totalTx = (stats.successCount || 0) + (stats.pendingCount || 0);
+    document.getElementById('payStatTotal').textContent   = totalTx.toLocaleString();
+    document.getElementById('payStatSuccess').textContent = (stats.successCount || 0).toLocaleString();
+    document.getElementById('payStatPending').textContent = (stats.pendingCount  || 0).toLocaleString();
+    document.getElementById('payStatRevenue').textContent = fmt(stats.totalAmount || 0);
     document.getElementById('statRevenue').textContent    = fmt(stats.totalAmount || 0);
 
     // Table rows
     if (!payments.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted);">No payments found.</td></tr>';
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align:center;padding:50px;">
+            <div style="color:var(--text-muted);">
+              <i class="fas fa-inbox" style="font-size:36px;margin-bottom:12px;display:block;"></i>
+              <strong>No transactions found</strong>
+              <p style="margin-top:6px;font-size:13px;">Try adjusting your filters</p>
+            </div>
+          </td>
+        </tr>`;
     } else {
       tbody.innerHTML = payments.map(p => {
-        const statusBadge = p.status === 'success'
-          ? '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Success</span>'
-          : p.status === 'pending'
-          ? '<span class="badge badge-pending"><i class="fas fa-clock"></i> Pending</span>'
-          : '<span class="badge badge-fail"><i class="fas fa-times-circle"></i> Failed</span>';
-
-        const emailBadge = p.emailSent
-          ? '<span class="badge badge-success"><i class="fas fa-envelope"></i> Sent</span>'
-          : '<span class="badge badge-pending">Pending</span>';
-
-        const date = new Date(p.paymentDate || p.createdAt).toLocaleDateString('en-NG', {
-          day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-        });
-
+        const statusClass = p.status === 'success' ? 'badge-success' :
+                            p.status === 'pending'  ? 'badge-pending' : 'badge-fail';
+        const statusIcon  = p.status === 'success' ? 'fa-check-circle' :
+                            p.status === 'pending'  ? 'fa-clock' : 'fa-times-circle';
+        const customerName = (p.metadata && p.metadata.customer_name) ? escHtml(p.metadata.customer_name) : 'N/A';
+        const date = fmtDate(p.createdAt || p.paymentDate);
+        const payId = p._id || '';
         return `
           <tr>
-            <td><span style="font-family:monospace;font-size:12px;">${escHtml(p.reference || '—')}</span></td>
-            <td>${escHtml(p.email || '—')}</td>
+            <td style="font-size:12px;white-space:nowrap;">${date}</td>
+            <td><code style="font-size:11px;word-break:break-all;">${escHtml(p.reference || '—')}</code></td>
+            <td>${customerName}</td>
+            <td style="font-size:12px;">${escHtml(p.email || '—')}</td>
             <td style="font-weight:700;">${fmt(p.amount)}</td>
-            <td>${statusBadge}</td>
-            <td>${emailBadge}</td>
-            <td style="font-size:12px;">${date}</td>
-          </tr>
-        `;
+            <td><span class="badge ${statusClass}"><i class="fas ${statusIcon}"></i> ${escHtml(p.status || '').toUpperCase()}</span></td>
+            <td>
+              <button class="btn btn-sm btn-secondary" onclick="viewPayment('${payId}')" style="white-space:nowrap;">
+                <i class="fas fa-eye"></i> View
+              </button>
+            </td>
+          </tr>`;
       }).join('');
     }
 
     // Pagination
-    const pagEl = document.getElementById('paymentPagination');
+    const pagEl   = document.getElementById('paymentPagination');
     const pagInfo = document.getElementById('payPagInfo');
     const pagBtns = document.getElementById('payPagBtns');
 
@@ -1871,24 +1968,22 @@ async function loadPayments(page = 1, search = '', status = 'all') {
 
       if (page > 1) {
         const prev = document.createElement('button');
-        prev.className = 'page-btn'; prev.textContent = '‹';
-        prev.onclick = () => loadPayments(page - 1, search, status);
+        prev.className = 'page-btn'; prev.textContent = '‹ Previous';
+        prev.onclick = () => loadPayments(page - 1);
         pagBtns.appendChild(prev);
       }
-
       for (let i = start; i <= end; i++) {
         const btn = document.createElement('button');
         btn.className = `page-btn ${i === page ? 'active' : ''}`;
         btn.textContent = i;
         const pi = i;
-        btn.onclick = () => loadPayments(pi, search, status);
+        btn.onclick = () => loadPayments(pi);
         pagBtns.appendChild(btn);
       }
-
       if (page < pagination.totalPages) {
         const next = document.createElement('button');
-        next.className = 'page-btn'; next.textContent = '›';
-        next.onclick = () => loadPayments(page + 1, search, status);
+        next.className = 'page-btn'; next.textContent = 'Next ›';
+        next.onclick = () => loadPayments(page + 1);
         pagBtns.appendChild(next);
       }
     } else {
@@ -1896,21 +1991,184 @@ async function loadPayments(page = 1, search = '', status = 'all') {
     }
 
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--danger);">Error loading payments: ${escHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--danger);"><i class="fas fa-exclamation-circle"></i> Error: ${escHtml(err.message)}</td></tr>`;
     toast('Payment load error: ' + err.message, 'error');
+  } finally {
+    if (loadingEl) loadingEl.style.display = 'none';
   }
 }
 
+// View single payment details
+async function viewPayment(id) {
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/payments/${id}`, { headers: authHeaders() });
+    const result = await res.json();
+    if (result.success) {
+      displayPaymentDetails(result.data);
+      document.getElementById('payDetailModal').classList.add('show');
+    } else {
+      toast('Failed to load payment details', 'error');
+    }
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+}
+
+function displayPaymentDetails(payment) {
+  const metadata = payment.metadata || {};
+  const cartItems = metadata.cart_items || [];
+
+  let cartHTML = '';
+  if (cartItems.length > 0) {
+    cartHTML = '<ul style="list-style:none;padding:0;margin:0;">';
+    cartItems.forEach(item => {
+      const unitPrice = (item.price && item.price > 1000) ? item.price / 100 : (item.price || 0);
+      const itemTotal = unitPrice * (item.quantity || 1);
+      cartHTML += `
+        <li style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);">
+          <div>
+            <strong style="font-size:14px;">${escHtml(item.name || 'Item')}</strong>
+            <small style="display:block;color:var(--text-muted);margin-top:2px;">Qty: ${item.quantity || 1} × ${fmt(unitPrice)}</small>
+          </div>
+          <strong style="color:var(--primary);">${fmt(itemTotal)}</strong>
+        </li>`;
+    });
+    cartHTML += '</ul>';
+  } else {
+    cartHTML = '<p style="color:var(--text-muted);font-size:13px;">No items data available</p>';
+  }
+
+  document.getElementById('payDetailBody').innerHTML = `
+    <div style="display:grid;gap:16px;">
+
+      <div style="background:var(--surface-2);border-radius:10px;padding:16px;">
+        <h4 style="margin-bottom:12px;font-size:13px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:.5px;">
+          <i class="fas fa-info-circle" style="margin-right:6px;"></i>Basic Information
+        </h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><label style="font-size:11px;color:var(--text-muted);font-weight:600;">Reference</label>
+               <p style="font-family:monospace;font-size:12px;word-break:break-all;margin-top:3px;">${escHtml(payment.reference || '—')}</p></div>
+          <div><label style="font-size:11px;color:var(--text-muted);font-weight:600;">Status</label>
+               <p style="margin-top:3px;"><span class="badge ${payment.status==='success'?'badge-success':payment.status==='pending'?'badge-pending':'badge-fail'}">${escHtml((payment.status||'').toUpperCase())}</span></p></div>
+          <div><label style="font-size:11px;color:var(--text-muted);font-weight:600;">Amount</label>
+               <p style="font-weight:700;color:var(--primary);font-size:16px;margin-top:3px;">${fmt(payment.amount)}</p></div>
+          <div><label style="font-size:11px;color:var(--text-muted);font-weight:600;">Currency</label>
+               <p style="margin-top:3px;">${escHtml(payment.currency || 'NGN')}</p></div>
+          <div><label style="font-size:11px;color:var(--text-muted);font-weight:600;">Date</label>
+               <p style="margin-top:3px;font-size:13px;">${fmtDate(payment.createdAt)}</p></div>
+          <div><label style="font-size:11px;color:var(--text-muted);font-weight:600;">Email Sent</label>
+               <p style="margin-top:3px;">${payment.emailSent ? '✅ Yes' : '❌ No'}</p></div>
+        </div>
+      </div>
+
+      <div style="background:var(--surface-2);border-radius:10px;padding:16px;">
+        <h4 style="margin-bottom:12px;font-size:13px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:.5px;">
+          <i class="fas fa-user" style="margin-right:6px;"></i>Customer Information
+        </h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><label style="font-size:11px;color:var(--text-muted);font-weight:600;">Name</label>
+               <p style="margin-top:3px;">${escHtml(metadata.customer_name || 'N/A')}</p></div>
+          <div><label style="font-size:11px;color:var(--text-muted);font-weight:600;">Email</label>
+               <p style="margin-top:3px;font-size:13px;">${escHtml(payment.email || 'N/A')}</p></div>
+          <div><label style="font-size:11px;color:var(--text-muted);font-weight:600;">Phone</label>
+               <p style="margin-top:3px;">${escHtml(metadata.customer_phone || 'N/A')}</p></div>
+          <div><label style="font-size:11px;color:var(--text-muted);font-weight:600;">Delivery State</label>
+               <p style="margin-top:3px;">${escHtml(metadata.shipping_state || 'N/A')}</p></div>
+        </div>
+      </div>
+
+      <div style="background:var(--surface-2);border-radius:10px;padding:16px;">
+        <h4 style="margin-bottom:12px;font-size:13px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:.5px;">
+          <i class="fas fa-shopping-cart" style="margin-right:6px;"></i>Order Items
+        </h4>
+        ${cartHTML}
+      </div>
+
+    </div>
+  `;
+}
+
+// Payment detail modal close
+document.getElementById('closePayDetailModal').addEventListener('click', () => {
+  document.getElementById('payDetailModal').classList.remove('show');
+});
+document.getElementById('payDetailModal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('payDetailModal'))
+    document.getElementById('payDetailModal').classList.remove('show');
+});
+
+// Filters
+document.getElementById('applyPayFilters').addEventListener('click', () => {
+  currentPayFilters = {
+    status:    document.getElementById('paymentStatusFilter').value,
+    search:    document.getElementById('paymentSearch').value.trim(),
+    startDate: document.getElementById('payStartDate').value,
+    endDate:   document.getElementById('payEndDate').value
+  };
+  Object.keys(currentPayFilters).forEach(k => {
+    if (!currentPayFilters[k] || currentPayFilters[k] === 'all') delete currentPayFilters[k];
+  });
+  loadPayments(1);
+});
+
+document.getElementById('resetPayFilters').addEventListener('click', () => {
+  document.getElementById('paymentStatusFilter').value = 'all';
+  document.getElementById('paymentSearch').value = '';
+  document.getElementById('payStartDate').value = '';
+  document.getElementById('payEndDate').value = '';
+  currentPayFilters = {};
+  loadPayments(1);
+});
+
 let paySearchTimeout;
-document.getElementById('paymentSearch').addEventListener('input', (e) => {
+document.getElementById('paymentSearch').addEventListener('input', () => {
   clearTimeout(paySearchTimeout);
   paySearchTimeout = setTimeout(() => {
-    loadPayments(1, e.target.value.trim(), document.getElementById('paymentStatusFilter').value);
+    currentPayFilters.search = document.getElementById('paymentSearch').value.trim();
+    if (!currentPayFilters.search) delete currentPayFilters.search;
+    loadPayments(1);
   }, 400);
 });
-document.getElementById('paymentStatusFilter').addEventListener('change', (e) => {
-  loadPayments(1, document.getElementById('paymentSearch').value.trim(), e.target.value);
-});
+
+// Clear all transactions
+async function clearAllTransactions() {
+  if (!confirm('⚠️ WARNING: This will permanently delete ALL transactions.\n\nThis action CANNOT be undone!\n\nAre you sure?')) return;
+  if (!confirm('⚠️ FINAL CONFIRMATION\n\nClick OK to delete ALL transactions or Cancel to abort.')) return;
+
+  const btn = document.getElementById('clearAllBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Clearing...';
+
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/payments/clear-all`, {
+      method: 'DELETE', headers: authHeaders()
+    });
+    if (res.status === 401) { logout(); return; }
+    const result = await res.json();
+    if (result.success) {
+      toast(`✅ Cleared ${result.deletedCount} transaction(s)`, 'success');
+      loadPayments(1);
+    } else {
+      toast('Error: ' + result.message, 'error');
+    }
+  } catch (err) {
+    toast('Connection Error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-trash-alt"></i> Clear All';
+  }
+}
+
+window.clearAllTransactions = clearAllTransactions;
+window.viewPayment = viewPayment;
+
+function fmtDate(dateString) {
+  if (!dateString) return '—';
+  return new Date(dateString).toLocaleString('en-NG', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+}
 
 // =========================================================
 // 12) DASHBOARD
