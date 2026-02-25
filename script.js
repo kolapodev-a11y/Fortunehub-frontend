@@ -63,11 +63,12 @@ const zoomResult = document.getElementById("zoomResult");
 // ------------------------------
 // 3) HELPERS
 // ------------------------------
-function formatCurrency(amountInKobo) {
-  return `₦${(amountInKobo / 100).toLocaleString("en-NG", {
-    minimumFractionDigits: 2,
+function formatCurrency(amountInNaira) {
+  return `₦${amountInNaira.toLocaleString("en-NG", {
+    minimumFractionDigits: 0,
   })}`;
 }
+
 
 function getProductById(id) {
   return products.find((p) => p.id === id);
@@ -328,7 +329,7 @@ function updateCartUI() {
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const selectedShippingFeeNaira = parseInt(shippingStateSelect?.value || "0", 10);
-  const shippingFee = cart.length > 0 ? selectedShippingFeeNaira * 100 : 0;
+  const shippingFee = cart.length > 0 ? selectedShippingFeeNaira : 0;te
   const grandTotal = subtotal + shippingFee;
 
   if (cartSubTotalElement) cartSubTotalElement.textContent = formatCurrency(subtotal);
@@ -339,7 +340,7 @@ function updateCartUI() {
     const isValid = validateCustomerInfo({ silent: true });
     const name = customerNameInput?.value?.trim() || "";
     const email = customerEmailInput?.value?.trim() || "";
-    const phone = customerPhoneInput?.value?.trim() || "";
+    const phone = customerPhoneIetnput?.value?.trim() || "";
 
     if (!isValid || !name || !email || !phone) {
       checkoutButton.disabled = true;
