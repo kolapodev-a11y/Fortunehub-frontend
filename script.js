@@ -71,7 +71,8 @@ function formatCurrency(amountInNaira) {
 }
 
 function getProductById(id) {
-  return products.find((p) => p.id === id);
+  // Support both numeric IDs (products.json) and string IDs (MongoDB db_xxx)
+  return products.find((p) => String(p.id) === String(id));
 }
 
 // Always fetch products.json from the repo root on GitHub Pages
@@ -314,7 +315,7 @@ function updateCartUI() {
 
   document.querySelectorAll(".btn-quantity").forEach((button) => {
     button.addEventListener("click", (e) => {
-      const id = parseInt(e.currentTarget.dataset.id, 10);
+      const id = e.currentTarget.dataset.id; // keep as string
       const change = parseInt(e.currentTarget.dataset.change, 10);
       updateQuantity(id, change);
     });
@@ -322,7 +323,7 @@ function updateCartUI() {
 
   document.querySelectorAll(".remove-item").forEach((button) => {
     button.addEventListener("click", (e) => {
-      const id = parseInt(e.currentTarget.dataset.id, 10);
+      const id = e.currentTarget.dataset.id; // keep as string
       removeItem(id);
     });
   });
@@ -359,11 +360,11 @@ function addToCart(productId, quantity = 1) {
     return;
   }
 
-  const cartItem = cart.find((item) => item.id === productId);
+  const cartItem = cart.find((item) => String(item.id) === String(productId));
   if (cartItem) cartItem.quantity += quantity;
   else {
     cart.push({
-      id: productId,
+      id: product.id, // store the product's original id
       name: product.name,
       price: product.price,
       quantity,
@@ -377,17 +378,17 @@ function addToCart(productId, quantity = 1) {
 }
 
 function updateQuantity(productId, change) {
-  const cartItem = cart.find((item) => item.id === productId);
+  const cartItem = cart.find((item) => String(item.id) === String(productId));
   if (cartItem) {
     cartItem.quantity += change;
-    if (cartItem.quantity <= 0) cart = cart.filter((item) => item.id !== productId);
+    if (cartItem.quantity <= 0) cart = cart.filter((item) => String(item.id) !== String(productId));
   }
   localStorage.setItem("cart", JSON.stringify(cart));
   updateCartUI();
 }
 
 function removeItem(productId) {
-  cart = cart.filter((item) => item.id !== productId);
+  cart = cart.filter((item) => String(item.id) !== String(productId));
   localStorage.setItem("cart", JSON.stringify(cart));
   updateCartUI();
 }
@@ -832,7 +833,7 @@ function setupEventListeners() {
   if (detailAddCart) {
     detailAddCart.addEventListener("click", () => {
       if (currentProduct && !currentProduct.sold && !currentProduct.outOfStock) {
-        addToCart(currentProduct.id);
+        addToCart(String(currentProduct.id)); // use string ID
       }
     });
   }
@@ -840,7 +841,7 @@ function setupEventListeners() {
   if (detailBuyNow) {
     detailBuyNow.addEventListener("click", () => {
       if (currentProduct && !currentProduct.sold && !currentProduct.outOfStock) {
-        addToCart(currentProduct.id, 1);
+        addToCart(String(currentProduct.id), 1); // use string ID
         closeProductDetail();
         openCartModal();
       }
@@ -866,20 +867,20 @@ function setupEventListeners() {
     // Click on product card to view details (but not on buttons)
     const card = target.closest(".product-card");
     if (card && !target.closest("button") && !target.closest(".thumb")) {
-      const productId = parseInt(card.dataset.productId, 10);
+      const productId = card.dataset.productId; // keep as string to support MongoDB IDs
       openProductDetail(productId);
       return;
     }
 
     if (target?.classList?.contains("add-to-cart")) {
       e.stopPropagation();
-      addToCart(parseInt(target.dataset.id, 10));
+      addToCart(target.dataset.id); // keep as string to support MongoDB IDs
       return;
     }
 
     if (target?.classList?.contains("buy-now")) {
       e.stopPropagation();
-      addToCart(parseInt(target.dataset.id, 10), 1);
+      addToCart(target.dataset.id, 1); // keep as string to support MongoDB IDs
       openCartModal();
       return;
     }
@@ -1039,7 +1040,11 @@ async function initializeApp() {
     if (response.ok) {
       const data = await response.json();
       // Backend returns an array (same shape as products.json)
-      if (Array.isArray(data) && data.length) {
+      // Backend returns { success: true, data: [...] } shape
+      if (data.success && Array.isArray(data.data) && data.data.length) {
+        products = data.data;
+      } else if (Array.isArray(data) && data.length) {
+        // plain array fallback
         products = data;
       } else {
         // fallback to products.json
