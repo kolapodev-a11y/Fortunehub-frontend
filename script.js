@@ -1,4 +1,4 @@
-te// ===================================================
+// ===================================================
 // FortuneHub Frontend Script - WITH PRODUCT DETAIL MODAL & IMAGE ZOOM
 // ===================================================
 
@@ -63,9 +63,10 @@ const zoomResult = document.getElementById("zoomResult");
 // ------------------------------
 // 3) HELPERS
 // ------------------------------
-function formatCurrency(amountInKobo) {
-  return `₦${(amountInKobo / 100).toLocaleString("en-NG", {
+function formatCurrency(amountInNaira) {
+  return `₦${Number(amountInNaira || 0).toLocaleString("en-NG", {
     minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   })}`;
 }
 
@@ -328,7 +329,7 @@ function updateCartUI() {
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const selectedShippingFeeNaira = parseInt(shippingStateSelect?.value || "0", 10);
-  const shippingFee = cart.length > 0 ? selectedShippingFeeNaira * 100 : 0;
+  const shippingFee = cart.length > 0 ? selectedShippingFeeNaira : 0;
   const grandTotal = subtotal + shippingFee;
 
   if (cartSubTotalElement) cartSubTotalElement.textContent = formatCurrency(subtotal);
@@ -936,9 +937,12 @@ function initiatePaystackPayment() {
 
   const shippingFeeNaira = parseInt(shippingStateSelect.value, 10) || 0;
 
-  const subtotalKobo = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shippingKobo = shippingFeeNaira * 100;
-  const totalKobo = subtotalKobo + shippingKobo;
+  // Prices are stored in NAIRA in the UI/cart
+  const subtotalNaira = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const totalNaira = subtotalNaira + shippingFeeNaira;
+
+  // Paystack expects KOBO (naira * 100)
+  const totalKobo = Math.round(totalNaira * 100);
 
   const handler = PaystackPop.setup({
     key: PAYSTACK_PUBLIC_KEY,
@@ -1027,12 +1031,30 @@ function initiatePaystackPayment() {
 // 13) INIT
 // ------------------------------
 async function initializeApp() {
+  // ✅ NEW: load products from backend first (client can manage products via /admin dashboard)
+  // Fallback to products.json if backend is down or empty.
   try {
-    const response = await fetch(getProductsJsonUrl(), { cache: "no-store" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    products = await response.json();
+    let response = await fetch(`${API_BASE_URL}/api/products`, { cache: "no-store" });
+
+    if (response.ok) {
+      const data = await response.json();
+      // Backend returns an array (same shape as products.json)
+      if (Array.isArray(data) && data.length) {
+        products = data;
+      } else {
+        // fallback to products.json
+        response = await fetch(getProductsJsonUrl(), { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        products = await response.json();
+      }
+    } else {
+      // fallback to products.json
+      response = await fetch(getProductsJsonUrl(), { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      products = await response.json();
+    }
   } catch (e) {
-    console.error("❌ Failed to load products.json:", e);
+    console.error("❌ Failed to load products from backend/products.json:", e);
     products = [];
   }
 
