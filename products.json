@@ -2,7 +2,7 @@
   {
     "id": 1,
     "name": "Wireless Bluetooth Headphones",
-    "price": 59999,
+    "price": 39999,
     "category": "accessories",
     "description": "Premium wireless headphones with noise cancellation, 30-hour battery life, and superior sound quality.",
     "image": "images/product1.jpg",
@@ -28,7 +28,7 @@
   {
     "id": 3,
     "name": "Super Fast Charger",
-    "price": 24999,
+    "price": 7500,
     "category": "accessories",
     "description": "30W USB-C fast charger compatible with all modern smartphones.",
     "image": "images/product3.jpg",
@@ -54,7 +54,7 @@
   {
     "id": 5,
     "name": "Portable Bluetooth Speaker",
-    "price": 45000,
+    "price": 35000,
     "category": "speakers",
     "description": "Loud and clear portable speaker with waterproof rating.",
     "image": "images/product5.jpg",
@@ -67,7 +67,7 @@
   {
     "id": 6,
     "name": "Smart Watch Series 7",
-    "price": 70000,
+    "price": 20000,
     "category": "watches",
     "description": "Feature-rich smartwatch with health monitoring.",
     "image": "images/product6.jpg",
@@ -93,7 +93,7 @@
   {
     "id": 8,
     "name": "Wireless Bluetooth Headphones (Budget)",
-    "price": 20000,
+    "price": 18000,
     "category": "accessories",
     "description": "Affordable wireless headphones with 20-hour battery life.",
     "image": "images/product8.jpg",
