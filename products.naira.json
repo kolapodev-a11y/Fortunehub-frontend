@@ -1,8 +1,8 @@
-[
+te[
   {
     "id": 1,
     "name": "Wireless Bluetooth Headphones",
-    "price": 59999,
+    "price": 39999,
     "category": "accessories",
     "description": "Premium wireless headphones with noise cancellation, 30-hour battery life, and superior sound quality.",
     "image": "images/product1.jpg",
@@ -36,7 +36,7 @@
   {
     "id": 3,
     "name": "Super Fast Charger",
-    "price": 24999,
+    "price": 7500,
     "category": "accessories",
     "description": "30W USB-C fast charger compatible with all modern smartphones.",
     "image": "images/product3.jpg",
@@ -87,7 +87,7 @@
   {
     "id": 6,
     "name": "Smart Watch Series 7",
-    "price": 70000,
+    "price": 20000,
     "category": "watches",
     "description": "Feature-rich smartwatch with health monitoring.",
     "image": "images/product6.jpg",
