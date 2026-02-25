@@ -927,6 +927,13 @@ function initiatePaystackPayment() {
     return;
   }
 
+  if (typeof PaystackPop === "undefined") {
+    alert(
+      "Paystack could not load on this browser/network. Please disable adblockers, try incognito mode, or try another network and retry."
+    );
+    return;
+  }
+
   const name = (customerNameInput?.value || "").trim();
   const email = (customerEmailInput?.value || "").trim();
   const phone = (customerPhoneInput?.value || "").trim();
@@ -936,96 +943,135 @@ function initiatePaystackPayment() {
     return;
   }
 
-  const shippingFeeNaira = parseInt(shippingStateSelect.value, 10) || 0;
+  const shippingFeeNaira = parseInt(shippingStateSelect?.value || "0", 10) || 0;
 
   // Prices are stored in NAIRA in the UI/cart
-  const subtotalNaira = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotalNaira = cart.reduce((sum, item) => sum + Number(item.price || 0) * (item.quantity || 1), 0);
   const totalNaira = subtotalNaira + shippingFeeNaira;
+
+  if (!Number.isFinite(totalNaira) || totalNaira <= 0) {
+    alert("Invalid total amount. Please refresh the page and try again.");
+    return;
+  }
 
   // Paystack expects KOBO (naira * 100)
   const totalKobo = Math.round(totalNaira * 100);
 
-  const handler = PaystackPop.setup({
-    key: PAYSTACK_PUBLIC_KEY,
-    email,
-    amount: totalKobo,
-    metadata: {
-      customer_name: name,
-      customer_email: email,
-      customer_phone: phone,
-      cart_items: cart,
-      shipping_fee: shippingFeeNaira,
-      shipping_state: shippingStateSelect.options[shippingStateSelect.selectedIndex]?.text || ''
+  const metadata = {
+    customer_name: name,
+    customer_email: email,
+    customer_phone: phone,
+    cart_items: cart,
+    shipping_fee: shippingFeeNaira,
+    shipping_state: shippingStateSelect?.options?.[shippingStateSelect.selectedIndex]?.text || "",
+  };
+
+  // ✅ IMPORTANT FIX:
+  // Initialize the transaction on the backend first, then open Paystack with access_code.
+  // This prevents the Paystack popup error: "We could not start this transaction".
+  showLoadingOverlay("Starting payment...");
+
+  fetch(`${API_BASE_URL}/api/payment/initialize`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
     },
-    callback: function (response) {
-      console.log("✅ Paystack payment successful:", response.reference);
-      
-      // Show loading overlay immediately after payment
-      showLoadingOverlay("Verifying your payment...");
-      
-      // Add timeout fallback (90 seconds)
-      const timeoutId = setTimeout(() => {
-        hideLoadingOverlay();
-        alert("⏱️ Payment verification is taking longer than expected. Your payment was received. Please check your email for confirmation or contact support with reference: " + response.reference);
-      }, 90000); // 90 seconds
-      
-      // Verify payment
-      fetch(`${API_BASE_URL}/api/payment/verify`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json", 
-          "Accept": "application/json" 
+    body: JSON.stringify({ email, amount: totalNaira, metadata }),
+  })
+    .then((r) => {
+      if (!r.ok) throw new Error(`Initialize failed (HTTP ${r.status})`);
+      return r.json();
+    })
+    .then((init) => {
+      if (!init?.success || !init?.access_code) {
+        throw new Error(init?.message || "Failed to initialize transaction");
+      }
+
+      hideLoadingOverlay();
+
+      const handler = PaystackPop.setup({
+        key: PAYSTACK_PUBLIC_KEY,
+        email,
+        amount: totalKobo,
+        access_code: init.access_code,
+        ref: init.reference,
+        metadata,
+        callback: function (response) {
+          console.log("✅ Paystack payment successful:", response.reference);
+
+          // Show loading overlay immediately after payment
+          showLoadingOverlay("Verifying your payment...");
+
+          // Add timeout fallback (90 seconds)
+          const timeoutId = setTimeout(() => {
+            hideLoadingOverlay();
+            alert(
+              "⏱️ Payment verification is taking longer than expected. Your payment was received. Please check your email for confirmation or contact support with reference: " +
+                response.reference
+            );
+          }, 90000);
+
+          // Verify payment
+          fetch(`${API_BASE_URL}/api/payment/verify`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+            },
+            body: JSON.stringify({ reference: response.reference }),
+          })
+            .then((r) => {
+              clearTimeout(timeoutId);
+              if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
+              return r.json();
+            })
+            .then((data) => {
+              console.log("✅ Verification response:", data);
+              hideLoadingOverlay();
+
+              if (data.success) {
+                alert("✅ Payment successful! Order confirmed. Check your email for details.");
+
+                // Clear cart
+                cart = [];
+                localStorage.setItem("cart", JSON.stringify(cart));
+
+                // Clear form
+                if (customerNameInput) customerNameInput.value = "";
+                if (customerEmailInput) customerEmailInput.value = "";
+                if (customerPhoneInput) customerPhoneInput.value = "";
+                if (shippingStateSelect) shippingStateSelect.value = "";
+
+                updateCartUI();
+                closeCartModal();
+              } else {
+                alert("⚠️ Payment verification failed: " + (data.message || "Unknown error"));
+              }
+            })
+            .catch((err) => {
+              clearTimeout(timeoutId);
+              console.error("❌ Verification error:", err);
+              hideLoadingOverlay();
+              alert(
+                "❌ Failed to verify payment. Your payment was received. Please contact support with reference: " +
+                  response.reference
+              );
+            });
         },
-        body: JSON.stringify({ reference: response.reference }),
-      })
-        .then((r) => {
-          clearTimeout(timeoutId); // Clear timeout on response
-          
-          if (!r.ok) {
-            throw new Error(`HTTP error! status: ${r.status}`);
-          }
-          return r.json();
-        })
-        .then((data) => {
-          console.log("✅ Verification response:", data);
+        onClose: function () {
+          console.log("Payment window closed");
           hideLoadingOverlay();
-          
-          if (data.success) {
-            alert("✅ Payment successful! Order confirmed. Check your email for details.");
-            
-            // Clear cart
-            cart = [];
-            localStorage.setItem("cart", JSON.stringify(cart));
+        },
+      });
 
-            // Clear form
-            if (customerNameInput) customerNameInput.value = "";
-            if (customerEmailInput) customerEmailInput.value = "";
-            if (customerPhoneInput) customerPhoneInput.value = "";
-            if (shippingStateSelect) shippingStateSelect.value = "";
-
-            updateCartUI();
-            closeCartModal();
-            
-            // Optional: Redirect to success page
-            // window.location.href = "success.html?reference=" + response.reference;
-          } else {
-            alert("⚠️ Payment verification failed: " + (data.message || "Unknown error"));
-          }
-        })
-        .catch((err) => {
-          clearTimeout(timeoutId); // Clear timeout on error
-          console.error("❌ Verification error:", err);
-          hideLoadingOverlay();
-          alert("❌ Failed to verify payment. Your payment was received. Please contact support with reference: " + response.reference);
-        });
-    },
-    onClose: function () {
-      console.log("Payment window closed");
-      // Don't show any message when user closes the payment window
-    },
-  });
-
-  handler.openIframe();
+      handler.openIframe();
+    })
+    .catch((err) => {
+      console.error("❌ Paystack init error:", err);
+      hideLoadingOverlay();
+      alert("❌ Could not start payment: " + (err?.message || "Unknown error"));
+    });
 }
 
 // ------------------------------
