@@ -333,7 +333,7 @@ function updateCartUI() {
     const itemHTML = `
       <div class="cart-item">
         <div class="item-details">
-          <img src="${resolveAssetUrl(item.image)}" alt="${item.name}">
+          <img src="${resolveAssetUrl(item.image || (getProductById(item.id) && getProductById(item.id).image) || '')}" alt="${item.name}" onerror="this.style.display='none'">
           <div class="item-info">
             <h4>${item.name}</h4>
             <span class="item-price">${formatCurrency(item.price)}</span>
