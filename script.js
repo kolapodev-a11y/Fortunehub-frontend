@@ -15,10 +15,18 @@ let cart = (() => {
   return saved.map(item => {
     // Heuristic: if price > 10000 and is a round kobo value, convert to naira
     // This safely migrates old carts without breaking new naira-priced items
+    let migratedItem = item;
     if (item.price && item.price > 10000) {
-      return { ...item, price: Math.round(item.price / 100) };
+      migratedItem = { ...item, price: Math.round(item.price / 100) };
     }
-    return item;
+    // ✅ FIX: Also strip any base64 images that may have been saved in older cart versions.
+    // Admin-panel products can have data:image/... base64 strings (50-300 KB) stored as
+    // product.image. These bloat localStorage and cause Paystack metadata-too-large errors.
+    const img = String(migratedItem.image || '');
+    if (img.startsWith('data:') || img.length > 300) {
+      migratedItem = { ...migratedItem, image: '' };
+    }
+    return migratedItem;
   });
 })();
 let currentProduct = null;
@@ -392,12 +400,21 @@ function addToCart(productId, quantity = 1) {
   const cartItem = cart.find((item) => String(item.id) === String(productId));
   if (cartItem) cartItem.quantity += quantity;
   else {
+    // ✅ FIX: Do NOT store base64 images in cart. Admin-panel products save images as
+    // base64 data URLs which can be 50-300 KB each. Storing them in the cart causes
+    // Paystack to reject the payment (metadata too large) with
+    // "We could not start this transaction / Unknown error occurred".
+    // products.json products have short relative paths so they were not affected.
+    // We keep only normal URL-style image paths (non-base64, <300 chars).
+    const rawImg = product.image || '';
+    const safeImg = (rawImg.startsWith('data:') || rawImg.length > 300) ? '' : rawImg;
+
     cart.push({
       id: product.id, // store the product's original id
       name: product.name,
       price: product.price,
       quantity,
-      image: product.image,
+      image: safeImg,
     });
   }
 
