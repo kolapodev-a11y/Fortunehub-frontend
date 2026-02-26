@@ -2290,9 +2290,35 @@ async function saveProduct() {
       body: JSON.stringify(payload)
     });
 
-    const data = await res.json();
+    // ✅ FIX: handle non-JSON error responses cleanly (e.g., 413 payload too large, HTML error pages)
+    // so the admin panel shows the REAL reason instead of "Unexpected token <".
+    let data = null;
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    if (ct.includes('application/json')) {
+      data = await res.json();
+    } else {
+      const text = await res.text();
+      data = { success: false, message: text || `HTTP ${res.status}` };
+    }
 
-    if (data.success) {
+    // Auto-logout if unauthorized
+    if (res.status === 401) {
+      toast('Session expired or unauthorized. Please login again.', 'warn');
+      logout();
+      return;
+    }
+
+    if (!res.ok) {
+      // Friendly message for large payloads
+      if (res.status === 413) {
+        toast('Images are too large. Use smaller images or the Image URL tab.', 'error');
+      } else {
+        toast('Save failed: ' + (data.message || `HTTP ${res.status}`), 'error');
+      }
+      return;
+    }
+
+    if (data && data.success) {
       toast(editMode ? `"${name}" updated!` : `"${name}" added!`, 'success');
       closeProductModal();
       await loadProducts();
@@ -2300,7 +2326,7 @@ async function saveProduct() {
         // Already visible
       }
     } else {
-      toast('Error: ' + (data.message || 'Unknown error'), 'error');
+      toast('Error: ' + ((data && data.message) ? data.message : 'Unknown error'), 'error');
     }
   } catch (err) {
     toast('Save failed: ' + err.message, 'error');
