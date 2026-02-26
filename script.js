@@ -10,15 +10,7 @@ let cart = JSON.parse(localStorage.getItem("cart")) || [];
 let currentProduct = null;
 let zoomEnabled = false;
 
-// ✅ FIX: Do NOT hardcode the public key here. The backend returns the correct public key
-// in /api/payment/initialize so it always matches the backend's secret key account.
-// The hardcoded key below is only a LAST-RESORT fallback (should never be reached).
-// ========================================================================
-// IMPORTANT: If payment still fails, go to your Paystack dashboard and copy
-// your PUBLIC KEY (pk_test_... or pk_live_...) then add it as PAYSTACK_PUBLIC_KEY
-// in your Render environment variables. The server will return it automatically.
-// ========================================================================
-let PAYSTACK_PUBLIC_KEY = "pk_test_9f6a5cb45aeab4bd8bccd72129beda47f2609921"; // FALLBACK ONLY
+const PAYSTACK_PUBLIC_KEY = "pk_test_9f6a5cb45aeab4bd8bccd72129beda47f2609921";
 const API_BASE_URL = "https://fortunehub-backend.onrender.com";
 
 // ------------------------------
@@ -71,16 +63,14 @@ const zoomResult = document.getElementById("zoomResult");
 // ------------------------------
 // 3) HELPERS
 // ------------------------------
-function formatCurrency(amountInNaira) {
-  return `₦${Number(amountInNaira || 0).toLocaleString("en-NG", {
+function formatCurrency(amountInKobo) {
+  return `₦${(amountInKobo / 100).toLocaleString("en-NG", {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
   })}`;
 }
 
 function getProductById(id) {
-  // Support both numeric IDs (products.json) and string IDs (MongoDB db_xxx)
-  return products.find((p) => String(p.id) === String(id));
+  return products.find((p) => p.id === id);
 }
 
 // Always fetch products.json from the repo root on GitHub Pages
@@ -323,7 +313,7 @@ function updateCartUI() {
 
   document.querySelectorAll(".btn-quantity").forEach((button) => {
     button.addEventListener("click", (e) => {
-      const id = e.currentTarget.dataset.id; // keep as string
+      const id = parseInt(e.currentTarget.dataset.id, 10);
       const change = parseInt(e.currentTarget.dataset.change, 10);
       updateQuantity(id, change);
     });
@@ -331,14 +321,14 @@ function updateCartUI() {
 
   document.querySelectorAll(".remove-item").forEach((button) => {
     button.addEventListener("click", (e) => {
-      const id = e.currentTarget.dataset.id; // keep as string
+      const id = parseInt(e.currentTarget.dataset.id, 10);
       removeItem(id);
     });
   });
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const selectedShippingFeeNaira = parseInt(shippingStateSelect?.value || "0", 10);
-  const shippingFee = cart.length > 0 ? selectedShippingFeeNaira : 0;
+  const shippingFee = cart.length > 0 ? selectedShippingFeeNaira * 100 : 0;
   const grandTotal = subtotal + shippingFee;
 
   if (cartSubTotalElement) cartSubTotalElement.textContent = formatCurrency(subtotal);
@@ -368,11 +358,11 @@ function addToCart(productId, quantity = 1) {
     return;
   }
 
-  const cartItem = cart.find((item) => String(item.id) === String(productId));
+  const cartItem = cart.find((item) => item.id === productId);
   if (cartItem) cartItem.quantity += quantity;
   else {
     cart.push({
-      id: product.id, // store the product's original id
+      id: productId,
       name: product.name,
       price: product.price,
       quantity,
@@ -386,17 +376,17 @@ function addToCart(productId, quantity = 1) {
 }
 
 function updateQuantity(productId, change) {
-  const cartItem = cart.find((item) => String(item.id) === String(productId));
+  const cartItem = cart.find((item) => item.id === productId);
   if (cartItem) {
     cartItem.quantity += change;
-    if (cartItem.quantity <= 0) cart = cart.filter((item) => String(item.id) !== String(productId));
+    if (cartItem.quantity <= 0) cart = cart.filter((item) => item.id !== productId);
   }
   localStorage.setItem("cart", JSON.stringify(cart));
   updateCartUI();
 }
 
 function removeItem(productId) {
-  cart = cart.filter((item) => String(item.id) !== String(productId));
+  cart = cart.filter((item) => item.id !== productId);
   localStorage.setItem("cart", JSON.stringify(cart));
   updateCartUI();
 }
@@ -841,7 +831,7 @@ function setupEventListeners() {
   if (detailAddCart) {
     detailAddCart.addEventListener("click", () => {
       if (currentProduct && !currentProduct.sold && !currentProduct.outOfStock) {
-        addToCart(String(currentProduct.id)); // use string ID
+        addToCart(currentProduct.id);
       }
     });
   }
@@ -849,7 +839,7 @@ function setupEventListeners() {
   if (detailBuyNow) {
     detailBuyNow.addEventListener("click", () => {
       if (currentProduct && !currentProduct.sold && !currentProduct.outOfStock) {
-        addToCart(String(currentProduct.id), 1); // use string ID
+        addToCart(currentProduct.id, 1);
         closeProductDetail();
         openCartModal();
       }
@@ -875,20 +865,20 @@ function setupEventListeners() {
     // Click on product card to view details (but not on buttons)
     const card = target.closest(".product-card");
     if (card && !target.closest("button") && !target.closest(".thumb")) {
-      const productId = card.dataset.productId; // keep as string to support MongoDB IDs
+      const productId = parseInt(card.dataset.productId, 10);
       openProductDetail(productId);
       return;
     }
 
     if (target?.classList?.contains("add-to-cart")) {
       e.stopPropagation();
-      addToCart(target.dataset.id); // keep as string to support MongoDB IDs
+      addToCart(parseInt(target.dataset.id, 10));
       return;
     }
 
     if (target?.classList?.contains("buy-now")) {
       e.stopPropagation();
-      addToCart(target.dataset.id, 1); // keep as string to support MongoDB IDs
+      addToCart(parseInt(target.dataset.id, 10), 1);
       openCartModal();
       return;
     }
@@ -935,13 +925,6 @@ function initiatePaystackPayment() {
     return;
   }
 
-  if (typeof PaystackPop === "undefined") {
-    alert(
-      "Paystack could not load on this browser/network. Please disable adblockers, try incognito mode, or try another network and retry."
-    );
-    return;
-  }
-
   const name = (customerNameInput?.value || "").trim();
   const email = (customerEmailInput?.value || "").trim();
   const phone = (customerPhoneInput?.value || "").trim();
@@ -951,190 +934,105 @@ function initiatePaystackPayment() {
     return;
   }
 
-  const shippingFeeNaira = parseInt(shippingStateSelect?.value || "0", 10) || 0;
+  const shippingFeeNaira = parseInt(shippingStateSelect.value, 10) || 0;
 
-  // Prices are stored in NAIRA in the UI/cart
-  const subtotalNaira = cart.reduce((sum, item) => sum + Number(item.price || 0) * (item.quantity || 1), 0);
-  const totalNaira = subtotalNaira + shippingFeeNaira;
+  const subtotalKobo = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const shippingKobo = shippingFeeNaira * 100;
+  const totalKobo = subtotalKobo + shippingKobo;
 
-  if (!Number.isFinite(totalNaira) || totalNaira <= 0) {
-    alert("Invalid total amount. Please refresh the page and try again.");
-    return;
-  }
-
-  // Paystack expects KOBO (naira * 100)
-  const totalKobo = Math.round(totalNaira * 100);
-
-  const metadata = {
-    customer_name: name,
-    customer_email: email,
-    customer_phone: phone,
-    cart_items: cart,
-    shipping_fee: shippingFeeNaira,
-    shipping_state: shippingStateSelect?.options?.[shippingStateSelect.selectedIndex]?.text || "",
-  };
-
-  // ✅ IMPORTANT FIX:
-  // Initialize the transaction on the backend first, then open Paystack with access_code.
-  // This prevents the Paystack popup error: "We could not start this transaction".
-  showLoadingOverlay("Starting payment...");
-
-  fetch(`${API_BASE_URL}/api/payment/initialize`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
+  const handler = PaystackPop.setup({
+    key: PAYSTACK_PUBLIC_KEY,
+    email,
+    amount: totalKobo,
+    metadata: {
+      customer_name: name,
+      customer_email: email,
+      customer_phone: phone,
+      cart_items: cart,
+      shipping_fee: shippingFeeNaira,
+      shipping_state: shippingStateSelect.options[shippingStateSelect.selectedIndex]?.text || ''
     },
-    body: JSON.stringify({ email, amount: totalNaira, metadata }),
-  })
-    .then((r) => {
-      if (!r.ok) throw new Error(`Initialize failed (HTTP ${r.status})`);
-      return r.json();
-    })
-    .then((init) => {
-      if (!init?.success || !init?.access_code) {
-        throw new Error(init?.message || "Failed to initialize transaction");
-      }
-
-      // ✅ FIX: Use public key returned by backend (guaranteed to match the secret key account).
-      // This is the root cause of "We could not start this transaction": key mismatch.
-      if (init.public_key) {
-        PAYSTACK_PUBLIC_KEY = init.public_key;
-        console.log("✅ Using backend public key:", PAYSTACK_PUBLIC_KEY.substring(0, 18) + "...");
-      } else {
-        console.warn("⚠️ Backend did not return public_key. Using fallback. Add PAYSTACK_PUBLIC_KEY to Render env.");
-      }
-
-      hideLoadingOverlay();
-
-      // ✅ When using access_code, Paystack locks email+amount server-side.
-      // Passing key + access_code is enough; adding currency:'NGN' for clarity.
-      const handler = PaystackPop.setup({
-        key: PAYSTACK_PUBLIC_KEY,
-        email,
-        amount: totalKobo,
-        currency: 'NGN',
-        access_code: init.access_code,
-        ref: init.reference,
-        metadata,
-        callback: function (response) {
-          console.log("✅ Paystack payment successful:", response.reference);
-
-          // Show loading overlay immediately after payment
-          showLoadingOverlay("Verifying your payment...");
-
-          // Add timeout fallback (90 seconds)
-          const timeoutId = setTimeout(() => {
-            hideLoadingOverlay();
-            alert(
-              "⏱️ Payment verification is taking longer than expected. Your payment was received. Please check your email for confirmation or contact support with reference: " +
-                response.reference
-            );
-          }, 90000);
-
-          // Verify payment
-          fetch(`${API_BASE_URL}/api/payment/verify`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Accept": "application/json",
-            },
-            body: JSON.stringify({ reference: response.reference }),
-          })
-            .then((r) => {
-              clearTimeout(timeoutId);
-              if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
-              return r.json();
-            })
-            .then((data) => {
-              console.log("✅ Verification response:", data);
-              hideLoadingOverlay();
-
-              if (data.success) {
-                alert("✅ Payment successful! Order confirmed. Check your email for details.");
-
-                // Clear cart
-                cart = [];
-                localStorage.setItem("cart", JSON.stringify(cart));
-
-                // Clear form
-                if (customerNameInput) customerNameInput.value = "";
-                if (customerEmailInput) customerEmailInput.value = "";
-                if (customerPhoneInput) customerPhoneInput.value = "";
-                if (shippingStateSelect) shippingStateSelect.value = "";
-
-                updateCartUI();
-                closeCartModal();
-              } else {
-                alert("⚠️ Payment verification failed: " + (data.message || "Unknown error"));
-              }
-            })
-            .catch((err) => {
-              clearTimeout(timeoutId);
-              console.error("❌ Verification error:", err);
-              hideLoadingOverlay();
-              alert(
-                "❌ Failed to verify payment. Your payment was received. Please contact support with reference: " +
-                  response.reference
-              );
-            });
+    callback: function (response) {
+      console.log("✅ Paystack payment successful:", response.reference);
+      
+      // Show loading overlay immediately after payment
+      showLoadingOverlay("Verifying your payment...");
+      
+      // Add timeout fallback (90 seconds)
+      const timeoutId = setTimeout(() => {
+        hideLoadingOverlay();
+        alert("⏱️ Payment verification is taking longer than expected. Your payment was received. Please check your email for confirmation or contact support with reference: " + response.reference);
+      }, 90000); // 90 seconds
+      
+      // Verify payment
+      fetch(`${API_BASE_URL}/api/payment/verify`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json", 
+          "Accept": "application/json" 
         },
-        onClose: function () {
-          console.log("Payment window closed");
+        body: JSON.stringify({ reference: response.reference }),
+      })
+        .then((r) => {
+          clearTimeout(timeoutId); // Clear timeout on response
+          
+          if (!r.ok) {
+            throw new Error(`HTTP error! status: ${r.status}`);
+          }
+          return r.json();
+        })
+        .then((data) => {
+          console.log("✅ Verification response:", data);
           hideLoadingOverlay();
-        },
-      });
+          
+          if (data.success) {
+            alert("✅ Payment successful! Order confirmed. Check your email for details.");
+            
+            // Clear cart
+            cart = [];
+            localStorage.setItem("cart", JSON.stringify(cart));
 
-      handler.openIframe();
-    })
-    .catch((err) => {
-      console.error("❌ Paystack init error:", err);
-      hideLoadingOverlay();
-      const msg = err?.message || "Unknown error";
-      // Common causes: PAYSTACK_SECRET_KEY missing on server, test/live key mismatch,
-      // or backend server is sleeping (Render free tier).
-      alert(
-        "❌ Could not start payment: " + msg +
-        "\n\nPossible causes:\n" +
-        "• Backend server is still waking up (wait 30s and retry)\n" +
-        "• PAYSTACK_SECRET_KEY missing in server environment\n" +
-        "• Public/Secret key mode mismatch (test vs live)"
-      );
-    });
+            // Clear form
+            if (customerNameInput) customerNameInput.value = "";
+            if (customerEmailInput) customerEmailInput.value = "";
+            if (customerPhoneInput) customerPhoneInput.value = "";
+            if (shippingStateSelect) shippingStateSelect.value = "";
+
+            updateCartUI();
+            closeCartModal();
+            
+            // Optional: Redirect to success page
+            // window.location.href = "success.html?reference=" + response.reference;
+          } else {
+            alert("⚠️ Payment verification failed: " + (data.message || "Unknown error"));
+          }
+        })
+        .catch((err) => {
+          clearTimeout(timeoutId); // Clear timeout on error
+          console.error("❌ Verification error:", err);
+          hideLoadingOverlay();
+          alert("❌ Failed to verify payment. Your payment was received. Please contact support with reference: " + response.reference);
+        });
+    },
+    onClose: function () {
+      console.log("Payment window closed");
+      // Don't show any message when user closes the payment window
+    },
+  });
+
+  handler.openIframe();
 }
 
 // ------------------------------
 // 13) INIT
 // ------------------------------
 async function initializeApp() {
-  // ✅ NEW: load products from backend first (client can manage products via /admin dashboard)
-  // Fallback to products.json if backend is down or empty.
   try {
-    let response = await fetch(`${API_BASE_URL}/api/products`, { cache: "no-store" });
-
-    if (response.ok) {
-      const data = await response.json();
-      // Backend returns an array (same shape as products.json)
-      // Backend returns { success: true, data: [...] } shape
-      if (data.success && Array.isArray(data.data) && data.data.length) {
-        products = data.data;
-      } else if (Array.isArray(data) && data.length) {
-        // plain array fallback
-        products = data;
-      } else {
-        // fallback to products.json
-        response = await fetch(getProductsJsonUrl(), { cache: "no-store" });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        products = await response.json();
-      }
-    } else {
-      // fallback to products.json
-      response = await fetch(getProductsJsonUrl(), { cache: "no-store" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      products = await response.json();
-    }
+    const response = await fetch(getProductsJsonUrl(), { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    products = await response.json();
   } catch (e) {
-    console.error("❌ Failed to load products from backend/products.json:", e);
+    console.error("❌ Failed to load products.json:", e);
     products = [];
   }
 
