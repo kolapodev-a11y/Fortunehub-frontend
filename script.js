@@ -10,10 +10,15 @@ let cart = JSON.parse(localStorage.getItem("cart")) || [];
 let currentProduct = null;
 let zoomEnabled = false;
 
-const PAYSTACK_PUBLIC_KEY = "pk_test_9f6a5cb45aeab4bd8bccd72129beda47f2609921";
-// ⚠️  IMPORTANT: The public key above MUST match the mode of your PAYSTACK_SECRET_KEY on the server.
-// If server uses sk_live_..., change this to pk_live_... (your Paystack live public key).
-// Mismatch between test/live keys is the #1 cause of "We could not start this transaction" error.
+// ✅ FIX: Do NOT hardcode the public key here. The backend returns the correct public key
+// in /api/payment/initialize so it always matches the backend's secret key account.
+// The hardcoded key below is only a LAST-RESORT fallback (should never be reached).
+// ========================================================================
+// IMPORTANT: If payment still fails, go to your Paystack dashboard and copy
+// your PUBLIC KEY (pk_test_... or pk_live_...) then add it as PAYSTACK_PUBLIC_KEY
+// in your Render environment variables. The server will return it automatically.
+// ========================================================================
+let PAYSTACK_PUBLIC_KEY = "pk_test_9f6a5cb45aeab4bd8bccd72129beda47f2609921"; // FALLBACK ONLY
 const API_BASE_URL = "https://fortunehub-backend.onrender.com";
 
 // ------------------------------
@@ -989,6 +994,15 @@ function initiatePaystackPayment() {
     .then((init) => {
       if (!init?.success || !init?.access_code) {
         throw new Error(init?.message || "Failed to initialize transaction");
+      }
+
+      // ✅ FIX: Use public key returned by backend (guaranteed to match the secret key account).
+      // This is the root cause of "We could not start this transaction": key mismatch.
+      if (init.public_key) {
+        PAYSTACK_PUBLIC_KEY = init.public_key;
+        console.log("✅ Using backend public key:", PAYSTACK_PUBLIC_KEY.substring(0, 18) + "...");
+      } else {
+        console.warn("⚠️ Backend did not return public_key. Using fallback. Add PAYSTACK_PUBLIC_KEY to Render env.");
       }
 
       hideLoadingOverlay();
