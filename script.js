@@ -328,10 +328,10 @@ function updateCartUI() {
     });
   });
 
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0); // NAIRA
   const selectedShippingFeeNaira = parseInt(shippingStateSelect?.value || "0", 10);
-  const shippingFee = cart.length > 0 ? selectedShippingFeeNaira : 0;
-  const grandTotal = subtotal + shippingFee;
+  const shippingFee = cart.length > 0 ? selectedShippingFeeNaira : 0; // NAIRA
+  const grandTotal = subtotal + shippingFee; // NAIRA
 
   if (cartSubTotalElement) cartSubTotalElement.textContent = formatCurrency(subtotal);
   if (shippingFeeAmountElement) shippingFeeAmountElement.textContent = formatCurrency(shippingFee);
@@ -945,133 +945,99 @@ function initiatePaystackPayment() {
 
   const shippingFeeNaira = parseInt(shippingStateSelect?.value || "0", 10) || 0;
 
-  // Prices are stored in NAIRA in the UI/cart
+  // ✅ CLEAN: All cart prices are in NAIRA. Multiply by 100 for Paystack (which needs kobo).
   const subtotalNaira = cart.reduce((sum, item) => sum + Number(item.price || 0) * (item.quantity || 1), 0);
-  const totalNaira = subtotalNaira + shippingFeeNaira;
+  const totalNaira    = subtotalNaira + shippingFeeNaira;
+  const totalKobo     = Math.round(totalNaira * 100); // Paystack needs kobo
 
-  if (!Number.isFinite(totalNaira) || totalNaira <= 0) {
+  if (!Number.isFinite(totalKobo) || totalKobo <= 0) {
     alert("Invalid total amount. Please refresh the page and try again.");
     return;
   }
 
-  // Paystack expects KOBO (naira * 100)
-  const totalKobo = Math.round(totalNaira * 100);
+  const shippingStateName = shippingStateSelect?.options?.[shippingStateSelect.selectedIndex]?.text || "";
 
   const metadata = {
-    customer_name: name,
+    customer_name:  name,
     customer_email: email,
     customer_phone: phone,
-    cart_items: cart,
-    shipping_fee: shippingFeeNaira,
-    shipping_state: shippingStateSelect?.options?.[shippingStateSelect.selectedIndex]?.text || "",
+    cart_items:     cart,           // cart prices are NAIRA – server uses directly
+    shipping_fee:   shippingFeeNaira,
+    shipping_state: shippingStateName,
   };
 
-  // ✅ IMPORTANT FIX:
-  // Initialize the transaction on the backend first, then open Paystack with access_code.
-  // This prevents the Paystack popup error: "We could not start this transaction".
-  showLoadingOverlay("Starting payment...");
+  // ✅ Direct PaystackPop (reliable – no backend round-trip before popup)
+  // Backend is only called AFTER payment for secure verification + email
+  const handler = PaystackPop.setup({
+    key:   PAYSTACK_PUBLIC_KEY,
+    email,
+    amount: totalKobo,              // Paystack expects KOBO
+    metadata,
+    callback: function (response) {
+      console.log("✅ Paystack payment successful:", response.reference);
 
-  fetch(`${API_BASE_URL}/api/payment/initialize`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-    },
-    body: JSON.stringify({ email, amount: totalNaira, metadata }),
-  })
-    .then((r) => {
-      if (!r.ok) throw new Error(`Initialize failed (HTTP ${r.status})`);
-      return r.json();
-    })
-    .then((init) => {
-      if (!init?.success || !init?.access_code) {
-        throw new Error(init?.message || "Failed to initialize transaction");
-      }
+      // Show loading overlay immediately after payment
+      showLoadingOverlay("Verifying your payment...");
 
-      hideLoadingOverlay();
+      // 90-second timeout fallback
+      const timeoutId = setTimeout(() => {
+        hideLoadingOverlay();
+        alert(
+          "⏱️ Verification is taking longer than expected. Your payment was received. " +
+          "Check your email or contact support with reference: " + response.reference
+        );
+      }, 90000);
 
-      const handler = PaystackPop.setup({
-        key: PAYSTACK_PUBLIC_KEY,
-        email,
-        amount: totalKobo,
-        access_code: init.access_code,
-        ref: init.reference,
-        metadata,
-        callback: function (response) {
-          console.log("✅ Paystack payment successful:", response.reference);
-
-          // Show loading overlay immediately after payment
-          showLoadingOverlay("Verifying your payment...");
-
-          // Add timeout fallback (90 seconds)
-          const timeoutId = setTimeout(() => {
-            hideLoadingOverlay();
-            alert(
-              "⏱️ Payment verification is taking longer than expected. Your payment was received. Please check your email for confirmation or contact support with reference: " +
-                response.reference
-            );
-          }, 90000);
-
-          // Verify payment
-          fetch(`${API_BASE_URL}/api/payment/verify`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Accept": "application/json",
-            },
-            body: JSON.stringify({ reference: response.reference }),
-          })
-            .then((r) => {
-              clearTimeout(timeoutId);
-              if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
-              return r.json();
-            })
-            .then((data) => {
-              console.log("✅ Verification response:", data);
-              hideLoadingOverlay();
-
-              if (data.success) {
-                alert("✅ Payment successful! Order confirmed. Check your email for details.");
-
-                // Clear cart
-                cart = [];
-                localStorage.setItem("cart", JSON.stringify(cart));
-
-                // Clear form
-                if (customerNameInput) customerNameInput.value = "";
-                if (customerEmailInput) customerEmailInput.value = "";
-                if (customerPhoneInput) customerPhoneInput.value = "";
-                if (shippingStateSelect) shippingStateSelect.value = "";
-
-                updateCartUI();
-                closeCartModal();
-              } else {
-                alert("⚠️ Payment verification failed: " + (data.message || "Unknown error"));
-              }
-            })
-            .catch((err) => {
-              clearTimeout(timeoutId);
-              console.error("❌ Verification error:", err);
-              hideLoadingOverlay();
-              alert(
-                "❌ Failed to verify payment. Your payment was received. Please contact support with reference: " +
-                  response.reference
-              );
-            });
-        },
-        onClose: function () {
-          console.log("Payment window closed");
+      // Verify on backend (triggers DB save + confirmation emails)
+      fetch(`${API_BASE_URL}/api/payment/verify`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body:    JSON.stringify({ reference: response.reference }),
+      })
+        .then((r) => {
+          clearTimeout(timeoutId);
+          if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
+          return r.json();
+        })
+        .then((data) => {
+          console.log("✅ Verification response:", data);
           hideLoadingOverlay();
-        },
-      });
 
-      handler.openIframe();
-    })
-    .catch((err) => {
-      console.error("❌ Paystack init error:", err);
-      hideLoadingOverlay();
-      alert("❌ Could not start payment: " + (err?.message || "Unknown error"));
-    });
+          if (data.success) {
+            alert("✅ Payment successful! Order confirmed. Check your email for details.");
+
+            // Clear cart
+            cart = [];
+            localStorage.setItem("cart", JSON.stringify(cart));
+
+            // Clear form
+            if (customerNameInput)  customerNameInput.value  = "";
+            if (customerEmailInput) customerEmailInput.value = "";
+            if (customerPhoneInput) customerPhoneInput.value = "";
+            if (shippingStateSelect) shippingStateSelect.value = "";
+
+            updateCartUI();
+            closeCartModal();
+          } else {
+            alert("⚠️ Payment verification failed: " + (data.message || "Unknown error"));
+          }
+        })
+        .catch((err) => {
+          clearTimeout(timeoutId);
+          console.error("❌ Verification error:", err);
+          hideLoadingOverlay();
+          alert(
+            "❌ Could not verify payment. Your payment was received. " +
+            "Contact support with reference: " + response.reference
+          );
+        });
+    },
+    onClose: function () {
+      console.log("Payment window closed");
+    },
+  });
+
+  handler.openIframe();
 }
 
 // ------------------------------
@@ -1088,6 +1054,8 @@ async function initializeApp() {
       // Backend returns an array (same shape as products.json)
       // Backend returns { success: true, data: [...] } shape
       if (data.success && Array.isArray(data.data) && data.data.length) {
+        // ✅ FIX: Backend stores prices in Naira. Multiply by 100 to convert to Kobo
+        // so formatCurrency() and Paystack payment amounts stay consistent with products.json
         products = data.data;
       } else if (Array.isArray(data) && data.length) {
         // plain array fallback
