@@ -47,7 +47,7 @@ let zoomEnabled = false;
 //    It must match the SAME Paystack account as your PAYSTACK_SECRET_KEY.
 //    Example: PAYSTACK_PUBLIC_KEY = pk_test_xxxxxxx  (for test mode)
 //         or: PAYSTACK_PUBLIC_KEY = pk_live_xxxxxxx  (for live mode)
-let PAYSTACK_PUBLIC_KEY = "pk_test_9f6a5cb45aeab4bd8bccd72129beda47f2609921"; // FALLBACK ONLY - CHANGE IN RENDER ENV
+let PAYSTACK_PUBLIC_KEY = "pk_live_fec83b08634c2adfc06601390c8665efb6a714e6"; // FALLBACK ONLY - CHANGE IN RENDER ENV
 const API_BASE_URL = "https://fortunehub-backend.onrender.com";
 
 // ------------------------------
