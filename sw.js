@@ -7,8 +7,7 @@ const CORE_ASSETS = [
   './index.html',
   './style.css',
   './script.js',
-  './fot.png',
-  './products.json'
+  './fot.png'
 ];
 
 self.addEventListener('install', (event) => {
