@@ -1,5 +1,9 @@
 // ===================================================
 // FortuneHub Frontend Script - WITH PRODUCT DETAIL MODAL & IMAGE ZOOM
+// ✅ v2 FIXES:
+//   1. AbortController timeout (10s) for backend API → instant fallback to products.json
+//   2. Loading skeleton shown while waiting for products (better UX)
+//   3. Backend cold-start graceful handling (Render free plan)
 // ===================================================
 
 // ------------------------------
@@ -8,20 +12,12 @@
 let products = [];
 let cart = (() => {
   // ✅ FIX: Migrate old cart items that may have kobo prices to naira
-  // Old script stored prices in kobo (e.g., 500000 for ₦5000)
-  // New script uses naira (e.g., 5000 for ₦5000)
-  // If any item.price > 10000 AND looks like kobo (divisible by 100), convert it
   const saved = JSON.parse(localStorage.getItem("cart")) || [];
   return saved.map(item => {
-    // Heuristic: if price > 10000 and is a round kobo value, convert to naira
-    // This safely migrates old carts without breaking new naira-priced items
     let migratedItem = item;
     if (item.price && item.price > 10000) {
       migratedItem = { ...item, price: Math.round(item.price / 100) };
     }
-    // ✅ FIX: Also strip any base64 images that may have been saved in older cart versions.
-    // Admin-panel products can have data:image/... base64 strings (50-300 KB) stored as
-    // product.image. These bloat localStorage and cause Paystack metadata-too-large errors.
     const img = String(migratedItem.image || '');
     if (img.startsWith('data:') || img.length > 300) {
       migratedItem = { ...migratedItem, image: '' };
@@ -32,23 +28,15 @@ let cart = (() => {
 let currentProduct = null;
 let zoomEnabled = false;
 
-// ✅ FIX: Do NOT hardcode the public key here. The backend returns the correct public key
-// in /api/payment/initialize so it always matches the backend's secret key account.
-// The hardcoded key below is only a LAST-RESORT fallback (should never be reached).
-// ========================================================================
-// IMPORTANT: If payment still fails, go to your Paystack dashboard and copy
-// your PUBLIC KEY (pk_test_... or pk_live_...) then add it as PAYSTACK_PUBLIC_KEY
-// in your Render environment variables. The server will return it automatically.
-// ========================================================================
-// ⚠️  IMPORTANT: This hardcoded key is ONLY a fallback.
-// If your Render PAYSTACK_SECRET_KEY is from a DIFFERENT account than this pk_test key,
-// you will get "We could not start this transaction".
-// ✅ FIX: Set PAYSTACK_PUBLIC_KEY in your Render environment variables.
-//    It must match the SAME Paystack account as your PAYSTACK_SECRET_KEY.
-//    Example: PAYSTACK_PUBLIC_KEY = pk_test_xxxxxxx  (for test mode)
-//         or: PAYSTACK_PUBLIC_KEY = pk_live_xxxxxxx  (for live mode)
-let PAYSTACK_PUBLIC_KEY = "pk_test_9f6a5cb45aeab4bd8bccd72129beda47f2609921"; // FALLBACK ONLY - CHANGE IN RENDER ENV
+// ✅ FIX: Do NOT hardcode the public key here. The backend returns the correct public key.
+let PAYSTACK_PUBLIC_KEY = "pk_test_9f6a5cb45aeab4bd8bccd72129beda47f2609921"; // FALLBACK ONLY
 const API_BASE_URL = "https://fortunehub-backend.onrender.com";
+
+// ✅ FIX: Timeout (ms) for the backend /api/products call.
+// Render free plan can take 30–60s to wake from sleep.
+// We use a SHORT timeout (8s) so we fall back to products.json quickly,
+// and users see products immediately instead of staring at a blank page.
+const API_TIMEOUT_MS = 8000;
 
 // ------------------------------
 // 2) DOM ELEMENTS
@@ -68,14 +56,11 @@ const searchInput = document.getElementById("searchInput");
 const categoryCards = document.querySelectorAll(".category-card");
 const cartIcon = document.getElementById("cartIcon");
 const searchIconBtn = document.getElementById("searchIcon");
-
 const footerOpenCart = document.getElementById("footerOpenCart");
-
 const customerNameInput = document.getElementById("customerName");
 const customerEmailInput = document.getElementById("customerEmail");
 const customerPhoneInput = document.getElementById("customerPhone");
 const shippingStateSelect = document.getElementById("shippingState");
-
 const nameError = document.getElementById("nameError");
 const emailError = document.getElementById("emailError");
 const phoneError = document.getElementById("phoneError");
@@ -108,22 +93,13 @@ function formatCurrency(amountInNaira) {
 }
 
 function getProductById(id) {
-  // Support both numeric IDs (products.json) and string IDs (MongoDB db_xxx)
   return products.find((p) => String(p.id) === String(id));
 }
 
-// Always fetch products.json from the repo root on GitHub Pages
 function getProductsJsonUrl() {
   return new URL("products.json", window.location.href).toString();
 }
 
-/**
- * Repo base URL for GitHub Pages project sites.
- * Example:
- * origin: https://kolapodev-a11y.github.io
- * pathname: /Fortunehub-frontend/...
- * base => https://kolapodev-a11y.github.io/Fortunehub-frontend/
- */
 function getRepoBaseUrl() {
   const parts = window.location.pathname.split("/").filter(Boolean);
   const repoName = parts.length ? parts[0] : "";
@@ -133,20 +109,16 @@ function getRepoBaseUrl() {
 function resolveAssetUrl(path) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
-
   const base = getRepoBaseUrl();
-
   if (path.startsWith("/")) return `${window.location.origin}${path}`;
   return new URL(path, base).toString();
 }
 
 // ------------------------------
-// 4) LOADING OVERLAY - NEW
+// 4) LOADING OVERLAY
 // ------------------------------
 function showLoadingOverlay(message = "Processing payment...") {
-  // Remove existing overlay if any
   hideLoadingOverlay();
-
   const overlay = document.createElement("div");
   overlay.id = "paymentLoadingOverlay";
   overlay.innerHTML = `
@@ -164,129 +136,33 @@ function showLoadingOverlay(message = "Processing payment...") {
     </div>
     <style>
       #paymentLoadingOverlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.85);
-        backdrop-filter: blur(8px);
-        z-index: 99999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+        z-index: 99999; display: flex; align-items: center; justify-content: center;
         animation: fadeIn 0.3s ease;
       }
-      
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      
+      @keyframes fadeIn { from{opacity:0} to{opacity:1} }
       .loading-content {
-        background: white;
-        border-radius: 20px;
-        padding: 40px 50px;
-        max-width: 450px;
-        width: 90%;
-        text-align: center;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-        animation: slideUp 0.4s ease;
+        background: white; border-radius: 20px; padding: 40px 50px;
+        max-width: 450px; width: 90%; text-align: center;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.4); animation: slideUp 0.4s ease;
       }
-      
-      @keyframes slideUp {
-        from {
-          opacity: 0;
-          transform: translateY(30px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-      
+      @keyframes slideUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
       .loading-spinner {
-        width: 60px;
-        height: 60px;
-        border: 5px solid #f0f0f0;
-        border-top: 5px solid #667eea;
-        border-radius: 50%;
-        margin: 0 auto 25px;
-        animation: spin 1s linear infinite;
+        width:60px; height:60px; border:5px solid #f0f0f0; border-top:5px solid #667eea;
+        border-radius:50%; margin:0 auto 25px; animation:spin 1s linear infinite;
       }
-      
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-      
-      .loading-title {
-        font-size: 22px;
-        font-weight: 700;
-        color: #1f2937;
-        margin: 0 0 10px;
-      }
-      
-      .loading-subtitle {
-        font-size: 15px;
-        color: #6b7280;
-        margin: 0 0 25px;
-        line-height: 1.5;
-      }
-      
-      .loading-progress {
-        width: 100%;
-        height: 6px;
-        background: #f0f0f0;
-        border-radius: 10px;
-        overflow: hidden;
-        margin-bottom: 20px;
-      }
-      
-      .loading-progress-bar {
-        height: 100%;
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        border-radius: 10px;
-        animation: progressBar 60s ease-in-out;
-        width: 0%;
-      }
-      
-      @keyframes progressBar {
-        0% { width: 0%; }
-        50% { width: 75%; }
-        100% { width: 95%; }
-      }
-      
-      .loading-info {
-        font-size: 13px;
-        color: #9ca3af;
-        margin: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-      }
-      
-      .loading-info i {
-        color: #667eea;
-      }
-      
-      @media (max-width: 480px) {
-        .loading-content {
-          padding: 30px 25px;
-        }
-        
-        .loading-title {
-          font-size: 18px;
-        }
-        
-        .loading-subtitle {
-          font-size: 14px;
-        }
-      }
+      @keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+      .loading-title { font-size:22px; font-weight:700; color:#1f2937; margin:0 0 10px; }
+      .loading-subtitle { font-size:15px; color:#595959; margin:0 0 25px; line-height:1.5; }
+      .loading-progress { width:100%; height:6px; background:#f0f0f0; border-radius:10px; overflow:hidden; margin-bottom:20px; }
+      .loading-progress-bar { height:100%; background:linear-gradient(90deg,#667eea,#764ba2); border-radius:10px; animation:progressBar 60s ease-in-out; width:0%; }
+      @keyframes progressBar { 0%{width:0%} 50%{width:75%} 100%{width:95%} }
+      .loading-info { font-size:13px; color:#9ca3af; margin:0; display:flex; align-items:center; justify-content:center; gap:8px; }
+      .loading-info i { color:#667eea; }
+      @media(max-width:480px){ .loading-content{padding:30px 25px} .loading-title{font-size:18px} }
     </style>
   `;
-
   document.body.appendChild(overlay);
   document.body.style.overflow = "hidden";
 }
@@ -295,22 +171,31 @@ function hideLoadingOverlay() {
   const overlay = document.getElementById("paymentLoadingOverlay");
   if (overlay) {
     overlay.style.animation = "fadeOut 0.3s ease";
-    setTimeout(() => {
-      overlay.remove();
-      document.body.style.overflow = "auto";
-    }, 300);
+    setTimeout(() => { overlay.remove(); document.body.style.overflow = "auto"; }, 300);
   }
 }
 
-// Add fadeOut animation
-const style = document.createElement("style");
-style.textContent = `
-  @keyframes fadeOut {
-    from { opacity: 1; }
-    to { opacity: 0; }
-  }
-`;
-document.head.appendChild(style);
+const _fadeOutStyle = document.createElement("style");
+_fadeOutStyle.textContent = `@keyframes fadeOut { from{opacity:1} to{opacity:0} }`;
+document.head.appendChild(_fadeOutStyle);
+
+// ------------------------------
+// 4b) PRODUCTS LOADING STATE (skeleton)
+// ✅ NEW: Shows a spinner while waiting for backend to wake from Render sleep
+// ------------------------------
+function showProductsLoading(isBackendWaking = false) {
+  if (!productsGrid) return;
+  productsGrid.innerHTML = `
+    <div class="products-loading">
+      <div class="loading-spinner-sm"></div>
+      <p>${isBackendWaking ? "Waking up product server..." : "Loading products..."}</p>
+      <small>${isBackendWaking
+        ? "The server may take up to 30 seconds to wake from sleep. Products will appear shortly."
+        : "Please wait a moment."
+      }</small>
+    </div>
+  `;
+}
 
 // ------------------------------
 // 5) CART UI + LOGIC
@@ -323,8 +208,7 @@ function updateCartUI() {
 
   cartItemsContainer.innerHTML = "";
   if (cart.length === 0) {
-    cartItemsContainer.innerHTML =
-      '<p style="text-align:center;color:#555;">Your cart is empty.</p>';
+    cartItemsContainer.innerHTML = '<p style="text-align:center;color:#555;">Your cart is empty.</p>';
     if (checkoutButton) checkoutButton.disabled = true;
     return;
   }
@@ -352,7 +236,7 @@ function updateCartUI() {
 
   document.querySelectorAll(".btn-quantity").forEach((button) => {
     button.addEventListener("click", (e) => {
-      const id = e.currentTarget.dataset.id; // keep as string
+      const id = e.currentTarget.dataset.id;
       const change = parseInt(e.currentTarget.dataset.change, 10);
       updateQuantity(id, change);
     });
@@ -360,8 +244,7 @@ function updateCartUI() {
 
   document.querySelectorAll(".remove-item").forEach((button) => {
     button.addEventListener("click", (e) => {
-      const id = e.currentTarget.dataset.id; // keep as string
-      removeItem(id);
+      removeItem(e.currentTarget.dataset.id);
     });
   });
 
@@ -392,30 +275,14 @@ function updateCartUI() {
 
 function addToCart(productId, quantity = 1) {
   const product = getProductById(productId);
-  if (!product || product.outOfStock) {
-    alert("Product is out of stock.");
-    return;
-  }
+  if (!product || product.outOfStock) { alert("Product is out of stock."); return; }
 
   const cartItem = cart.find((item) => String(item.id) === String(productId));
   if (cartItem) cartItem.quantity += quantity;
   else {
-    // ✅ FIX: Do NOT store base64 images in cart. Admin-panel products save images as
-    // base64 data URLs which can be 50-300 KB each. Storing them in the cart causes
-    // Paystack to reject the payment (metadata too large) with
-    // "We could not start this transaction / Unknown error occurred".
-    // products.json products have short relative paths so they were not affected.
-    // We keep only normal URL-style image paths (non-base64, <300 chars).
     const rawImg = product.image || '';
     const safeImg = (rawImg.startsWith('data:') || rawImg.length > 300) ? '' : rawImg;
-
-    cart.push({
-      id: product.id, // store the product's original id
-      name: product.name,
-      price: product.price,
-      quantity,
-      image: safeImg,
-    });
+    cart.push({ id: product.id, name: product.name, price: product.price, quantity, image: safeImg });
   }
 
   localStorage.setItem("cart", JSON.stringify(cart));
@@ -444,7 +311,6 @@ function removeItem(productId) {
 // ------------------------------
 function validateCustomerInfo({ silent = false } = {}) {
   let isValid = true;
-
   if (nameError) nameError.style.display = "none";
   if (emailError) emailError.style.display = "none";
   if (phoneError) phoneError.style.display = "none";
@@ -455,28 +321,19 @@ function validateCustomerInfo({ silent = false } = {}) {
   const stateValue = shippingStateSelect?.value || "";
 
   if (!name || name.length < 3 || name.includes("@") || name.includes(".")) {
-    if (!silent && nameError) {
-      nameError.textContent = "Please enter your full name (not email).";
-      nameError.style.display = "block";
-    }
+    if (!silent && nameError) { nameError.textContent = "Please enter your full name (not email)."; nameError.style.display = "block"; }
     isValid = false;
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!email || !emailRegex.test(email)) {
-    if (!silent && emailError) {
-      emailError.textContent = "Enter a valid email (e.g., name@example.com).";
-      emailError.style.display = "block";
-    }
+    if (!silent && emailError) { emailError.textContent = "Enter a valid email (e.g., name@example.com)."; emailError.style.display = "block"; }
     isValid = false;
   }
 
   const phoneRegex = /^(0[789][01])\d{8}$/;
   if (!phone || !phoneRegex.test(phone)) {
-    if (!silent && phoneError) {
-      phoneError.textContent = "Enter a valid Nigerian phone number (e.g., 08031234567).";
-      phoneError.style.display = "block";
-    }
+    if (!silent && phoneError) { phoneError.textContent = "Enter a valid Nigerian phone number (e.g., 08031234567)."; phoneError.style.display = "block"; }
     isValid = false;
   }
 
@@ -492,64 +349,32 @@ function openProductDetail(productId) {
   if (!product) return;
 
   currentProduct = product;
-  
-  // Disable zoom when opening modal
   zoomEnabled = false;
   const mainContainer = document.querySelector('.main-image-container');
   if (mainContainer) mainContainer.classList.remove('zoom-active');
 
-  // Set category
-  if (detailCategory) {
-    detailCategory.textContent = product.category || "Product";
-  }
+  if (detailCategory) detailCategory.textContent = product.category || "Product";
+  if (detailTitle) detailTitle.textContent = product.name;
+  if (detailPrice) detailPrice.textContent = formatCurrency(product.price);
 
-  // Set title
-  if (detailTitle) {
-    detailTitle.textContent = product.name;
-  }
-
-  // Set price
-  if (detailPrice) {
-    detailPrice.textContent = formatCurrency(product.price);
-  }
-
-  // Set badge
   if (detailBadge) {
     detailBadge.textContent = "";
     detailBadge.className = "detail-badge";
-    
-    if (product.sold) {
-      detailBadge.textContent = "SOLD";
-      detailBadge.classList.add("badge-sold");
-      detailBadge.style.display = "inline-block";
-    } else if (product.tag === "new") {
-      detailBadge.textContent = "NEW";
-      detailBadge.classList.add("badge-new");
-      detailBadge.style.display = "inline-block";
-    } else if (product.tag === "sale") {
-      detailBadge.textContent = "SALE";
-      detailBadge.classList.add("badge-sale");
-      detailBadge.style.display = "inline-block";
-    } else {
-      detailBadge.style.display = "none";
-    }
+    if (product.sold) { detailBadge.textContent = "SOLD"; detailBadge.classList.add("badge-sold"); detailBadge.style.display = "inline-block"; }
+    else if (product.tag === "new") { detailBadge.textContent = "NEW"; detailBadge.classList.add("badge-new"); detailBadge.style.display = "inline-block"; }
+    else if (product.tag === "sale") { detailBadge.textContent = "SALE"; detailBadge.classList.add("badge-sale"); detailBadge.style.display = "inline-block"; }
+    else detailBadge.style.display = "none";
   }
 
-  // Set description
-  if (detailDescription) {
-    detailDescription.textContent = product.description || "No description available.";
-  }
+  if (detailDescription) detailDescription.textContent = product.description || "No description available.";
 
-  // Set specifications
   if (detailSpecsList) {
     detailSpecsList.innerHTML = "";
-    
     const specs = product.specifications || {
       "Category": product.category,
       "Availability": product.outOfStock ? "Out of Stock" : "In Stock",
       "Price": formatCurrency(product.price)
     };
-
     Object.entries(specs).forEach(([key, value]) => {
       const li = document.createElement("li");
       li.innerHTML = `<i class="fas fa-check-circle"></i> <strong>${key}:</strong> ${value}`;
@@ -557,19 +382,13 @@ function openProductDetail(productId) {
     });
   }
 
-  // Set images
   const imgs = Array.isArray(product.images) && product.images.length
     ? product.images.slice(0, 4)
     : [product.image, product.image, product.image];
-
   const images = imgs.map(img => resolveAssetUrl(img || product.image));
 
-  if (detailMainImage) {
-    detailMainImage.src = images[0];
-    detailMainImage.alt = product.name;
-  }
+  if (detailMainImage) { detailMainImage.src = images[0]; detailMainImage.alt = product.name; }
 
-  // Set thumbnails
   if (detailThumbnails) {
     detailThumbnails.innerHTML = "";
     images.forEach((imgSrc, index) => {
@@ -587,39 +406,22 @@ function openProductDetail(productId) {
     });
   }
 
-  // Set button states
   const isSoldOrOutOfStock = product.sold || product.outOfStock;
-  
   if (detailAddCart) {
     detailAddCart.disabled = isSoldOrOutOfStock;
-    detailAddCart.textContent = isSoldOrOutOfStock ? "Out of Stock" : "Add to Cart";
-    detailAddCart.innerHTML = isSoldOrOutOfStock 
-      ? '<i class="fas fa-ban"></i> Out of Stock'
-      : '<i class="fas fa-cart-plus"></i> Add to Cart';
+    detailAddCart.innerHTML = isSoldOrOutOfStock ? '<i class="fas fa-ban"></i> Out of Stock' : '<i class="fas fa-cart-plus"></i> Add to Cart';
   }
-
   if (detailBuyNow) {
     detailBuyNow.disabled = isSoldOrOutOfStock;
-    detailBuyNow.innerHTML = isSoldOrOutOfStock 
-      ? '<i class="fas fa-ban"></i> Out of Stock'
-      : '<i class="fas fa-bolt"></i> Buy Now';
+    detailBuyNow.innerHTML = isSoldOrOutOfStock ? '<i class="fas fa-ban"></i> Out of Stock' : '<i class="fas fa-bolt"></i> Buy Now';
   }
 
-  // Show modal
-  if (productDetailModal) {
-    productDetailModal.style.display = "block";
-    document.body.style.overflow = "hidden";
-  }
-
-  // Initialize zoom
+  if (productDetailModal) { productDetailModal.style.display = "block"; document.body.style.overflow = "hidden"; }
   initImageZoom();
 }
 
 function closeProductDetail() {
-  if (productDetailModal) {
-    productDetailModal.style.display = "none";
-    document.body.style.overflow = "auto";
-  }
+  if (productDetailModal) { productDetailModal.style.display = "none"; document.body.style.overflow = "auto"; }
   currentProduct = null;
   zoomEnabled = false;
   const mainContainer = document.querySelector('.main-image-container');
@@ -634,12 +436,10 @@ function initImageZoom() {
   const lens = zoomLens;
   const result = zoomResult;
   const container = document.querySelector('.main-image-container');
-
   if (!mainImage || !lens || !result || !container) return;
 
   let cx, cy;
 
-  // Calculate zoom ratio
   function updateZoomRatio() {
     cx = result.offsetWidth / lens.offsetWidth;
     cy = result.offsetHeight / lens.offsetHeight;
@@ -649,19 +449,14 @@ function initImageZoom() {
 
   function moveLens(e) {
     if (!zoomEnabled) return;
-
     e.preventDefault();
-    
     const pos = getCursorPos(e);
     let x = pos.x - lens.offsetWidth / 2;
     let y = pos.y - lens.offsetHeight / 2;
-
-    // Prevent lens from going outside image
     if (x > mainImage.width - lens.offsetWidth) x = mainImage.width - lens.offsetWidth;
     if (x < 0) x = 0;
     if (y > mainImage.height - lens.offsetHeight) y = mainImage.height - lens.offsetHeight;
     if (y < 0) y = 0;
-
     lens.style.left = x + 'px';
     lens.style.top = y + 'px';
     result.style.backgroundPosition = `-${x * cx}px -${y * cy}px`;
@@ -674,28 +469,22 @@ function initImageZoom() {
     return { x, y };
   }
 
-  // Toggle zoom on button click
   if (zoomToggle) {
     zoomToggle.onclick = function() {
       zoomEnabled = !zoomEnabled;
-      
       if (zoomEnabled) {
         container.classList.add('zoom-active');
         updateZoomRatio();
-        this.querySelector('i').classList.remove('fa-search-plus');
-        this.querySelector('i').classList.add('fa-search-minus');
+        this.querySelector('i').classList.replace('fa-search-plus', 'fa-search-minus');
       } else {
         container.classList.remove('zoom-active');
-        this.querySelector('i').classList.remove('fa-search-minus');
-        this.querySelector('i').classList.add('fa-search-plus');
+        this.querySelector('i').classList.replace('fa-search-minus', 'fa-search-plus');
       }
     };
   }
 
-  // Mouse/Touch events
   container.addEventListener('mousemove', moveLens);
   container.addEventListener('touchmove', moveLens);
-  
   mainImage.addEventListener('load', updateZoomRatio);
   window.addEventListener('resize', updateZoomRatio);
 }
@@ -721,105 +510,70 @@ function displayProducts(productsToShow) {
     const isSold = !!product.sold;
     const isOutOfStock = !!product.outOfStock;
 
-    let badgeClass = "";
-    let badgeText = "";
+    let badgeClass = "", badgeText = "";
+    if (isSold) { badgeClass = "badge-sold"; badgeText = "SOLD"; }
+    else if (product.tag === "new") { badgeClass = "badge-new"; badgeText = "NEW"; }
+    else if (product.tag === "sale") { badgeClass = "badge-sale"; badgeText = "SALE"; }
 
-    if (isSold) {
-      badgeClass = "badge-sold";
-      badgeText = "SOLD";
-    } else if (product.tag === "new") {
-      badgeClass = "badge-new";
-      badgeText = "NEW";
-    } else if (product.tag === "sale") {
-      badgeClass = "badge-sale";
-      badgeText = "SALE";
-    }
-
-    let buttonText = "Add to Cart";
-    let buttonClass = "btn-add-to-cart add-to-cart";
-    let buyNowText = "Buy Now";
-    let buyNowClass = "btn-buy-now buy-now";
+    let buttonText = "Add to Cart", buttonClass = "btn-add-to-cart add-to-cart";
+    let buyNowText = "Buy Now", buyNowClass = "btn-buy-now buy-now";
     let isDisabled = "";
 
     if (isSold) {
-      buttonText = "SOLD";
-      buttonClass = "btn-secondary";
-      buyNowText = "SOLD";
-      buyNowClass = "btn-secondary";
-      isDisabled = "disabled";
+      buttonText = "SOLD"; buttonClass = "btn-secondary";
+      buyNowText = "SOLD"; buyNowClass = "btn-secondary"; isDisabled = "disabled";
     } else if (isOutOfStock) {
-      buttonText = "Out of Stock";
-      buttonClass = "btn-secondary";
-      buyNowText = "Out of Stock";
-      buyNowClass = "btn-secondary";
-      isDisabled = "disabled";
+      buttonText = "Out of Stock"; buttonClass = "btn-secondary";
+      buyNowText = "Out of Stock"; buyNowClass = "btn-secondary"; isDisabled = "disabled";
     }
 
-    const imgs =
-      Array.isArray(product.images) && product.images.length
-        ? product.images.slice(0, 3)
-        : [product.image, product.image, product.image];
-
+    const imgs = Array.isArray(product.images) && product.images.length
+      ? product.images.slice(0, 3)
+      : [product.image, product.image, product.image];
     const images = [
       resolveAssetUrl(imgs[0] || product.image),
       resolveAssetUrl(imgs[1] || product.image),
       resolveAssetUrl(imgs[2] || product.image),
     ];
 
-    const productHTML = `
+    productsGrid.insertAdjacentHTML("beforeend", `
       <div class="product-card" data-category="${product.category}" data-product-id="${product.id}">
         <div class="product-image-slider" data-images='${JSON.stringify(images)}'>
           <img src="${images[0]}" alt="${product.name}" class="product-main-img" loading="lazy">
-
           <div class="product-thumbnails">
             <img src="${images[0]}" alt="1" class="thumb active" data-index="0" loading="lazy">
             <img src="${images[1]}" alt="2" class="thumb" data-index="1" loading="lazy">
             <img src="${images[2]}" alt="3" class="thumb" data-index="2" loading="lazy">
           </div>
-
           ${badgeText ? `<span class="product-badge ${badgeClass}">${badgeText}</span>` : ""}
         </div>
-
         <div class="product-info">
           <p class="product-category">${product.category}</p>
           <h3 class="product-title">${product.name}</h3>
           <p class="product-price">${formatCurrency(product.price)}</p>
           <p class="product-description">${product.description}</p>
-
           <div class="product-actions">
-            <button class="btn ${buttonClass}" ${isDisabled} data-id="${product.id}">
-              ${buttonText}
-            </button>
-            <button class="btn ${buyNowClass}" ${isDisabled} data-id="${product.id}">
-              ${buyNowText}
-            </button>
+            <button class="btn ${buttonClass}" ${isDisabled} data-id="${product.id}">${buttonText}</button>
+            <button class="btn ${buyNowClass}" ${isDisabled} data-id="${product.id}">${buyNowText}</button>
           </div>
         </div>
       </div>
-    `;
-
-    productsGrid.insertAdjacentHTML("beforeend", productHTML);
+    `);
   });
 }
 
 function filterProducts(category) {
-  const filtered =
-    category === "all"
-      ? products
-      : products.filter((p) => (p.category || "").toLowerCase() === category.toLowerCase());
-
+  const filtered = category === "all" ? products : products.filter((p) => (p.category || "").toLowerCase() === category.toLowerCase());
   displayProducts(filtered);
 }
 
 function searchProducts(query) {
   const text = (query || "").toLowerCase();
-  const filtered = products.filter((p) => {
-    const name = (p.name || "").toLowerCase();
-    const category = (p.category || "").toLowerCase();
-    const desc = (p.description || "").toLowerCase();
-    return name.includes(text) || category.includes(text) || desc.includes(text);
-  });
-
+  const filtered = products.filter((p) =>
+    (p.name || "").toLowerCase().includes(text) ||
+    (p.category || "").toLowerCase().includes(text) ||
+    (p.description || "").toLowerCase().includes(text)
+  );
   displayProducts(filtered);
 }
 
@@ -842,9 +596,7 @@ function setupEventListeners() {
     });
   }
 
-  if (searchInput) {
-    searchInput.addEventListener("input", (e) => searchProducts(e.target.value));
-  }
+  if (searchInput) searchInput.addEventListener("input", (e) => searchProducts(e.target.value));
 
   filterButtons.forEach((button) => {
     button.setAttribute("aria-pressed", button.classList.contains("active") ? "true" : "false");
@@ -865,21 +617,15 @@ function setupEventListeners() {
   });
 
   cartIcon?.addEventListener("click", openCartModal);
-  footerOpenCart?.addEventListener("click", (e) => {
-    e.preventDefault();
-    openCartModal();
-  });
-
+  footerOpenCart?.addEventListener("click", (e) => { e.preventDefault(); openCartModal(); });
   closeModal?.addEventListener("click", closeCartModal);
   continueShoppingButton?.addEventListener("click", closeCartModal);
-
-  // Product Detail Modal Events
   closeProductModal?.addEventListener("click", closeProductDetail);
 
   if (detailAddCart) {
     detailAddCart.addEventListener("click", () => {
       if (currentProduct && !currentProduct.sold && !currentProduct.outOfStock) {
-        addToCart(String(currentProduct.id)); // use string ID
+        addToCart(String(currentProduct.id));
       }
     });
   }
@@ -887,7 +633,7 @@ function setupEventListeners() {
   if (detailBuyNow) {
     detailBuyNow.addEventListener("click", () => {
       if (currentProduct && !currentProduct.sold && !currentProduct.outOfStock) {
-        addToCart(String(currentProduct.id), 1); // use string ID
+        addToCart(String(currentProduct.id), 1);
         closeProductDetail();
         openCartModal();
       }
@@ -900,48 +646,28 @@ function setupEventListeners() {
   });
 
   shippingStateSelect?.addEventListener("change", updateCartUI);
-
   customerNameInput?.addEventListener("input", updateCartUI);
   customerEmailInput?.addEventListener("input", updateCartUI);
   customerPhoneInput?.addEventListener("input", updateCartUI);
-
   checkoutButton?.addEventListener("click", initiatePaystackPayment);
 
   productsGrid?.addEventListener("click", (e) => {
     const target = e.target;
-
-    // Click on product card to view details (but not on buttons)
     const card = target.closest(".product-card");
     if (card && !target.closest("button") && !target.closest(".thumb")) {
-      const productId = card.dataset.productId; // keep as string to support MongoDB IDs
-      openProductDetail(productId);
+      openProductDetail(card.dataset.productId);
       return;
     }
-
-    if (target?.classList?.contains("add-to-cart")) {
-      e.stopPropagation();
-      addToCart(target.dataset.id); // keep as string to support MongoDB IDs
-      return;
-    }
-
-    if (target?.classList?.contains("buy-now")) {
-      e.stopPropagation();
-      addToCart(target.dataset.id, 1); // keep as string to support MongoDB IDs
-      openCartModal();
-      return;
-    }
-
+    if (target?.classList?.contains("add-to-cart")) { e.stopPropagation(); addToCart(target.dataset.id); return; }
+    if (target?.classList?.contains("buy-now")) { e.stopPropagation(); addToCart(target.dataset.id, 1); openCartModal(); return; }
     if (target?.classList?.contains("thumb")) {
       e.stopPropagation();
       const slider = target.closest(".product-image-slider");
       const mainImg = slider?.querySelector(".product-main-img");
       if (!slider || !mainImg) return;
-
       const images = JSON.parse(slider.dataset.images || "[]");
       const index = parseInt(target.dataset.index, 10);
-
       if (images[index]) mainImg.src = images[index];
-
       slider.querySelectorAll(".thumb").forEach((t) => t.classList.remove("active"));
       target.classList.add("active");
     }
@@ -968,15 +694,10 @@ function closeCartModal() {
 // 12) PAYSTACK - WITH LOADING INDICATOR
 // ------------------------------
 function initiatePaystackPayment() {
-  if (cart.length === 0) {
-    alert("Your cart is empty.");
-    return;
-  }
+  if (cart.length === 0) { alert("Your cart is empty."); return; }
 
   if (typeof PaystackPop === "undefined") {
-    alert(
-      "Paystack could not load on this browser/network. Please disable adblockers, try incognito mode, or try another network and retry."
-    );
+    alert("Paystack could not load on this browser/network. Please disable adblockers, try incognito mode, or try another network and retry.");
     return;
   }
 
@@ -984,25 +705,15 @@ function initiatePaystackPayment() {
   const email = (customerEmailInput?.value || "").trim();
   const phone = (customerPhoneInput?.value || "").trim();
 
-  if (!validateCustomerInfo()) {
-    alert("Please complete all required information correctly.");
-    return;
-  }
+  if (!validateCustomerInfo()) { alert("Please complete all required information correctly."); return; }
 
   const shippingFeeNaira = parseInt(shippingStateSelect?.value || "0", 10) || 0;
-
-  // Prices are stored in NAIRA in the UI/cart
   const subtotalNaira = cart.reduce((sum, item) => sum + Number(item.price || 0) * (item.quantity || 1), 0);
   const totalNaira = subtotalNaira + shippingFeeNaira;
 
-  if (!Number.isFinite(totalNaira) || totalNaira <= 0) {
-    alert("Invalid total amount. Please refresh the page and try again.");
-    return;
-  }
+  if (!Number.isFinite(totalNaira) || totalNaira <= 0) { alert("Invalid total amount. Please refresh the page and try again."); return; }
 
-  // Paystack expects KOBO (naira * 100)
   const totalKobo = Math.round(totalNaira * 100);
-
   const metadata = {
     customer_name: name,
     customer_email: email,
@@ -1012,49 +723,21 @@ function initiatePaystackPayment() {
     shipping_state: shippingStateSelect?.options?.[shippingStateSelect.selectedIndex]?.text || "",
   };
 
-  // ✅ IMPORTANT FIX:
-  // Initialize the transaction on the backend first, then open Paystack with access_code.
-  // This prevents the Paystack popup error: "We could not start this transaction".
   showLoadingOverlay("Starting payment...");
 
   fetch(`${API_BASE_URL}/api/payment/initialize`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-    },
+    headers: { "Content-Type": "application/json", "Accept": "application/json" },
     body: JSON.stringify({ email, amount: totalNaira, metadata }),
   })
-    .then((r) => {
-      if (!r.ok) throw new Error(`Initialize failed (HTTP ${r.status})`);
-      return r.json();
-    })
+    .then((r) => { if (!r.ok) throw new Error(`Initialize failed (HTTP ${r.status})`); return r.json(); })
     .then((init) => {
-      if (!init?.success || !init?.access_code) {
-        throw new Error(init?.message || "Failed to initialize transaction");
-      }
-
-      // ✅ FIX: Use public key returned by backend (guaranteed to match the secret key account).
-      // This is the ROOT CAUSE of "We could not start this transaction": mismatched public/secret keys.
-      // ⚠️  To fix: Go to Render dashboard → Environment Variables → Add PAYSTACK_PUBLIC_KEY = pk_test_xxx
-      //     (it MUST be the public key from the SAME Paystack account as your PAYSTACK_SECRET_KEY)
+      if (!init?.success || !init?.access_code) throw new Error(init?.message || "Failed to initialize transaction");
       if (init.public_key && init.public_key.startsWith('pk_')) {
         PAYSTACK_PUBLIC_KEY = init.public_key;
-        console.log("✅ Using backend public key:", PAYSTACK_PUBLIC_KEY.substring(0, 18) + "...");
-      } else if (init.public_key === '' || !init.public_key) {
-        console.error(
-          "❌ CRITICAL: Backend did not return a valid public key!\n" +
-          "This WILL cause 'We could not start this transaction' if your\n" +
-          "server uses a DIFFERENT account's secret key than the hardcoded public key.\n" +
-          "FIX: Add PAYSTACK_PUBLIC_KEY=pk_test_xxx (or pk_live_xxx) to your Render env vars.\n" +
-          "Using hardcoded fallback key: " + PAYSTACK_PUBLIC_KEY.substring(0, 18) + "..."
-        );
       }
-
       hideLoadingOverlay();
 
-      // ✅ When using access_code, Paystack locks email+amount server-side.
-      // Passing key + access_code is enough; adding currency:'NGN' for clarity.
       const handler = PaystackPop.setup({
         key: PAYSTACK_PUBLIC_KEY,
         email,
@@ -1064,136 +747,122 @@ function initiatePaystackPayment() {
         ref: init.reference,
         metadata,
         callback: function (response) {
-          console.log("✅ Paystack payment successful:", response.reference);
-
-          // Show loading overlay immediately after payment
           showLoadingOverlay("Verifying your payment...");
-
-          // Add timeout fallback (90 seconds)
           const timeoutId = setTimeout(() => {
             hideLoadingOverlay();
-            alert(
-              "⏱️ Payment verification is taking longer than expected. Your payment was received. Please check your email for confirmation or contact support with reference: " +
-                response.reference
-            );
+            alert("⏱️ Payment verification is taking longer than expected. Your payment was received. Please check your email for confirmation or contact support with reference: " + response.reference);
           }, 90000);
 
-          // Verify payment
           fetch(`${API_BASE_URL}/api/payment/verify`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Accept": "application/json",
-            },
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
             body: JSON.stringify({ reference: response.reference }),
           })
-            .then((r) => {
-              clearTimeout(timeoutId);
-              if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
-              return r.json();
-            })
+            .then((r) => { clearTimeout(timeoutId); if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`); return r.json(); })
             .then((data) => {
-              console.log("✅ Verification response:", data);
               hideLoadingOverlay();
-
               if (data.success) {
                 alert("✅ Payment successful! Order confirmed. Check your email for details.");
-
-                // Clear cart
                 cart = [];
                 localStorage.setItem("cart", JSON.stringify(cart));
-
-                // Clear form
                 if (customerNameInput) customerNameInput.value = "";
                 if (customerEmailInput) customerEmailInput.value = "";
                 if (customerPhoneInput) customerPhoneInput.value = "";
                 if (shippingStateSelect) shippingStateSelect.value = "";
-
                 updateCartUI();
                 closeCartModal();
               } else {
                 alert("⚠️ Payment verification failed: " + (data.message || "Unknown error"));
               }
             })
-            .catch((err) => {
-              clearTimeout(timeoutId);
-              console.error("❌ Verification error:", err);
-              hideLoadingOverlay();
-              alert(
-                "❌ Failed to verify payment. Your payment was received. Please contact support with reference: " +
-                  response.reference
-              );
-            });
+            .catch((err) => { clearTimeout(timeoutId); hideLoadingOverlay(); alert("❌ Failed to verify payment. Please contact support with reference: " + response.reference); });
         },
-        onClose: function () {
-          console.log("Payment window closed");
-          hideLoadingOverlay();
-        },
+        onClose: function () { hideLoadingOverlay(); },
       });
-
       handler.openIframe();
     })
     .catch((err) => {
-      console.error("❌ Paystack init error:", err);
       hideLoadingOverlay();
-      const msg = err?.message || "Unknown error";
-      // Common causes: PAYSTACK_SECRET_KEY missing on server, test/live key mismatch,
-      // or backend server is sleeping (Render free tier).
-      alert(
-        "❌ Could not start payment: " + msg +
-        "\n\nPossible causes:\n" +
-        "• Backend server is still waking up (wait 30s and retry)\n" +
-        "• PAYSTACK_SECRET_KEY missing in server environment\n" +
-        "• Public/Secret key mode mismatch (test vs live)"
-      );
+      alert("❌ Could not start payment: " + (err?.message || "Unknown error") + "\n\nPossible causes:\n• Backend server is still waking up (wait 30s and retry)\n• PAYSTACK_SECRET_KEY missing in server environment\n• Public/Secret key mode mismatch (test vs live)");
     });
 }
 
 // ------------------------------
-// 13) INIT
+// 13) INIT — with timeout + graceful Render cold-start handling
+// ✅ FIX: AbortController timeout ensures we don't wait forever for a sleeping Render backend.
+//         Products load from products.json immediately if backend doesn't respond in 8 seconds.
 // ------------------------------
 async function initializeApp() {
-  // ✅ NEW: load products from backend first (client can manage products via /admin dashboard)
-  // Fallback to products.json if backend is down or empty.
-  try {
-    let response = await fetch(`${API_BASE_URL}/api/products`, { cache: "no-store" });
+  // Show loading state while we wait for products
+  showProductsLoading(false);
 
-    if (response.ok) {
-      const data = await response.json();
-      // Backend returns an array (same shape as products.json)
-      // Backend returns { success: true, data: [...] } shape
-      if (data.success && Array.isArray(data.data) && data.data.length) {
-        // ✅ DB products have prices in NAIRA (as stored by admin panel)
-        products = data.data;
-      } else if (Array.isArray(data) && data.length) {
-        // plain array fallback - also naira from DB
-        products = data;
+  // ✅ Create an AbortController to cancel the backend request if it takes too long
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+    console.warn("⏱️ Backend API timeout — falling back to products.json (Render free plan may be waking up)");
+    // Update the loading message to inform the user
+    const loadingEl = productsGrid?.querySelector('.products-loading p');
+    if (loadingEl) loadingEl.textContent = "Loading products from cache...";
+  }, API_TIMEOUT_MS);
+
+  try {
+    let backendFailed = false;
+
+    try {
+      // ✅ Pass the AbortController signal — this will throw AbortError after API_TIMEOUT_MS
+      const response = await fetch(`${API_BASE_URL}/api/products`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data) && data.data.length) {
+          products = data.data;
+        } else if (Array.isArray(data) && data.length) {
+          products = data;
+        } else {
+          backendFailed = true; // Backend returned empty — fall back to products.json
+        }
       } else {
-        // fallback to products.json (prices stored in KOBO → convert to NAIRA for display)
-        response = await fetch(getProductsJsonUrl(), { cache: "no-store" });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const rawA = await response.json();
-        // ✅ FIX: products.json has prices in KOBO. New script expects NAIRA. Convert ÷100.
-        products = rawA.map(p => ({ ...p, price: (Number(p.price) || 0) / 100 }));
+        backendFailed = true;
       }
-    } else {
-      // fallback to products.json (prices stored in KOBO → convert to NAIRA for display)
-      response = await fetch(getProductsJsonUrl(), { cache: "no-store" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const rawB = await response.json();
-      // ✅ FIX: products.json has prices in KOBO. New script expects NAIRA. Convert ÷100.
-      products = rawB.map(p => ({ ...p, price: (Number(p.price) || 0) / 100 }));
+    } catch (apiErr) {
+      clearTimeout(timeoutId);
+      // AbortError means we hit our timeout — backend is sleeping on Render free plan
+      if (apiErr.name === "AbortError") {
+        console.warn("⚠️ Backend API timed out. Using products.json fallback. The backend will wake up in the background.");
+        // ✅ Re-trigger the backend wake-up in the background (fire-and-forget with long timeout)
+        // This primes the server so it's ready for checkout later
+        fetch(`${API_BASE_URL}/health`, { cache: "no-store" }).catch(() => {});
+      } else {
+        console.error("❌ Backend API error:", apiErr.message);
+      }
+      backendFailed = true;
     }
-  } catch (e) {
-    console.error("❌ Failed to load products from backend/products.json:", e);
-    products = [];
+
+    if (backendFailed) {
+      // Load from products.json (fallback)
+      try {
+        const fallbackResp = await fetch(getProductsJsonUrl(), { cache: "no-store" });
+        if (!fallbackResp.ok) throw new Error(`HTTP ${fallbackResp.status}`);
+        const rawProducts = await fallbackResp.json();
+        // products.json stores prices in KOBO → convert to NAIRA for display
+        products = rawProducts.map(p => ({ ...p, price: (Number(p.price) || 0) / 100 }));
+      } catch (fallbackErr) {
+        console.error("❌ Failed to load products.json:", fallbackErr);
+        products = [];
+      }
+    }
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   displayProducts(products);
   setupEventListeners();
   updateCartUI();
-
-  // Ensure default "All Products" active matches UI
   setActiveFilterButton("all");
 }
 
