@@ -114,6 +114,10 @@ function resolveAssetUrl(path) {
   return new URL(path, base).toString();
 }
 
+function svgIcon(name, extraClass = '') {
+  return `<svg class=\"icon ${extraClass}\" aria-hidden=\"true\"><use href=\"#icon-${name}\"></use></svg>`;
+}
+
 // ------------------------------
 // 4) LOADING OVERLAY
 // ------------------------------
@@ -130,7 +134,7 @@ function showLoadingOverlay(message = "Processing payment...") {
         <div class="loading-progress-bar"></div>
       </div>
       <p class="loading-info">
-        <i class="fas fa-info-circle"></i> 
+        ${svgIcon('info')} 
         Do not close this window or press the back button
       </p>
     </div>
@@ -187,7 +191,7 @@ function showProductsLoading(isBackendWaking = false) {
   if (!productsGrid) return;
   productsGrid.innerHTML = `
     <div class="products-loading">
-      <div class="loading-spinner-sm"></div>
+      <div class="loading-spinner-sm" aria-hidden="true"></div>
       <p>${isBackendWaking ? "Waking up product server..." : "Loading products..."}</p>
       <small>${isBackendWaking
         ? "The server may take up to 30 seconds to wake from sleep. Products will appear shortly."
@@ -227,7 +231,7 @@ function updateCartUI() {
           <button class="btn-quantity minus" data-id="${item.id}" data-change="-1">-</button>
           <span>${item.quantity}</span>
           <button class="btn-quantity plus" data-id="${item.id}" data-change="1">+</button>
-          <i class="fas fa-trash-alt remove-item" data-id="${item.id}"></i>
+          <button type="button" class="remove-item" data-id="${item.id}" aria-label="Remove item">${svgIcon('trash')}</button>
         </div>
       </div>
     `;
@@ -265,10 +269,10 @@ function updateCartUI() {
 
     if (!isValid || !name || !email || !phone) {
       checkoutButton.disabled = true;
-      checkoutButton.innerHTML = '<i class="fas fa-info-circle"></i> Complete Info to Continue';
+      checkoutButton.innerHTML = `${svgIcon('info')} Complete Info to Continue`;
     } else {
       checkoutButton.disabled = false;
-      checkoutButton.innerHTML = '<i class="fas fa-credit-card"></i> Proceed to Checkout';
+      checkoutButton.innerHTML = `${svgIcon('credit-card')} Proceed to Checkout`;
     }
   }
 }
@@ -377,7 +381,7 @@ function openProductDetail(productId) {
     };
     Object.entries(specs).forEach(([key, value]) => {
       const li = document.createElement("li");
-      li.innerHTML = `<i class="fas fa-check-circle"></i> <strong>${key}:</strong> ${value}`;
+      li.innerHTML = `${svgIcon('check')} <strong>${key}:</strong> ${value}`;
       detailSpecsList.appendChild(li);
     });
   }
@@ -409,11 +413,11 @@ function openProductDetail(productId) {
   const isSoldOrOutOfStock = product.sold || product.outOfStock;
   if (detailAddCart) {
     detailAddCart.disabled = isSoldOrOutOfStock;
-    detailAddCart.innerHTML = isSoldOrOutOfStock ? '<i class="fas fa-ban"></i> Out of Stock' : '<i class="fas fa-cart-plus"></i> Add to Cart';
+    detailAddCart.innerHTML = isSoldOrOutOfStock ? `${svgIcon('ban')} Out of Stock` : `${svgIcon('cart-plus')} Add to Cart`;
   }
   if (detailBuyNow) {
     detailBuyNow.disabled = isSoldOrOutOfStock;
-    detailBuyNow.innerHTML = isSoldOrOutOfStock ? '<i class="fas fa-ban"></i> Out of Stock' : '<i class="fas fa-bolt"></i> Buy Now';
+    detailBuyNow.innerHTML = isSoldOrOutOfStock ? `${svgIcon('ban')} Out of Stock` : `${svgIcon('bolt')} Buy Now`;
   }
 
   if (productDetailModal) { productDetailModal.style.display = "block"; document.body.style.overflow = "hidden"; }
@@ -475,10 +479,10 @@ function initImageZoom() {
       if (zoomEnabled) {
         container.classList.add('zoom-active');
         updateZoomRatio();
-        this.querySelector('i').classList.replace('fa-search-plus', 'fa-search-minus');
+        const u = this.querySelector('use'); if (u) u.setAttribute('href','#icon-zoom-out');
       } else {
         container.classList.remove('zoom-active');
-        this.querySelector('i').classList.replace('fa-search-minus', 'fa-search-plus');
+        const u = this.querySelector('use'); if (u) u.setAttribute('href','#icon-zoom-in');
       }
     };
   }
@@ -499,7 +503,7 @@ function displayProducts(productsToShow) {
   if (!productsToShow || productsToShow.length === 0) {
     productsGrid.innerHTML = `
       <div style="grid-column:1/-1;text-align:center;padding:40px;color:#555;">
-        <i class="fas fa-box-open" style="font-size:48px;color:#ccc;margin-bottom:15px;"></i>
+        <span style="display:inline-flex;font-size:48px;color:#ccc;margin-bottom:15px;">${svgIcon('list')}</span>
         <p style="font-size:18px;margin:0;">No products found</p>
       </div>
     `;
@@ -692,9 +696,31 @@ function closeCartModal() {
 
 // ------------------------------
 // 12) PAYSTACK - WITH LOADING INDICATOR
+//     Paystack JS is loaded ONLY when user clicks checkout.
 // ------------------------------
-function initiatePaystackPayment() {
+async function loadPaystackScript() {
+  if (typeof window.PaystackPop !== 'undefined') return true;
+  if (window.__paystackLoadingPromise) return window.__paystackLoadingPromise;
+  window.__paystackLoadingPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://js.paystack.co/v1/inline.js';
+    s.async = true;
+    s.onload = () => resolve(true);
+    s.onerror = () => reject(new Error('Failed to load Paystack script'));
+    document.head.appendChild(s);
+  });
+  return window.__paystackLoadingPromise;
+}
+
+async function initiatePaystackPayment() {
   if (cart.length === 0) { alert("Your cart is empty."); return; }
+
+  try {
+    await loadPaystackScript();
+  } catch (e) {
+    alert("Paystack could not load. Please disable adblockers or try another network and retry.");
+    return;
+  }
 
   if (typeof PaystackPop === "undefined") {
     alert("Paystack could not load on this browser/network. Please disable adblockers, try incognito mode, or try another network and retry.");
@@ -867,3 +893,10 @@ async function initializeApp() {
 }
 
 document.addEventListener("DOMContentLoaded", initializeApp);
+
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
