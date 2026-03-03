@@ -409,17 +409,6 @@
     </div>
   </footer>
 
-  <!--
-    ✅ FIX PERFORMANCE + BEST PRACTICES:
-    1. Cloudflare email-decode script REMOVED — it 404'd on GitHub Pages / Render,
-       causing a console error that Lighthouse penalises under Best Practices.
-    2. Paystack inline.js REMOVED from here — it is now loaded LAZILY inside
-       script.js only when the user clicks "Proceed to Checkout". This saves
-       ~516 KiB of JavaScript on every page load, significantly improving
-       First Contentful Paint (FCP) and Largest Contentful Paint (LCP).
-    3. script.js has defer — it does not block HTML parsing.
-  -->
-  <script src="script.js" defer></script>
-
+  
 </body>
 </html>
