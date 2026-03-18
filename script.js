@@ -52,6 +52,9 @@ let cart = (() => {
 let currentProduct = null;
 let zoomEnabled    = false;
 
+// ✅ FIX: Track active payment reference to cancel it if user closes popup
+let _pendingPaymentRef = null;  // set when Paystack popup opens, cleared on verify/cancel
+
 // ─────────────────────────────────────────────────────────────────────
 // ✅ AUTH STATE
 // ─────────────────────────────────────────────────────────────────────
@@ -1082,9 +1085,18 @@ function closeCartModal() {
 async function initiatePaystackPayment() {
   if (cart.length === 0) { alert('Your cart is empty.'); return; }
 
-  // Resolve name + email from auth or form
-  const name  = currentUser ? currentUser.name  : (customerNameInput?.value  || '').trim();
-  const email = currentUser ? currentUser.email : (customerEmailInput?.value || '').trim();
+  // ✅ FIX: Require login before purchase — open auth modal if not logged in
+  if (!currentUser) {
+    // Close cart modal temporarily and open auth modal
+    closeCartModal();
+    showToast('Please sign in to complete your purchase.', 'info');
+    openAuthModal('signin');
+    return;
+  }
+
+  // Resolve name + email from auth (user is now guaranteed to be logged in)
+  const name  = currentUser.name;
+  const email = currentUser.email;
   const phone = (customerPhoneInput?.value || '').trim();
 
   if (!validateCustomerInfo()) { alert('Please complete all required information correctly.'); return; }
@@ -1122,10 +1134,15 @@ async function initiatePaystackPayment() {
       if (init.public_key && init.public_key.startsWith('pk_')) PAYSTACK_PUBLIC_KEY = init.public_key;
       hideLoadingOverlay();
 
+      // ✅ FIX: Store reference so we can cancel it if popup is closed
+      _pendingPaymentRef = init.reference;
+
       const handler = PaystackPop.setup({
         key: PAYSTACK_PUBLIC_KEY, email, amount: totalKobo, currency: 'NGN',
         access_code: init.access_code, ref: init.reference, metadata,
         callback: function (response) {
+          // Payment completed in Paystack popup — now verify on backend
+          _pendingPaymentRef = null; // clear: payment is being verified, not cancelled
           showLoadingOverlay('Verifying your payment…');
           const timeoutId = setTimeout(() => {
             hideLoadingOverlay();
@@ -1143,10 +1160,6 @@ async function initiatePaystackPayment() {
               if (data.success) {
                 cart = []; localStorage.setItem('cart', JSON.stringify(cart));
                 if (customerPhoneInput)  customerPhoneInput.value  = '';
-                if (!currentUser) {
-                  if (customerNameInput)   customerNameInput.value   = '';
-                  if (customerEmailInput)  customerEmailInput.value  = '';
-                }
                 if (shippingStateSelect) shippingStateSelect.value = '';
                 updateCartUI();
                 closeCartModal();
@@ -1159,7 +1172,21 @@ async function initiatePaystackPayment() {
             })
             .catch(err => { clearTimeout(timeoutId); hideLoadingOverlay(); alert('❌ Failed to verify payment. Contact support with reference: ' + response.reference); });
         },
-        onClose: function () { hideLoadingOverlay(); },
+        onClose: function () {
+          // ✅ FIX: User closed/cancelled Paystack popup without paying
+          // Update status from 'pending' to 'cancelled' on the backend
+          const ref = _pendingPaymentRef;
+          _pendingPaymentRef = null;
+          hideLoadingOverlay();
+          if (ref) {
+            fetch(`${API_BASE_URL}/api/payment/cancel`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...authHeaders() },
+              body: JSON.stringify({ reference: ref }),
+            }).catch(() => {}); // silent — best effort
+            showToast('Payment cancelled. Your cart is still saved.', 'info');
+          }
+        },
       });
       handler.openIframe();
     })
