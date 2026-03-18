@@ -119,12 +119,8 @@ const searchIconBtn            = document.getElementById('searchIcon');
 const footerOpenCart           = document.getElementById('footerOpenCart');
 
 // Cart form fields
-const customerNameInput        = document.getElementById('customerName');
-const customerEmailInput       = document.getElementById('customerEmail');
 const customerPhoneInput       = document.getElementById('customerPhone');
 const shippingStateSelect      = document.getElementById('shippingState');
-const nameError                = document.getElementById('nameError');
-const emailError               = document.getElementById('emailError');
 const phoneError               = document.getElementById('phoneError');
 
 // Auth UI elements
@@ -855,44 +851,26 @@ function removeItem(productId) {
 // ✅ VALIDATION — aware of auth state
 // ─────────────────────────────────────────────────────────────────────
 function validateCustomerInfo({ silent = false } = {}) {
+  // Checkout is account-based: user must be signed in.
+  if (!currentUser) return false;
+
   let isValid = true;
-  if (nameError)  nameError.style.display  = 'none';
-  if (emailError) emailError.style.display = 'none';
   if (phoneError) phoneError.style.display = 'none';
 
   const phone = (customerPhoneInput?.value || '').trim();
-
-  if (currentUser) {
-    // Logged in — only validate phone + state
-    const phoneRegex = /^(0[789][01])\d{8}$/;
-    if (!phone || !phoneRegex.test(phone)) {
-      if (!silent && phoneError) { phoneError.textContent = 'Enter a valid Nigerian WhatsApp number (e.g., 08031234567).'; phoneError.style.display = 'block'; }
-      isValid = false;
+  const phoneRegex = /^(0[789][01])\d{8}$/;
+  if (!phone || !phoneRegex.test(phone)) {
+    if (!silent && phoneError) {
+      phoneError.textContent = 'Enter a valid Nigerian WhatsApp number (e.g., 08031234567).';
+      phoneError.style.display = 'block';
     }
-  } else {
-    // Guest — validate all fields
-    const name  = (customerNameInput?.value  || '').trim();
-    const email = (customerEmailInput?.value || '').trim();
-
-    if (!name || name.length < 3 || name.includes('@') || name.includes('.')) {
-      if (!silent && nameError) { nameError.textContent = 'Please enter your full name (not email).'; nameError.style.display = 'block'; }
-      isValid = false;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
-      if (!silent && emailError) { emailError.textContent = 'Enter a valid email (e.g., name@example.com).'; emailError.style.display = 'block'; }
-      isValid = false;
-    }
-    const phoneRegex = /^(0[789][01])\d{8}$/;
-    if (!phone || !phoneRegex.test(phone)) {
-      if (!silent && phoneError) { phoneError.textContent = 'Enter a valid Nigerian WhatsApp number (e.g., 08031234567).'; phoneError.style.display = 'block'; }
-      isValid = false;
-    }
+    isValid = false;
   }
 
   if (!(shippingStateSelect?.value || '')) isValid = false;
   return isValid;
 }
+
 
 // ─────────────────────────────────────────────────────────────────────
 // PRODUCT DETAIL MODAL (unchanged)
@@ -1087,9 +1065,7 @@ function setupEventListeners() {
   });
 
   shippingStateSelect?.addEventListener('change', updateCartUI);
-  customerNameInput?.addEventListener('input',  updateCartUI);
-  customerEmailInput?.addEventListener('input', updateCartUI);
-  customerPhoneInput?.addEventListener('input', () => {
+customerPhoneInput?.addEventListener('input', () => {
     updateCartUI();
     // Save phone for logged-in users
     if (currentUser && customerPhoneInput.value) {
@@ -1328,6 +1304,28 @@ function warmUpBackend() {
 // INIT
 // ─────────────────────────────────────────────────────────────────────
 async function initializeApp() {
+  // ✅ Handle verification-link redirects like:
+  //   /?email_verified=1&email=user@example.com
+  // This solves the "I verified but I still can't login" confusion.
+  try {
+    const url = new URL(window.location.href);
+    const sp  = url.searchParams;
+    if (sp.get('email_verified') === '1') {
+      const e = (sp.get('email') || '').trim();
+      showToast('✅ Email verified. Please sign in to continue.', 'success');
+      openAuthModal('signin');
+      if (e) {
+        const siEmail = document.getElementById('siEmail');
+        if (siEmail) siEmail.value = e;
+      }
+      // Clean URL (remove params) without reloading
+      sp.delete('email_verified');
+      sp.delete('email');
+      url.search = sp.toString();
+      window.history.replaceState({}, document.title, url.toString());
+    }
+  } catch (_) {}
+
   // Load persisted auth state
   loadAuthState();
   updateAuthUI();
