@@ -1,0 +1,295 @@
+/* =====================================================================
+   FortuneHub style.css — Auth Edition (v5)
+   ✅ All original styles PRESERVED (copy this AFTER the original CSS)
+   ✅ NEW sections added at the bottom:
+      • Auth header button / avatar / dropdown
+      • Auth modal (tabs, Google button, email/password forms)
+      • Cart auth banner
+      • Order history modal
+      • Receipt modal
+      • Toast notifications
+      • Print styles for receipt
+   ===================================================================== */
+
+/* ─── PASTE THE ENTIRE ORIGINAL style.css FIRST, THEN ADD BELOW ─── */
+
+/* ==============================
+   ✅ NEW — AUTH HEADER ELEMENTS
+   ============================== */
+.auth-header-wrap { position: relative; display: flex; align-items: center; }
+
+.user-avatar-wrap { position: relative; display: flex; align-items: center; }
+
+.user-avatar-btn {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 2px solid var(--brand-blue);
+  background: #f0f2ff; cursor: pointer;
+  padding: 0; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--transition);
+}
+.user-avatar-btn:hover { border-color: var(--brand-red); transform: scale(1.05); }
+
+.user-avatar-img {
+  width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
+}
+.user-avatar-initial {
+  width: 100%; height: 100%; border-radius: 50%;
+  background: var(--brand-blue); color: #fff;
+  font-weight: 800; font-size: 1.1rem;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Dropdown */
+.user-dropdown {
+  position: absolute; top: calc(100% + 10px); right: 0;
+  background: #fff; border-radius: 14px; min-width: 230px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+  border: 1px solid rgba(0,0,0,0.08);
+  overflow: hidden; z-index: 500;
+  opacity: 0; transform: translateY(-8px) scale(0.97);
+  pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+}
+.user-dropdown.open {
+  opacity: 1; transform: translateY(0) scale(1); pointer-events: all;
+}
+.user-dropdown-info { padding: 14px 16px; background: #f8f9ff; border-bottom: 1px solid rgba(0,0,0,0.06); }
+.user-dropdown-info strong { display: block; font-size: .98rem; color: var(--dark); margin-bottom: 2px; }
+.user-dropdown-info small { color: var(--gray); font-size: .83rem; word-break: break-all; }
+.dropdown-divider { border: none; border-top: 1px solid rgba(0,0,0,0.07); margin: 0; }
+
+.dropdown-item {
+  width: 100%; background: none; border: none; cursor: pointer;
+  padding: 13px 16px; text-align: left; font-size: .95rem;
+  color: var(--dark); display: flex; align-items: center; gap: 10px;
+  transition: background .18s;
+}
+.dropdown-item:hover { background: #f0f2ff; }
+.dropdown-item i { color: var(--brand-blue); width: 18px; text-align: center; }
+.dropdown-signout { color: var(--brand-red); }
+.dropdown-signout i { color: var(--brand-red); }
+
+/* ==============================
+   ✅ NEW — AUTH MODAL
+   ============================== */
+.auth-modal .modal-content {
+  max-width: 440px; padding: 32px 28px;
+}
+.auth-tabs {
+  display: flex; gap: 0; margin-bottom: 24px;
+  border-bottom: 2px solid var(--light-gray);
+}
+.auth-tab {
+  flex: 1; padding: 10px; background: none; border: none;
+  font-size: 1rem; font-weight: 700; cursor: pointer;
+  color: var(--gray); border-bottom: 3px solid transparent;
+  margin-bottom: -2px; transition: color .2s, border-color .2s;
+}
+.auth-tab.active { color: var(--brand-blue); border-bottom-color: var(--brand-blue); }
+.auth-tab:hover:not(.active) { color: var(--dark); }
+
+.auth-google-section { text-align: center; margin-bottom: 8px; }
+.google-btn-wrap { display: flex; justify-content: center; margin-bottom: 16px; }
+/* Override GIS button minimum width */
+.google-btn-wrap > div { width: 100% !important; }
+
+.auth-or {
+  display: flex; align-items: center; gap: 12px;
+  color: var(--gray); font-size: .9rem; margin: 8px 0 16px;
+}
+.auth-or::before, .auth-or::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+.auth-form .form-group { margin-bottom: 16px; }
+
+.btn-auth-submit {
+  background: var(--brand-blue); color: #fff; border: none;
+  padding: 13px; border-radius: 12px; font-size: 1rem;
+  font-weight: 700; width: 100%; cursor: pointer;
+  transition: var(--transition); display: flex;
+  align-items: center; justify-content: center; gap: 8px;
+}
+.btn-auth-submit:hover:not(:disabled) { background: #161c6b; transform: translateY(-1px); }
+.btn-auth-submit:disabled { opacity: .65; cursor: not-allowed; }
+
+.btn-spinner {
+  width: 18px; height: 18px; border: 3px solid rgba(255,255,255,.3);
+  border-top-color: #fff; border-radius: 50%;
+  animation: spinAnim .8s linear infinite;
+  display: inline-block; vertical-align: middle;
+}
+
+.password-wrap { position: relative; }
+.password-wrap .form-input { padding-right: 44px; }
+.toggle-pw {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer;
+  color: var(--gray); font-size: 1rem; padding: 4px;
+}
+.toggle-pw:hover { color: var(--brand-blue); }
+
+/* ==============================
+   ✅ NEW — CART AUTH BANNER
+   ============================== */
+.auth-user-banner {
+  display: flex; align-items: center; gap: 12px;
+  background: #f0f7ff; border: 1.5px solid #b8d4f8;
+  border-radius: 12px; padding: 12px 14px; margin-bottom: 14px;
+}
+.banner-avatar {
+  width: 44px; height: 44px; border-radius: 50%; object-fit: cover;
+  border: 2px solid var(--brand-blue); flex-shrink: 0;
+}
+.banner-info { flex: 1; min-width: 0; }
+.banner-info strong { display: block; font-size: .95rem; color: var(--dark); }
+.banner-info span { font-size: .85rem; color: var(--gray); word-break: break-all; }
+.btn-change-account {
+  background: none; border: 1px solid var(--brand-blue); color: var(--brand-blue);
+  border-radius: 8px; padding: 5px 12px; font-size: .82rem;
+  font-weight: 700; cursor: pointer; white-space: nowrap;
+  transition: var(--transition); flex-shrink: 0;
+}
+.btn-change-account:hover { background: var(--brand-blue); color: #fff; }
+
+.cart-signin-prompt {
+  background: #fff8e1; border: 1px solid #ffe082;
+  border-radius: 10px; padding: 10px 14px; margin-bottom: 12px;
+  font-size: .88rem; color: #555;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+}
+.cart-signin-prompt i { color: var(--warning); }
+.btn-inline-signin {
+  background: var(--brand-blue); color: #fff; border: none;
+  border-radius: 8px; padding: 5px 12px; font-size: .85rem;
+  font-weight: 700; cursor: pointer; transition: var(--transition);
+}
+.btn-inline-signin:hover { background: #161c6b; }
+
+/* ==============================
+   ✅ NEW — ORDER HISTORY MODAL
+   ============================== */
+.order-history-content { max-width: 680px; }
+.order-history-list { max-height: 68vh; overflow-y: auto; padding-right: 4px; }
+
+.order-card {
+  border: 1px solid rgba(0,0,0,0.09); border-radius: 14px;
+  padding: 16px; margin-bottom: 14px; background: #fff;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+  transition: var(--transition);
+}
+.order-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.10); }
+
+.order-card-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 10px; margin-bottom: 10px;
+}
+.order-ref { display: block; font-family: monospace; font-size: .85rem; color: var(--brand-blue); font-weight: 700; }
+.order-date { font-size: .8rem; color: var(--gray); margin-top: 2px; }
+
+.order-status {
+  padding: 4px 10px; border-radius: 999px; font-size: .78rem;
+  font-weight: 800; text-transform: uppercase; flex-shrink: 0;
+}
+.order-status-success { background: #d1fae5; color: #065f46; }
+.order-status-pending { background: #fef3c7; color: #92400e; }
+.order-status-failed  { background: #fee2e2; color: #991b1b; }
+
+.order-card-body { margin-bottom: 12px; }
+.order-items-summary { font-size: .88rem; color: var(--dark); margin-bottom: 4px; line-height: 1.5; }
+.order-shipping { font-size: .82rem; color: var(--gray); margin: 0; }
+
+.order-card-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.07); gap: 10px;
+}
+.order-total { font-size: 1.1rem; color: var(--brand-blue); font-weight: 900; }
+.btn-view-receipt {
+  background: var(--brand-blue); color: #fff; border: none;
+  border-radius: 10px; padding: 8px 16px; font-size: .88rem;
+  font-weight: 700; cursor: pointer; transition: var(--transition);
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-view-receipt:hover { background: #161c6b; transform: translateY(-1px); }
+
+.order-empty-state {
+  text-align: center; padding: 48px 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+}
+.order-empty-state i { font-size: 52px; color: #ccc; }
+.order-empty-state p { font-size: 1.1rem; color: var(--gray); margin: 0; }
+.order-empty { text-align: center; color: var(--gray); padding: 32px; }
+
+/* ==============================
+   ✅ NEW — RECEIPT MODAL
+   ============================== */
+.receipt-modal-content { max-width: 560px; }
+
+.receipt-header {
+  text-align: center; padding: 20px 0 16px;
+  border-bottom: 2px solid var(--light-gray); margin-bottom: 18px;
+}
+.receipt-header h2 { font-size: 1.6rem; color: var(--brand-blue); margin: 0 0 4px; }
+.receipt-header h2 span { color: var(--brand-red); }
+.receipt-subtitle { color: var(--gray); font-size: .95rem; margin: 0; }
+
+.receipt-meta {
+  background: #f8f9ff; border-radius: 12px; padding: 14px 16px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  margin-bottom: 16px; font-size: .9rem;
+}
+.receipt-meta > div { color: var(--dark); }
+.receipt-meta strong { color: var(--brand-blue); margin-right: 4px; }
+.receipt-meta code { font-family: monospace; font-size: .85rem; }
+
+.receipt-totals { margin: 16px 0; }
+.receipt-row {
+  display: flex; justify-content: space-between;
+  padding: 8px 0; font-size: .95rem; color: #555;
+  border-bottom: 1px dashed rgba(0,0,0,0.1);
+}
+.receipt-grand {
+  font-size: 1.15rem; font-weight: 900; color: var(--brand-blue);
+  border-bottom: none; padding-top: 12px; border-top: 2px solid var(--brand-blue);
+}
+.receipt-thankyou { text-align: center; font-size: 1rem; color: var(--brand-blue); font-weight: 700; margin: 16px 0 6px; }
+.receipt-contact { text-align: center; font-size: .85rem; color: var(--gray); margin: 0; }
+
+/* ==============================
+   ✅ NEW — TOAST NOTIFICATIONS
+   ============================== */
+.fh-toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(30px);
+  background: #1f2937; color: #fff; padding: 14px 22px;
+  border-radius: 12px; font-size: .95rem; font-weight: 600;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+  display: flex; align-items: center; gap: 10px;
+  z-index: 99998; opacity: 0; transition: opacity .35s ease, transform .35s ease;
+  max-width: 90vw; text-align: center;
+}
+.fh-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.fh-toast-success { background: #065f46; }
+.fh-toast-error   { background: #991b1b; }
+.fh-toast-info    { background: #1e3a8a; }
+.fh-toast i { font-size: 1.1rem; flex-shrink: 0; }
+
+/* ==============================
+   ✅ PRINT STYLES — receipt only
+   ============================== */
+@media print {
+  body > *:not(#receiptModal) { display: none !important; }
+  #receiptModal { display: block !important; position: static !important; background: none !important; }
+  #receiptModal .modal-content { box-shadow: none !important; max-width: 100% !important; }
+  #receiptModal .close, #printReceiptBtn { display: none !important; }
+}
+
+/* ==============================
+   ✅ RESPONSIVE ADDITIONS
+   ============================== */
+@media (max-width: 600px) {
+  .auth-modal .modal-content  { padding: 24px 16px; }
+  .receipt-meta { grid-template-columns: 1fr; }
+  .order-card-footer { flex-direction: column; align-items: flex-start; }
+  .btn-view-receipt { width: 100%; justify-content: center; }
+  .fh-toast { bottom: 16px; font-size: .88rem; }
+}

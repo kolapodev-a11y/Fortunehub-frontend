@@ -4,69 +4,34 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" type="image/png" href="favicon.png">
-  
-  <!-- SEO meta description -->
   <meta name="description" content="FortuneHub — Your one-stop destination for quality gadgets and accessories at unbeatable prices. Shop phones, laptops, accessories, games, speakers and watches with fast shipping across Nigeria." />
-
   <title>Fortune's hub - E-commerce website</title>
 
-  <!--
-    ✅ FIX PERFORMANCE #1 — REMOVED Paystack inline.js from HTML entirely.
-       It was loading 516 KiB of JavaScript on EVERY page visit, even before
-       the user ever opened the cart. It is now loaded LAZILY in script.js only
-       when the user clicks "Proceed to Checkout".
-       Impact: saves ~516 KiB JS parse+eval on initial load → major FCP/LCP gain.
-
-    ✅ FIX PERFORMANCE #2 — fetchpriority="high" on LCP hero image preload.
-       Tells the browser to prioritise this resource above other early fetches.
-
-    ✅ FIX PERFORMANCE #3 — DNS preconnect for all critical third-party origins
-       so TCP+TLS handshakes happen in parallel with HTML parsing.
-
-    ✅ FIX BEST PRACTICES — REMOVED the hardcoded Cloudflare email-decode script:
-       <script src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js">
-       On GitHub Pages / Render this path returns 404, which Lighthouse flags as a
-       "Browser error logged to console" → Best Practices deduction.
-
-    ✅ FIX BEST PRACTICES — Plain mailto email in footer (no __cf_email__ obfuscation).
-  -->
-
-  <!-- ✅ Preconnect to all critical third-party origins -->
+  <!-- Preconnect to critical third-party origins -->
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
   <link rel="preconnect" href="https://js.paystack.co" crossorigin />
   <link rel="preconnect" href="https://fortunehub-backend.onrender.com" crossorigin />
+  <link rel="preconnect" href="https://accounts.google.com" crossorigin />
   <link rel="dns-prefetch" href="https://fortunehub-backend.onrender.com" />
 
-  <!-- ✅ FIX LCP: Preload hero image with fetchpriority=high so browser grabs
-       it as the very first resource, reducing LCP from ~9s toward <2.5s. -->
+  <!-- Preload hero image -->
   <link rel="preload" as="image" href="fot.png" fetchpriority="high" />
 
-  <!--
-    ✅ FIX PERFORMANCE: Font Awesome loaded NON-RENDER-BLOCKING.
-    Uses preload + onload swap → downloads in background, applies when ready.
-    noscript fallback ensures icons load even without JS.
-    font-display:swap in the @font-face block below prevents render blocking
-    on the icon webfonts themselves.
-  -->
-  <link
-    rel="preload"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-    as="style"
-    crossorigin
-    onload="this.onload=null;this.rel='stylesheet'"
-  />
+  <!-- Google Identity Services (GIS) — for Google Sign-In -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <!-- Font Awesome (non-blocking) -->
+  <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    as="style" crossorigin onload="this.onload=null;this.rel='stylesheet'" />
   <noscript>
-    <link rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   </noscript>
 
-  <!-- ✅ font-display:swap stops icon fonts from blocking text rendering -->
   <style>
     @font-face { font-family:'Font Awesome 6 Free';   font-display:swap; }
     @font-face { font-family:'Font Awesome 6 Brands'; font-display:swap; }
   </style>
 
-  <!-- Main stylesheet (local — served from same origin, fast) -->
   <link rel="stylesheet" href="style.css" />
 </head>
 
@@ -83,12 +48,39 @@
           <li><a href="#categories">Categories</a></li>
         </ul>
         <div class="header-icons">
-          <button class="icon-btn" id="searchIcon" type="button"
-            title="Search Products" aria-label="Search Products">
+          <button class="icon-btn" id="searchIcon" type="button" title="Search Products" aria-label="Search Products">
             <i class="fas fa-search" aria-hidden="true"></i>
           </button>
-          <button class="icon-btn" id="cartIcon" type="button"
-            title="View Cart" aria-label="View Cart">
+
+          <!-- ✅ AUTH BUTTON — toggles between Sign In and user avatar -->
+          <div class="auth-header-wrap">
+            <!-- Shown when logged OUT -->
+            <button class="icon-btn auth-signin-btn" id="headerSignInBtn" type="button" title="Sign In" aria-label="Sign In" style="display:flex;">
+              <i class="fas fa-user-circle" aria-hidden="true"></i>
+            </button>
+            <!-- Shown when logged IN -->
+            <div class="user-avatar-wrap" id="userAvatarWrap" style="display:none;">
+              <button class="user-avatar-btn" id="userAvatarBtn" type="button" aria-label="Account menu">
+                <img id="userAvatarImg" src="" alt="User" class="user-avatar-img" />
+                <span id="userAvatarInitial" class="user-avatar-initial"></span>
+              </button>
+              <div class="user-dropdown" id="userDropdown">
+                <div class="user-dropdown-info">
+                  <strong id="dropdownUserName"></strong>
+                  <small id="dropdownUserEmail"></small>
+                </div>
+                <hr class="dropdown-divider"/>
+                <button class="dropdown-item" id="viewHistoryBtn" type="button">
+                  <i class="fas fa-receipt"></i> Order History
+                </button>
+                <button class="dropdown-item dropdown-signout" id="signOutBtn" type="button">
+                  <i class="fas fa-sign-out-alt"></i> Sign Out
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <button class="icon-btn" id="cartIcon" type="button" title="View Cart" aria-label="View Cart">
             <i class="fas fa-shopping-cart" aria-hidden="true"></i>
             <span class="cart-count" id="cartCount">0</span>
           </button>
@@ -97,7 +89,6 @@
     </div>
   </header>
 
-  <!-- ✅ FIX ACCESSIBILITY: <main> landmark present -->
   <main id="main-content">
 
     <!-- ===== HERO ===== -->
@@ -119,9 +110,7 @@
       <div class="container">
         <div class="search-container" id="search-container">
           <i class="fas fa-search search-icon" aria-hidden="true"></i>
-          <input type="text" class="search-input" id="searchInput"
-            placeholder="Search for products..."
-            inputmode="search" autocomplete="off" />
+          <input type="text" class="search-input" id="searchInput" placeholder="Search for products..." inputmode="search" autocomplete="off" />
         </div>
       </div>
     </section>
@@ -131,37 +120,29 @@
       <div class="container">
         <h2 class="section-title">Shop By Category</h2>
         <div class="category-grid" role="list">
-
           <div class="category-card" data-category="phones" role="listitem" tabindex="0">
             <div class="category-icon"><i class="fas fa-mobile-alt" aria-hidden="true"></i></div>
             <h3>Phones</h3><p>50+ items</p>
           </div>
-
           <div class="category-card" data-category="accessories" role="listitem" tabindex="0">
             <div class="category-icon"><i class="fas fa-headphones" aria-hidden="true"></i></div>
             <h3>Phone Accessories</h3><p>100+ items</p>
           </div>
-
           <div class="category-card" data-category="laptops" role="listitem" tabindex="0">
             <div class="category-icon"><i class="fas fa-laptop" aria-hidden="true"></i></div>
             <h3>Laptops</h3><p>10+ items</p>
           </div>
-
           <div class="category-card" data-category="games" role="listitem" tabindex="0">
             <div class="category-icon"><i class="fas fa-gamepad" aria-hidden="true"></i></div>
             <h3>Games</h3><p>20+ items</p>
           </div>
-
           <div class="category-card" data-category="speakers" role="listitem" tabindex="0">
             <div class="category-icon"><i class="fas fa-volume-up" aria-hidden="true"></i></div>
             <h3>Speaker</h3><p>15+ items</p>
           </div>
-
           <div class="category-card" data-category="watches" role="listitem" tabindex="0">
             <div class="category-icon" aria-hidden="true">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"
-                xmlns="http://www.w3.org/2000/svg"
-                style="display:inline-block;vertical-align:middle;">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;vertical-align:middle;">
                 <path d="M16 2H8C7.44772 2 7 2.44772 7 3V4H17V3C17 2.44772 16.5523 2 16 2Z"/>
                 <path fill-rule="evenodd" clip-rule="evenodd" d="M18 6H6C4.89543 6 4 6.89543 4 8V16C4 17.1046 4.89543 18 6 18H18C19.1046 18 20 17.1046 20 16V8C20 6.89543 19.1046 6 18 6ZM12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z"/>
                 <path d="M8 22H16C16.5523 22 17 21.5523 17 21V20H7V21C7 21.5523 7.44772 22 8 22Z"/>
@@ -169,7 +150,6 @@
             </div>
             <h3>Watches</h3><p>60+ items</p>
           </div>
-
         </div>
       </div>
     </section>
@@ -191,29 +171,22 @@
       </div>
     </section>
 
-  </main><!-- /main -->
-
+  </main>
 
   <!-- ===== PRODUCT DETAIL MODAL ===== -->
-  <div id="productDetailModal" class="modal product-detail-modal"
-    aria-hidden="true" role="dialog" aria-label="Product details">
+  <div id="productDetailModal" class="modal product-detail-modal" aria-hidden="true" role="dialog" aria-label="Product details">
     <div class="modal-content product-detail-content" role="document">
-      <button class="close" id="closeProductModal" type="button"
-        aria-label="Close product details">&times;</button>
+      <button class="close" id="closeProductModal" type="button" aria-label="Close product details">&times;</button>
       <div class="product-detail-grid">
-
         <div class="product-detail-images">
           <div class="main-image-container">
             <img src="" alt="" id="detailMainImage" class="detail-main-image">
             <div class="zoom-lens" id="zoomLens"></div>
             <div class="zoom-result" id="zoomResult"></div>
-            <button class="zoom-toggle" id="zoomToggle" title="Toggle Zoom">
-              <i class="fas fa-search-plus"></i>
-            </button>
+            <button class="zoom-toggle" id="zoomToggle" title="Toggle Zoom"><i class="fas fa-search-plus"></i></button>
           </div>
           <div class="detail-thumbnails" id="detailThumbnails"></div>
         </div>
-
         <div class="product-detail-info">
           <div class="detail-category" id="detailCategory"></div>
           <h2 class="detail-title" id="detailTitle"></h2>
@@ -238,11 +211,9 @@
             </button>
           </div>
         </div>
-
       </div>
     </div>
   </div>
-
 
   <!-- ===== CART MODAL ===== -->
   <div id="cartModal" class="modal" aria-hidden="true" role="dialog" aria-label="Cart modal">
@@ -252,36 +223,47 @@
       <div id="cartItems" class="cart-items"></div>
 
       <div class="shipping-section">
-        <h3><i class="fas fa-shipping-fast" aria-hidden="true"></i>
-          Contact &amp; Shipping Info <span style="color:red;">*</span></h3>
+        <h3><i class="fas fa-shipping-fast" aria-hidden="true"></i> Contact &amp; Shipping Info <span style="color:red;">*</span></h3>
 
-        <div class="form-group">
-          <label for="customerName"><i class="fas fa-user" aria-hidden="true"></i> Full Name</label>
-          <input type="text" id="customerName" class="form-input"
-            placeholder="e.g. John Doe" autocomplete="name" required />
-          <small id="nameError" class="error-msg"></small>
+        <!-- ✅ AUTH BANNER — shown when user is logged in (replaces name+email fields) -->
+        <div id="authUserBanner" class="auth-user-banner" style="display:none;">
+          <img id="bannerAvatar" src="" alt="" class="banner-avatar" />
+          <div class="banner-info">
+            <strong id="bannerName"></strong>
+            <span id="bannerEmail"></span>
+          </div>
+          <button type="button" class="btn-change-account" id="changeAccountBtn">Change</button>
+        </div>
+
+        <!-- Shown when user is NOT logged in -->
+        <div id="guestFields">
+          <div class="form-group">
+            <label for="customerName"><i class="fas fa-user" aria-hidden="true"></i> Full Name</label>
+            <input type="text" id="customerName" class="form-input" placeholder="e.g. John Doe" autocomplete="name" required />
+            <small id="nameError" class="error-msg"></small>
+          </div>
+          <div class="form-group">
+            <label for="customerEmail"><i class="fas fa-envelope" aria-hidden="true"></i> Email Address</label>
+            <input type="email" id="customerEmail" class="form-input" placeholder="e.g. john@example.com" autocomplete="email" required />
+            <small id="emailError" class="error-msg"></small>
+            <small class="helper-text">We'll send your receipt and delivery updates here.</small>
+          </div>
+          <!-- Sign-in prompt inside cart -->
+          <div class="cart-signin-prompt">
+            <span><i class="fas fa-info-circle"></i> Already have an account?</span>
+            <button type="button" class="btn-inline-signin" id="cartSignInPromptBtn">Sign in to auto-fill</button>
+          </div>
         </div>
 
         <div class="form-group">
-          <label for="customerEmail"><i class="fas fa-envelope" aria-hidden="true"></i> Email Address</label>
-          <input type="email" id="customerEmail" class="form-input"
-            placeholder="e.g. john@example.com" autocomplete="email" required />
-          <small id="emailError" class="error-msg"></small>
-          <small class="helper-text">We'll send your receipt and delivery updates here.</small>
-        </div>
-
-        <div class="form-group">
-          <label for="customerPhone"><i class="fas fa-phone-alt" aria-hidden="true"></i> Phone Number</label>
-          <input type="tel" id="customerPhone" class="form-input"
-            placeholder="e.g. 08031234567" autocomplete="tel" required />
+          <label for="customerPhone"><i class="fas fa-phone-alt" aria-hidden="true"></i> WhatsApp Number</label>
+          <input type="tel" id="customerPhone" class="form-input" placeholder="e.g. 08031234567" autocomplete="tel" required />
           <small id="phoneError" class="error-msg"></small>
-          <small class="helper-text">For delivery coordination (whatsapp number).</small>
+          <small class="helper-text">For delivery coordination (WhatsApp number).</small>
         </div>
 
         <div class="form-group">
-          <label for="shippingState">
-            <i class="fas fa-map-marker-alt" aria-hidden="true"></i> Shipping State
-          </label>
+          <label for="shippingState"><i class="fas fa-map-marker-alt" aria-hidden="true"></i> Shipping State</label>
           <select id="shippingState" class="form-select" required>
             <option value="">Select Your State</option>
             <option value="1500">Ondo State — ₦1,500</option>
@@ -308,41 +290,120 @@
           <button id="checkoutButton" class="btn btn-tertiary" type="button">
             <i class="fas fa-credit-card" aria-hidden="true"></i> Proceed to Checkout
           </button>
-          <button id="continueShoppingButton" class="btn btn-secondary" type="button">
-            Continue Shopping
-          </button>
+          <button id="continueShoppingButton" class="btn btn-secondary" type="button">Continue Shopping</button>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- ===== ✅ AUTH MODAL ===== -->
+  <div id="authModal" class="modal auth-modal" aria-hidden="true" role="dialog" aria-label="Sign in or Sign up">
+    <div class="modal-content auth-modal-content" role="document">
+      <button class="close" id="closeAuthModal" type="button" aria-label="Close">&times;</button>
+
+      <!-- Tab bar -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tabSignIn" data-tab="signin">Sign In</button>
+        <button class="auth-tab"        id="tabSignUp" data-tab="signup">Sign Up</button>
+      </div>
+
+      <!-- Google button -->
+      <div class="auth-google-section">
+        <div id="googleSignInBtn" class="google-btn-wrap"></div>
+        <p class="auth-or"><span>or</span></p>
+      </div>
+
+      <!-- SIGN IN FORM -->
+      <form id="signInForm" class="auth-form" novalidate>
+        <div class="form-group">
+          <label for="siEmail">Email Address</label>
+          <input type="email" id="siEmail" class="form-input" placeholder="you@example.com" required />
+          <small id="siEmailError" class="error-msg"></small>
+        </div>
+        <div class="form-group">
+          <label for="siPassword">Password</label>
+          <div class="password-wrap">
+            <input type="password" id="siPassword" class="form-input" placeholder="••••••••" required />
+            <button type="button" class="toggle-pw" data-target="siPassword" aria-label="Show/hide password">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+          <small id="siPasswordError" class="error-msg"></small>
+        </div>
+        <small id="siGeneralError" class="error-msg" style="display:block;margin-bottom:10px;"></small>
+        <button type="submit" class="btn btn-auth-submit" id="siSubmitBtn">
+          <span id="siSubmitText"><i class="fas fa-sign-in-alt"></i> Sign In</span>
+          <span id="siSubmitLoader" style="display:none;"><div class="btn-spinner"></div> Signing in…</span>
+        </button>
+      </form>
+
+      <!-- SIGN UP FORM -->
+      <form id="signUpForm" class="auth-form" novalidate style="display:none;">
+        <div class="form-group">
+          <label for="suName">Full Name</label>
+          <input type="text" id="suName" class="form-input" placeholder="John Doe" required />
+          <small id="suNameError" class="error-msg"></small>
+        </div>
+        <div class="form-group">
+          <label for="suEmail">Email Address</label>
+          <input type="email" id="suEmail" class="form-input" placeholder="you@example.com" required />
+          <small id="suEmailError" class="error-msg"></small>
+        </div>
+        <div class="form-group">
+          <label for="suPassword">Password</label>
+          <div class="password-wrap">
+            <input type="password" id="suPassword" class="form-input" placeholder="Min. 6 characters" required />
+            <button type="button" class="toggle-pw" data-target="suPassword" aria-label="Show/hide password">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+          <small id="suPasswordError" class="error-msg"></small>
+        </div>
+        <small id="suGeneralError" class="error-msg" style="display:block;margin-bottom:10px;"></small>
+        <button type="submit" class="btn btn-auth-submit" id="suSubmitBtn">
+          <span id="suSubmitText"><i class="fas fa-user-plus"></i> Create Account</span>
+          <span id="suSubmitLoader" style="display:none;"><div class="btn-spinner"></div> Creating…</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== ✅ ORDER HISTORY MODAL ===== -->
+  <div id="orderHistoryModal" class="modal" aria-hidden="true" role="dialog" aria-label="Order History">
+    <div class="modal-content order-history-content" role="document">
+      <button class="close" id="closeOrderHistoryModal" type="button" aria-label="Close">&times;</button>
+      <h2><i class="fas fa-receipt"></i> Order History</h2>
+      <div id="orderHistoryList" class="order-history-list"></div>
+    </div>
+  </div>
+
+  <!-- ===== ✅ RECEIPT MODAL ===== -->
+  <div id="receiptModal" class="modal" aria-hidden="true" role="dialog" aria-label="Order Receipt">
+    <div class="modal-content receipt-modal-content" role="document">
+      <button class="close" id="closeReceiptModal" type="button" aria-label="Close">&times;</button>
+      <div id="receiptContent"></div>
+      <div style="text-align:center;margin-top:20px;">
+        <button type="button" class="btn btn-tertiary" id="printReceiptBtn" onclick="window.print()">
+          <i class="fas fa-print"></i> Print Receipt
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- ===== FOOTER ===== -->
   <footer class="site-footer">
     <div class="container">
       <div class="footer-top">
-
         <div class="footer-brand">
           <a href="#" class="footer-logo">Fortune<span>Hub</span></a>
-          <p class="footer-desc">
-            Your one-stop destination for quality gadgets and accessories at affordable prices.
-          </p>
+          <p class="footer-desc">Your one-stop destination for quality gadgets and accessories at affordable prices.</p>
           <div class="footer-social">
-            <a href="#" class="social-btn facebook" aria-label="Facebook">
-              <i class="fab fa-facebook-f" aria-hidden="true"></i>
-            </a>
-            <a href="#" class="social-btn instagram" aria-label="Instagram">
-              <i class="fab fa-instagram" aria-hidden="true"></i>
-            </a>
-            <a href="#" class="social-btn twitter" aria-label="X / Twitter">
-              <i class="fab fa-x-twitter" aria-hidden="true"></i>
-            </a>
-            <a href="#" class="social-btn whatsapp" aria-label="WhatsApp">
-              <i class="fab fa-whatsapp" aria-hidden="true"></i>
-            </a>
+            <a href="#" class="social-btn facebook" aria-label="Facebook"><i class="fab fa-facebook-f" aria-hidden="true"></i></a>
+            <a href="#" class="social-btn instagram" aria-label="Instagram"><i class="fab fa-instagram" aria-hidden="true"></i></a>
+            <a href="#" class="social-btn twitter" aria-label="X / Twitter"><i class="fab fa-x-twitter" aria-hidden="true"></i></a>
+            <a href="#" class="social-btn whatsapp" aria-label="WhatsApp"><i class="fab fa-whatsapp" aria-hidden="true"></i></a>
           </div>
         </div>
-
         <div class="footer-column">
           <h3>Shop</h3>
           <ul class="footer-links">
@@ -352,7 +413,6 @@
             <li><a href="#products">On Sale</a></li>
           </ul>
         </div>
-
         <div class="footer-column">
           <h3>Support</h3>
           <ul class="footer-links">
@@ -362,65 +422,27 @@
             <li><a href="#">Privacy Policy</a></li>
           </ul>
         </div>
-
         <div class="footer-column">
           <h3>Contact</h3>
           <ul class="footer-contact">
-            <li>
-              <i class="fas fa-map-marker-alt" aria-hidden="true"></i>
-              <span>Aloba complex, Idiope Awule Road, Akure.</span>
-            </li>
-            <li>
-              <i class="fas fa-phone" aria-hidden="true"></i>
-              <span>09033489520</span>
-            </li>
-            <!--
-              ✅ FIX BEST PRACTICES: Replaced Cloudflare __cf_email__ obfuscation
-              with a plain mailto link. The old code set a __cf_email__ data attribute
-              and relied on /cdn-cgi/scripts/email-decode.min.js to decode it.
-              That script returns 404 on GitHub Pages and Render → console error
-              → Lighthouse Best Practices deduction.
-            -->
-            <li>
-              <i class="fas fa-envelope" aria-hidden="true"></i>
-              <span>
-                <a href="mailto:fortunehabib9@gmail.com" style="color:inherit;">
-                  fortunehabib9@gmail.com
-                </a>
-              </span>
-            </li>
+            <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span>Aloba complex, Idiope Awule Road, Akure.</span></li>
+            <li><i class="fas fa-phone" aria-hidden="true"></i><span>09033489520</span></li>
+            <li><i class="fas fa-envelope" aria-hidden="true"></i><span><a href="mailto:fortunehabib9@gmail.com" style="color:inherit;">fortunehabib9@gmail.com</a></span></li>
           </ul>
-          <div class="footer-mini-note">
-            <i class="fas fa-clock" aria-hidden="true"></i>
-            <span>Mon–Sat: 9:00am – 6:00pm</span>
-          </div>
+          <div class="footer-mini-note"><i class="fas fa-clock" aria-hidden="true"></i><span>Mon–Sat: 9:00am – 6:00pm</span></div>
         </div>
-
       </div>
       <div class="footer-bottom">
         <p>&copy; 2026 Fortune's hub. All rights reserved.</p>
         <div class="footer-bottom-links">
-          <a href="#products">Products</a>
-          <span class="dot"></span>
-          <a href="#categories">Categories</a>
-          <span class="dot"></span>
+          <a href="#products">Products</a><span class="dot"></span>
+          <a href="#categories">Categories</a><span class="dot"></span>
           <a href="#">Terms</a>
         </div>
       </div>
     </div>
   </footer>
 
-  <!--
-    ✅ FIX PERFORMANCE + BEST PRACTICES:
-    1. Cloudflare email-decode script REMOVED — it 404'd on GitHub Pages / Render,
-       causing a console error that Lighthouse penalises under Best Practices.
-    2. Paystack inline.js REMOVED from here — it is now loaded LAZILY inside
-       script.js only when the user clicks "Proceed to Checkout". This saves
-       ~516 KiB of JavaScript on every page load, significantly improving
-       First Contentful Paint (FCP) and Largest Contentful Paint (LCP).
-    3. script.js has defer — it does not block HTML parsing.
-  -->
   <script src="script.js" defer></script>
-
 </body>
 </html>

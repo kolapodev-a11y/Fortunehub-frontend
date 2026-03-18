@@ -1,75 +1,95 @@
-// ===================================================
-// FortuneHub Frontend Script  v4 — Cold-Start / "No Products" Fix
+// =====================================================================
+// FortuneHub Frontend Script  v5 — Google Auth + Email/Password Auth
 //
-// ✅ ROOT-CAUSE FIX (the "No Products Found" bug):
-//    Products live in the Render backend DB (added via admin panel).
-//    The OLD code timed out after 8 s and fell back to products.json —
-//    which is empty/outdated — so the grid showed "No products found"
-//    until the user manually refreshed once the server had fully woken up.
+// ✅ NEW in v5:
+//    • Google Sign-In via Google Identity Services (GIS)
+//    • Email / Password Sign-Up & Sign-In
+//    • JWT stored in localStorage — session persists across refreshes
+//    • When logged in: Name + Email auto-filled from profile
+//    • Cart only asks Phone (WhatsApp) + Shipping State for logged-in users
+//    • Transaction History modal (fetched from backend)
+//    • Receipt modal with printable HTML
+//    • User avatar dropdown in header
 //
-//    NEW STRATEGY:
-//    1. Fire a silent wake-up ping to /health the instant the page loads,
-//       so Render starts booting ASAP in the background.
-//    2. Retry /api/products up to MAX_RETRIES times with short delays
-//       between each attempt instead of giving up after one 8-second timeout.
-//    3. Show friendly, live-updating progress messages so users know
-//       what's happening ("Server waking up…  Attempt 2 of 5…").
-//    4. Only fall back to products.json as an absolute last resort
-//       (it is kept here in case a future cache is added).
-//    5. After all retries fail, show a "Retry" button so the user never
-//       needs to hard-refresh the whole page.
-//
-// ✅ ALL PREVIOUS FIXES KEPT:
-//    • Paystack loaded lazily (saves 516 KiB on initial load)
-//    • Accessibility improvements, Best Practices 100, SEO 100
-//    • Cart migration / localStorage sanitisation
-//    • Image zoom, product-detail modal, search, filter, category cards
-//
-// ✅ PageSpeed scores preserved — zero new blocking resources added.
-// ===================================================
+// ✅ ALL v4 LOGIC PRESERVED:
+//    • Cold-start retry logic, warm-up ping
+//    • Lazy Paystack loader
+//    • Image zoom, product detail modal
+//    • Search, filter, category cards
+//    • Cart localStorage, quantity controls
+// =====================================================================
 
-// ------------------------------
-// 1) STATE
-// ------------------------------
+// ─────────────────────────────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────────────────────────────
+// ✅ Replace with YOUR Google OAuth Client ID from console.cloud.google.com
+// Set this to the same GOOGLE_CLIENT_ID used in the backend .env
+const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com';
+
+const API_BASE_URL = 'https://fortunehub-backend.onrender.com';
+
+let PAYSTACK_PUBLIC_KEY = 'pk_test_9f6a5cb45aeab4bd8bccd72129beda47f2609921';
+
+const PER_ATTEMPT_TIMEOUT_MS = 10000;
+const MAX_RETRIES             = 5;
+const RETRY_DELAYS            = [5000, 8000, 12000, 18000, 25000];
+
+// ─────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────
 let products = [];
 let cart = (() => {
   const saved = JSON.parse(localStorage.getItem('cart')) || [];
   return saved.map(item => {
-    let migratedItem = item;
-    if (item.price && item.price > 10000) {
-      migratedItem = { ...item, price: Math.round(item.price / 100) };
-    }
-    const img = String(migratedItem.image || '');
-    if (img.startsWith('data:') || img.length > 300) {
-      migratedItem = { ...migratedItem, image: '' };
-    }
-    return migratedItem;
+    let m = item;
+    if (item.price && item.price > 10000) m = { ...item, price: Math.round(item.price / 100) };
+    const img = String(m.image || '');
+    if (img.startsWith('data:') || img.length > 300) m = { ...m, image: '' };
+    return m;
   });
 })();
 
 let currentProduct = null;
-let zoomEnabled = false;
+let zoomEnabled    = false;
 
-let PAYSTACK_PUBLIC_KEY = 'pk_test_9f6a5cb45aeab4bd8bccd72129beda47f2609921';
-const API_BASE_URL = 'https://fortunehub-backend.onrender.com';
+// ─────────────────────────────────────────────────────────────────────
+// ✅ AUTH STATE
+// ─────────────────────────────────────────────────────────────────────
+let currentUser = null; // { id, name, email, picture, phone, token, authProvider }
 
-// ── Retry configuration ──────────────────────────────────────────────────────
-// Each individual fetch attempt aborts after PER_ATTEMPT_TIMEOUT_MS.
-// We make up to MAX_RETRIES attempts, waiting RETRY_DELAYS[i] ms between them.
-// Total worst-case wait ≈ 5×10 s + (5+8+12+18+25) s ≈ 118 s (under 2 min).
-// In practice Render wakes in ~30-45 s so attempt 3-4 usually succeeds.
-const PER_ATTEMPT_TIMEOUT_MS = 10000;          // 10 s per attempt
-const MAX_RETRIES             = 5;             // try up to 5 times
-const RETRY_DELAYS            = [5000, 8000, 12000, 18000, 25000]; // ms between retries
+function loadAuthState() {
+  try {
+    const stored = localStorage.getItem('fh_auth');
+    if (stored) currentUser = JSON.parse(stored);
+  } catch { currentUser = null; }
+}
 
+function saveAuthState(user) {
+  currentUser = user;
+  if (user) localStorage.setItem('fh_auth', JSON.stringify(user));
+  else localStorage.removeItem('fh_auth');
+  updateAuthUI();
+}
+
+function getAuthToken() {
+  return currentUser?.token || null;
+}
+
+function authHeaders() {
+  const token = getAuthToken();
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // Paystack lazy-load state
+// ─────────────────────────────────────────────────────────────────────
 let paystackScriptLoaded  = false;
 let paystackScriptLoading = false;
 let paystackLoadCallbacks = [];
 
-// ------------------------------
-// 2) DOM ELEMENTS
-// ------------------------------
+// ─────────────────────────────────────────────────────────────────────
+// DOM REFS
+// ─────────────────────────────────────────────────────────────────────
 const productsGrid             = document.getElementById('productsGrid');
 const cartCount                = document.getElementById('cartCount');
 const cartModal                = document.getElementById('cartModal');
@@ -86,6 +106,8 @@ const categoryCards            = document.querySelectorAll('.category-card');
 const cartIcon                 = document.getElementById('cartIcon');
 const searchIconBtn            = document.getElementById('searchIcon');
 const footerOpenCart           = document.getElementById('footerOpenCart');
+
+// Cart form fields
 const customerNameInput        = document.getElementById('customerName');
 const customerEmailInput       = document.getElementById('customerEmail');
 const customerPhoneInput       = document.getElementById('customerPhone');
@@ -94,7 +116,46 @@ const nameError                = document.getElementById('nameError');
 const emailError               = document.getElementById('emailError');
 const phoneError               = document.getElementById('phoneError');
 
-// Product Detail Modal
+// Auth UI elements
+const headerSignInBtn          = document.getElementById('headerSignInBtn');
+const userAvatarWrap           = document.getElementById('userAvatarWrap');
+const userAvatarBtn            = document.getElementById('userAvatarBtn');
+const userAvatarImg            = document.getElementById('userAvatarImg');
+const userAvatarInitial        = document.getElementById('userAvatarInitial');
+const userDropdown             = document.getElementById('userDropdown');
+const dropdownUserName         = document.getElementById('dropdownUserName');
+const dropdownUserEmail        = document.getElementById('dropdownUserEmail');
+const viewHistoryBtn           = document.getElementById('viewHistoryBtn');
+const signOutBtn               = document.getElementById('signOutBtn');
+
+// Auth modal
+const authModal                = document.getElementById('authModal');
+const closeAuthModal           = document.getElementById('closeAuthModal');
+const tabSignIn                = document.getElementById('tabSignIn');
+const tabSignUp                = document.getElementById('tabSignUp');
+const signInForm               = document.getElementById('signInForm');
+const signUpForm               = document.getElementById('signUpForm');
+
+// Cart auth elements
+const authUserBanner           = document.getElementById('authUserBanner');
+const guestFields              = document.getElementById('guestFields');
+const bannerAvatar             = document.getElementById('bannerAvatar');
+const bannerName               = document.getElementById('bannerName');
+const bannerEmail              = document.getElementById('bannerEmail');
+const changeAccountBtn         = document.getElementById('changeAccountBtn');
+const cartSignInPromptBtn      = document.getElementById('cartSignInPromptBtn');
+
+// Order history modal
+const orderHistoryModal        = document.getElementById('orderHistoryModal');
+const closeOrderHistoryModal   = document.getElementById('closeOrderHistoryModal');
+const orderHistoryList         = document.getElementById('orderHistoryList');
+
+// Receipt modal
+const receiptModal             = document.getElementById('receiptModal');
+const closeReceiptModal        = document.getElementById('closeReceiptModal');
+const receiptContent           = document.getElementById('receiptContent');
+
+// Product detail modal
 const productDetailModal = document.getElementById('productDetailModal');
 const closeProductModal  = document.getElementById('closeProductModal');
 const detailMainImage    = document.getElementById('detailMainImage');
@@ -111,84 +172,448 @@ const zoomToggle         = document.getElementById('zoomToggle');
 const zoomLens           = document.getElementById('zoomLens');
 const zoomResult         = document.getElementById('zoomResult');
 
-// ------------------------------
-// 3) HELPERS
-// ------------------------------
-function formatCurrency(amountInNaira) {
-  return `₦${Number(amountInNaira || 0).toLocaleString('en-NG', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  })}`;
+// ─────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────
+function formatCurrency(n) {
+  return `₦${Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
-
-function getProductById(id) {
-  return products.find(p => String(p.id) === String(id));
-}
-
-function getProductsJsonUrl() {
-  return new URL('products.json', window.location.href).toString();
-}
-
+function getProductById(id) { return products.find(p => String(p.id) === String(id)); }
+function getProductsJsonUrl() { return new URL('products.json', window.location.href).toString(); }
 function getRepoBaseUrl() {
   const parts = window.location.pathname.split('/').filter(Boolean);
   const repoName = parts.length ? parts[0] : '';
   return `${window.location.origin}/${repoName}/`;
 }
-
 function resolveAssetUrl(path) {
   if (!path) return '';
   if (/^https?:\/\//i.test(path)) return path;
-  const base = getRepoBaseUrl();
   if (path.startsWith('/')) return `${window.location.origin}${path}`;
-  return new URL(path, base).toString();
+  return new URL(path, getRepoBaseUrl()).toString();
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function getInitial(name) { return (name || 'U').charAt(0).toUpperCase(); }
+
+// ─────────────────────────────────────────────────────────────────────
+// ✅ AUTH UI UPDATE
+// ─────────────────────────────────────────────────────────────────────
+function updateAuthUI() {
+  if (currentUser) {
+    // Header — show avatar, hide sign-in button
+    if (headerSignInBtn)  headerSignInBtn.style.display  = 'none';
+    if (userAvatarWrap)   userAvatarWrap.style.display   = 'flex';
+
+    if (dropdownUserName)  dropdownUserName.textContent  = currentUser.name  || '';
+    if (dropdownUserEmail) dropdownUserEmail.textContent = currentUser.email || '';
+
+    // Avatar image or initial
+    if (currentUser.picture) {
+      if (userAvatarImg)     { userAvatarImg.src = currentUser.picture; userAvatarImg.style.display = 'block'; }
+      if (userAvatarInitial)   userAvatarInitial.style.display = 'none';
+    } else {
+      if (userAvatarImg)       userAvatarImg.style.display = 'none';
+      if (userAvatarInitial) { userAvatarInitial.textContent = getInitial(currentUser.name); userAvatarInitial.style.display = 'flex'; }
+    }
+
+    // Cart — show banner, hide guest fields
+    if (authUserBanner) {
+      authUserBanner.style.display = 'flex';
+      if (bannerName)  bannerName.textContent  = currentUser.name  || '';
+      if (bannerEmail) bannerEmail.textContent = currentUser.email || '';
+      if (bannerAvatar) {
+        if (currentUser.picture) { bannerAvatar.src = currentUser.picture; bannerAvatar.style.display = 'block'; }
+        else bannerAvatar.style.display = 'none';
+      }
+    }
+    if (guestFields) guestFields.style.display = 'none';
+
+    // Pre-fill phone if saved
+    if (customerPhoneInput && currentUser.phone && !customerPhoneInput.value)
+      customerPhoneInput.value = currentUser.phone;
+
+  } else {
+    // Logged out
+    if (headerSignInBtn)  headerSignInBtn.style.display  = 'flex';
+    if (userAvatarWrap)   userAvatarWrap.style.display   = 'none';
+    if (authUserBanner)   authUserBanner.style.display   = 'none';
+    if (guestFields)      guestFields.style.display      = 'block';
+  }
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+// ─────────────────────────────────────────────────────────────────────
+// ✅ GOOGLE IDENTITY SERVICES — initialise
+// ─────────────────────────────────────────────────────────────────────
+function initGoogleSignIn() {
+  if (typeof google === 'undefined' || !google.accounts) return;
+  if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes('YOUR_GOOGLE')) {
+    console.warn('⚠️ GOOGLE_CLIENT_ID not configured. Update GOOGLE_CLIENT_ID in script.js and backend .env');
+    return;
+  }
+
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback:  handleGoogleCredential,
+    auto_select: false,
+    cancel_on_tap_outside: true,
+  });
+
+  // Render the sign-in button inside #googleSignInBtn
+  const container = document.getElementById('googleSignInBtn');
+  if (container) {
+    google.accounts.id.renderButton(container, {
+      theme: 'outline',
+      size:  'large',
+      width: '100%',
+      text:  'continue_with',
+      logo_alignment: 'left',
+    });
+  }
 }
 
-// ------------------------------
-// 4) LAZY PAYSTACK LOADER
-// ------------------------------
+// Called by GIS with a credential (ID token)
+async function handleGoogleCredential(response) {
+  const credential = response?.credential;
+  if (!credential) return;
+
+  closeAuthModal_fn();
+  showLoadingOverlay('Signing in with Google…');
+
+  try {
+    const res  = await fetch(`${API_BASE_URL}/api/auth/google`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ credential }),
+    });
+    const data = await res.json();
+    hideLoadingOverlay();
+
+    if (data.success) {
+      saveAuthState({ ...data.user, token: data.token });
+      showToast(`Welcome, ${data.user.name}! 👋`, 'success');
+      updateCartUI();
+    } else {
+      showToast('Google sign-in failed: ' + (data.message || 'Unknown error'), 'error');
+    }
+  } catch (err) {
+    hideLoadingOverlay();
+    showToast('Network error during Google sign-in. Please try again.', 'error');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ✅ EMAIL / PASSWORD AUTH
+// ─────────────────────────────────────────────────────────────────────
+async function handleEmailSignIn(e) {
+  e.preventDefault();
+  const email    = document.getElementById('siEmail')?.value.trim() || '';
+  const password = document.getElementById('siPassword')?.value || '';
+
+  document.getElementById('siEmailError').textContent    = '';
+  document.getElementById('siPasswordError').textContent = '';
+  document.getElementById('siGeneralError').textContent  = '';
+
+  let valid = true;
+  if (!email)    { document.getElementById('siEmailError').textContent    = 'Email is required'; valid = false; }
+  if (!password) { document.getElementById('siPasswordError').textContent = 'Password is required'; valid = false; }
+  if (!valid) return;
+
+  // Loading state
+  document.getElementById('siSubmitText').style.display   = 'none';
+  document.getElementById('siSubmitLoader').style.display = 'inline-flex';
+  document.getElementById('siSubmitBtn').disabled         = true;
+
+  try {
+    const res  = await fetch(`${API_BASE_URL}/api/auth/signin`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      closeAuthModal_fn();
+      saveAuthState({ ...data.user, token: data.token });
+      showToast(`Welcome back, ${data.user.name}! 👋`, 'success');
+      updateCartUI();
+    } else {
+      document.getElementById('siGeneralError').textContent = data.message || 'Sign in failed';
+    }
+  } catch {
+    document.getElementById('siGeneralError').textContent = 'Network error. Please try again.';
+  } finally {
+    document.getElementById('siSubmitText').style.display   = 'inline';
+    document.getElementById('siSubmitLoader').style.display = 'none';
+    document.getElementById('siSubmitBtn').disabled         = false;
+  }
+}
+
+async function handleEmailSignUp(e) {
+  e.preventDefault();
+  const name     = document.getElementById('suName')?.value.trim()  || '';
+  const email    = document.getElementById('suEmail')?.value.trim() || '';
+  const password = document.getElementById('suPassword')?.value     || '';
+
+  document.getElementById('suNameError').textContent     = '';
+  document.getElementById('suEmailError').textContent    = '';
+  document.getElementById('suPasswordError').textContent = '';
+  document.getElementById('suGeneralError').textContent  = '';
+
+  let valid = true;
+  if (!name || name.length < 2)                     { document.getElementById('suNameError').textContent     = 'Enter your full name'; valid = false; }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { document.getElementById('suEmailError').textContent    = 'Enter a valid email'; valid = false; }
+  if (!password || password.length < 6)             { document.getElementById('suPasswordError').textContent = 'Password must be at least 6 characters'; valid = false; }
+  if (!valid) return;
+
+  document.getElementById('suSubmitText').style.display   = 'none';
+  document.getElementById('suSubmitLoader').style.display = 'inline-flex';
+  document.getElementById('suSubmitBtn').disabled         = true;
+
+  try {
+    const res  = await fetch(`${API_BASE_URL}/api/auth/signup`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name, email, password }),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      closeAuthModal_fn();
+      saveAuthState({ ...data.user, token: data.token });
+      showToast(`Account created! Welcome, ${data.user.name}! 🎉`, 'success');
+      updateCartUI();
+    } else {
+      document.getElementById('suGeneralError').textContent = data.message || 'Sign up failed';
+    }
+  } catch {
+    document.getElementById('suGeneralError').textContent = 'Network error. Please try again.';
+  } finally {
+    document.getElementById('suSubmitText').style.display   = 'inline';
+    document.getElementById('suSubmitLoader').style.display = 'none';
+    document.getElementById('suSubmitBtn').disabled         = false;
+  }
+}
+
+function signOut() {
+  // Revoke Google session if applicable
+  if (typeof google !== 'undefined' && google.accounts?.id) {
+    google.accounts.id.disableAutoSelect();
+  }
+  saveAuthState(null);
+  if (customerPhoneInput) customerPhoneInput.value = '';
+  closeDropdown();
+  showToast('You have been signed out.', 'info');
+  updateCartUI();
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ✅ AUTH MODAL
+// ─────────────────────────────────────────────────────────────────────
+function openAuthModal(startTab = 'signin') {
+  if (!authModal) return;
+  authModal.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  switchAuthTab(startTab);
+  // Re-init Google button each time (in case it wasn't ready before)
+  setTimeout(initGoogleSignIn, 100);
+}
+
+function closeAuthModal_fn() {
+  if (!authModal) return;
+  authModal.style.display = 'none';
+  document.body.style.overflow = 'auto';
+  // Clear form errors
+  ['siEmailError','siPasswordError','siGeneralError','suNameError','suEmailError','suPasswordError','suGeneralError']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
+}
+
+function switchAuthTab(tab) {
+  if (tab === 'signin') {
+    tabSignIn?.classList.add('active');
+    tabSignUp?.classList.remove('active');
+    if (signInForm) signInForm.style.display = 'block';
+    if (signUpForm) signUpForm.style.display = 'none';
+  } else {
+    tabSignUp?.classList.add('active');
+    tabSignIn?.classList.remove('active');
+    if (signUpForm) signUpForm.style.display = 'block';
+    if (signInForm) signInForm.style.display = 'none';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ✅ USER DROPDOWN
+// ─────────────────────────────────────────────────────────────────────
+function toggleDropdown() {
+  if (!userDropdown) return;
+  const isOpen = userDropdown.classList.contains('open');
+  if (isOpen) closeDropdown();
+  else        userDropdown.classList.add('open');
+}
+function closeDropdown() { userDropdown?.classList.remove('open'); }
+
+// ─────────────────────────────────────────────────────────────────────
+// ✅ TOAST NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────────────
+function showToast(message, type = 'info') {
+  const existing = document.querySelector('.fh-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.className = `fh-toast fh-toast-${type}`;
+  const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+  toast.innerHTML = `<i class="fas ${icon}"></i> <span>${message}</span>`;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('show'));
+  setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); }, 4000);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ✅ ORDER HISTORY
+// ─────────────────────────────────────────────────────────────────────
+async function openOrderHistory() {
+  closeDropdown();
+  if (!currentUser) { openAuthModal('signin'); return; }
+  if (!orderHistoryModal) return;
+
+  orderHistoryModal.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  if (orderHistoryList) orderHistoryList.innerHTML = `<div class="products-loading"><div class="spin"></div><p>Loading orders…</p></div>`;
+
+  try {
+    const res  = await fetch(`${API_BASE_URL}/api/transactions/my`, {
+      headers: { ...authHeaders(), 'Accept': 'application/json' },
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      orderHistoryList.innerHTML = `<p class="order-empty">Could not load orders. Please try again.</p>`;
+      return;
+    }
+
+    const orders = data.data || [];
+    if (orders.length === 0) {
+      orderHistoryList.innerHTML = `
+        <div class="order-empty-state">
+          <i class="fas fa-shopping-bag"></i>
+          <p>No orders yet. Start shopping!</p>
+          <button class="btn btn-tertiary" onclick="document.getElementById('orderHistoryModal').style.display='none';document.body.style.overflow='auto';">
+            Browse Products
+          </button>
+        </div>`;
+      return;
+    }
+
+    orderHistoryList.innerHTML = orders.map(order => {
+      const items    = order.metadata?.cart_items || [];
+      const date     = new Date(order.paymentDate || order.createdAt).toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' });
+      const itemsSummary = items.map(i => `${i.name} ×${i.quantity || 1}`).join(', ');
+      return `
+        <div class="order-card">
+          <div class="order-card-header">
+            <div>
+              <span class="order-ref">${order.reference}</span>
+              <span class="order-date">${date}</span>
+            </div>
+            <span class="order-status order-status-${order.status}">${order.status}</span>
+          </div>
+          <div class="order-card-body">
+            <p class="order-items-summary">${itemsSummary || 'Order items'}</p>
+            <p class="order-shipping">📍 ${order.metadata?.shipping_state || 'N/A'}</p>
+          </div>
+          <div class="order-card-footer">
+            <strong class="order-total">₦${Number(order.amount || 0).toLocaleString()}</strong>
+            <button class="btn-view-receipt" data-ref="${order.reference}" type="button">
+              <i class="fas fa-receipt"></i> View Receipt
+            </button>
+          </div>
+        </div>`;
+    }).join('');
+
+    // Wire receipt buttons
+    orderHistoryList.querySelectorAll('.btn-view-receipt').forEach(btn => {
+      btn.addEventListener('click', () => openReceipt(btn.dataset.ref, orders));
+    });
+
+  } catch (err) {
+    if (orderHistoryList) orderHistoryList.innerHTML = `<p class="order-empty">Error: ${err.message}</p>`;
+  }
+}
+
+function openReceipt(reference, orders) {
+  const order = orders.find(o => o.reference === reference);
+  if (!order || !receiptModal || !receiptContent) return;
+
+  const items    = order.metadata?.cart_items || [];
+  const date     = new Date(order.paymentDate || order.createdAt).toLocaleDateString('en-NG', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  const shipping = order.metadata?.shipping_state || 'N/A';
+  const phone    = order.metadata?.customer_phone || order.metadata?.phone || 'N/A';
+  const name     = order.metadata?.customer_name  || currentUser?.name   || 'Customer';
+  const fee      = Number(order.metadata?.shipping_fee || 0);
+  const total    = Number(order.amount || 0);
+  const subtotal = total - fee;
+
+  const itemsHtml = items.map(i => `
+    <tr>
+      <td style="padding:8px;border-bottom:1px solid #eee;">${i.name}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;">${i.quantity || 1}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">₦${Number(i.price || 0).toLocaleString()}</td>
+    </tr>`).join('');
+
+  receiptContent.innerHTML = `
+    <div class="receipt-header">
+      <h2>Fortune's <span>Hub</span></h2>
+      <p class="receipt-subtitle">Order Receipt</p>
+    </div>
+    <div class="receipt-meta">
+      <div><strong>Reference:</strong><code>${reference}</code></div>
+      <div><strong>Date:</strong> ${date}</div>
+      <div><strong>Customer:</strong> ${name}</div>
+      <div><strong>WhatsApp:</strong> ${phone}</div>
+      <div><strong>Shipping To:</strong> ${shipping}</div>
+      <div><strong>Email:</strong> ${order.email || currentUser?.email || 'N/A'}</div>
+    </div>
+    <table class="receipt-table" style="width:100%;border-collapse:collapse;margin:16px 0;">
+      <thead><tr style="background:#f0f2ff;">
+        <th style="padding:10px;text-align:left;">Item</th>
+        <th style="padding:10px;text-align:center;">Qty</th>
+        <th style="padding:10px;text-align:right;">Price</th>
+      </tr></thead>
+      <tbody>${itemsHtml}</tbody>
+    </table>
+    <div class="receipt-totals">
+      <div class="receipt-row"><span>Subtotal</span><span>₦${subtotal.toLocaleString()}</span></div>
+      <div class="receipt-row"><span>Shipping</span><span>₦${fee.toLocaleString()}</span></div>
+      <div class="receipt-row receipt-grand"><span>Total Paid</span><span>₦${total.toLocaleString()}</span></div>
+    </div>
+    <p class="receipt-thankyou">Thank you for shopping with Fortune's Hub! 🛒</p>
+    <p class="receipt-contact">Questions? WhatsApp: 09033489520 | fortunehabib9@gmail.com</p>`;
+
+  receiptModal.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// LAZY PAYSTACK LOADER (unchanged)
+// ─────────────────────────────────────────────────────────────────────
 function loadPaystackScript() {
   return new Promise((resolve, reject) => {
-    if (paystackScriptLoaded && typeof PaystackPop !== 'undefined') {
-      resolve();
-      return;
-    }
-    if (paystackScriptLoading) {
-      paystackLoadCallbacks.push({ resolve, reject });
-      return;
-    }
+    if (paystackScriptLoaded && typeof PaystackPop !== 'undefined') { resolve(); return; }
+    if (paystackScriptLoading) { paystackLoadCallbacks.push({ resolve, reject }); return; }
     paystackScriptLoading = true;
     paystackLoadCallbacks.push({ resolve, reject });
-
     const script = document.createElement('script');
     script.src   = 'https://js.paystack.co/v1/inline.js';
     script.async = true;
-
-    script.onload = () => {
-      paystackScriptLoaded  = true;
-      paystackScriptLoading = false;
-      paystackLoadCallbacks.forEach(cb => cb.resolve());
-      paystackLoadCallbacks = [];
-    };
-
-    script.onerror = () => {
-      paystackScriptLoading = false;
-      const err = new Error('Failed to load Paystack SDK. Check your network or try disabling ad-blockers.');
-      paystackLoadCallbacks.forEach(cb => cb.reject(err));
-      paystackLoadCallbacks = [];
-    };
-
+    script.onload  = () => { paystackScriptLoaded = true; paystackScriptLoading = false; paystackLoadCallbacks.forEach(cb => cb.resolve()); paystackLoadCallbacks = []; };
+    script.onerror = () => { paystackScriptLoading = false; const err = new Error('Failed to load Paystack SDK.'); paystackLoadCallbacks.forEach(cb => cb.reject(err)); paystackLoadCallbacks = []; };
     document.head.appendChild(script);
   });
 }
 
-// ------------------------------
-// 5) LOADING OVERLAY (payment)
-// ------------------------------
-function showLoadingOverlay(message = 'Processing payment...') {
+// ─────────────────────────────────────────────────────────────────────
+// LOADING OVERLAY (unchanged)
+// ─────────────────────────────────────────────────────────────────────
+function showLoadingOverlay(message = 'Processing…') {
   hideLoadingOverlay();
   const overlay = document.createElement('div');
   overlay.id = 'paymentLoadingOverlay';
@@ -196,135 +621,62 @@ function showLoadingOverlay(message = 'Processing payment...') {
     <div class="loading-content">
       <div class="loading-spinner"></div>
       <h3 class="loading-title">${message}</h3>
-      <p class="loading-subtitle">Please wait, this may take up to a minute...</p>
-      <div class="loading-progress">
-        <div class="loading-progress-bar"></div>
-      </div>
-      <p class="loading-info">
-        <i class="fas fa-info-circle"></i>
-        Do not close this window or press the back button
-      </p>
+      <p class="loading-subtitle">Please wait, do not close this window.</p>
+      <div class="loading-progress"><div class="loading-progress-bar"></div></div>
+      <p class="loading-info"><i class="fas fa-info-circle"></i> Do not close or go back</p>
     </div>
     <style>
-      #paymentLoadingOverlay {
-        position:fixed;top:0;left:0;width:100%;height:100%;
-        background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);
-        z-index:99999;display:flex;align-items:center;justify-content:center;
-        animation:fadeInOvl 0.3s ease;
-      }
+      #paymentLoadingOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:center;justify-content:center;animation:fadeInOvl .3s ease}
       @keyframes fadeInOvl{from{opacity:0}to{opacity:1}}
-      .loading-content{
-        background:#fff;border-radius:20px;padding:40px 50px;
-        max-width:450px;width:90%;text-align:center;
-        box-shadow:0 20px 60px rgba(0,0,0,0.4);animation:slideUpOvl 0.4s ease;
-      }
+      .loading-content{background:#fff;border-radius:20px;padding:40px 50px;max-width:450px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4);animation:slideUpOvl .4s ease}
       @keyframes slideUpOvl{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
-      .loading-spinner{
-        width:60px;height:60px;border:5px solid #f0f0f0;border-top:5px solid #667eea;
-        border-radius:50%;margin:0 auto 25px;animation:spinOvl 1s linear infinite;
-      }
+      .loading-spinner{width:60px;height:60px;border:5px solid #f0f0f0;border-top:5px solid #667eea;border-radius:50%;margin:0 auto 25px;animation:spinOvl 1s linear infinite}
       @keyframes spinOvl{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-      .loading-title{font-size:22px;font-weight:700;color:#1f2937;margin:0 0 10px;}
-      .loading-subtitle{font-size:15px;color:#595959;margin:0 0 25px;line-height:1.5;}
-      .loading-progress{width:100%;height:6px;background:#f0f0f0;border-radius:10px;overflow:hidden;margin-bottom:20px;}
-      .loading-progress-bar{height:100%;background:linear-gradient(90deg,#667eea,#764ba2);border-radius:10px;animation:progressBarOvl 60s ease-in-out;width:0%;}
+      .loading-title{font-size:22px;font-weight:700;color:#1f2937;margin:0 0 10px}
+      .loading-subtitle{font-size:15px;color:#595959;margin:0 0 25px;line-height:1.5}
+      .loading-progress{width:100%;height:6px;background:#f0f0f0;border-radius:10px;overflow:hidden;margin-bottom:20px}
+      .loading-progress-bar{height:100%;background:linear-gradient(90deg,#667eea,#764ba2);border-radius:10px;animation:progressBarOvl 60s ease-in-out;width:0%}
       @keyframes progressBarOvl{0%{width:0%}50%{width:75%}100%{width:95%}}
-      .loading-info{font-size:13px;color:#9ca3af;margin:0;display:flex;align-items:center;justify-content:center;gap:8px;}
-      .loading-info i{color:#667eea;}
-      @media(max-width:480px){.loading-content{padding:30px 25px}.loading-title{font-size:18px}}
+      .loading-info{font-size:13px;color:#9ca3af;margin:0;display:flex;align-items:center;justify-content:center;gap:8px}
+      .loading-info i{color:#667eea}
       @keyframes fadeOutOvl{from{opacity:1}to{opacity:0}}
-    </style>
-  `;
+    </style>`;
   document.body.appendChild(overlay);
   document.body.style.overflow = 'hidden';
 }
-
 function hideLoadingOverlay() {
   const overlay = document.getElementById('paymentLoadingOverlay');
-  if (overlay) {
-    overlay.style.animation = 'fadeOutOvl 0.3s ease';
-    setTimeout(() => { overlay.remove(); document.body.style.overflow = 'auto'; }, 300);
-  }
+  if (overlay) { overlay.style.animation = 'fadeOutOvl .3s ease'; setTimeout(() => { overlay.remove(); document.body.style.overflow = 'auto'; }, 300); }
 }
 
-// ------------------------------
-// 5b) PRODUCTS LOADING STATE — enhanced for cold-start UX
-// ------------------------------
-/**
- * @param {'idle'|'waking'|'retrying'|'error'} state
- * @param {object} opts  { attempt, maxRetries, retryFn }
- */
+// ─────────────────────────────────────────────────────────────────────
+// PRODUCTS LOADING STATE (unchanged)
+// ─────────────────────────────────────────────────────────────────────
 function showProductsLoading(state = 'idle', opts = {}) {
   if (!productsGrid) return;
-
   let html = '';
-
   if (state === 'idle') {
-    html = `
-      <div class="products-loading">
-        <div class="spin"></div>
-        <p>Loading products…</p>
-        <small>Please wait a moment.</small>
-      </div>`;
-
+    html = `<div class="products-loading"><div class="spin"></div><p>Loading products…</p><small>Please wait a moment.</small></div>`;
   } else if (state === 'waking') {
-    html = `
-      <div class="products-loading">
-        <div class="spin"></div>
-        <p>Server is waking up…</p>
-        <small>
-          The product server is starting up — this usually takes
-          <strong>20–40 seconds</strong>. Products will appear automatically.
-        </small>
-      </div>`;
-
+    html = `<div class="products-loading"><div class="spin"></div><p>Server is waking up…</p><small>This usually takes <strong>20–40 seconds</strong>. Products will appear automatically.</small></div>`;
   } else if (state === 'retrying') {
-    const attempt    = opts.attempt    || 2;
-    const maxRetries = opts.maxRetries || MAX_RETRIES;
-    html = `
-      <div class="products-loading">
-        <div class="spin"></div>
-        <p>Still waking up… <span style="color:#667eea;">(Attempt ${attempt} of ${maxRetries})</span></p>
-        <small>
-          Render free servers sleep when idle. They take up to 60 s to wake.
-          Hang tight — your products will load shortly. ☕
-        </small>
-      </div>`;
-
+    html = `<div class="products-loading"><div class="spin"></div><p>Still waking up… <span style="color:#667eea;">(Attempt ${opts.attempt || 2} of ${opts.maxRetries || MAX_RETRIES})</span></p><small>Hang tight — your products will load shortly. ☕</small></div>`;
   } else if (state === 'error') {
-    html = `
-      <div class="products-loading" style="gap:12px;">
-        <i class="fas fa-exclamation-circle" style="font-size:48px;color:#e74c3c;"></i>
-        <p style="color:#e74c3c;">Could not load products</p>
-        <small>The server could not be reached after several attempts.<br>
-          Please check your connection and try again.</small>
-        <button
-          id="retryLoadProducts"
-          class="btn btn-primary"
-          style="margin-top:10px;padding:10px 28px;font-size:15px;cursor:pointer;">
-          <i class="fas fa-redo"></i> Retry
-        </button>
-      </div>`;
+    html = `<div class="products-loading" style="gap:12px;"><i class="fas fa-exclamation-circle" style="font-size:48px;color:#e74c3c;"></i><p style="color:#e74c3c;">Could not load products</p><small>Please check your connection and try again.</small><button id="retryLoadProducts" class="btn btn-primary" style="margin-top:10px;padding:10px 28px;font-size:15px;cursor:pointer;"><i class="fas fa-redo"></i> Retry</button></div>`;
   }
-
   productsGrid.innerHTML = html;
-
-  // Wire up retry button if rendered
   const retryBtn = document.getElementById('retryLoadProducts');
-  if (retryBtn && typeof opts.retryFn === 'function') {
-    retryBtn.addEventListener('click', opts.retryFn);
-  }
+  if (retryBtn && typeof opts.retryFn === 'function') retryBtn.addEventListener('click', opts.retryFn);
 }
 
-// ------------------------------
-// 6) CART UI + LOGIC
-// ------------------------------
+// ─────────────────────────────────────────────────────────────────────
+// CART UI + LOGIC
+// ─────────────────────────────────────────────────────────────────────
 function updateCartUI() {
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   if (cartCount) cartCount.textContent = totalItems;
 
   if (!cartItemsContainer) return;
-
   cartItemsContainer.innerHTML = '';
   if (cart.length === 0) {
     cartItemsContainer.innerHTML = '<p style="text-align:center;color:#555;">Your cart is empty.</p>';
@@ -339,29 +691,22 @@ function updateCartUI() {
       <div class="cart-item">
         <div class="item-details">
           <img src="${imgSrc}" alt="${item.name}" onerror="this.style.display='none'">
-          <div class="item-info">
-            <h4>${item.name}</h4>
-            <span class="item-price">${formatCurrency(item.price)}</span>
-          </div>
+          <div class="item-info"><h4>${item.name}</h4><span class="item-price">${formatCurrency(item.price)}</span></div>
         </div>
         <div class="item-quantity">
           <button class="btn-quantity minus" data-id="${item.id}" data-change="-1">-</button>
           <span>${item.quantity}</span>
-          <button class="btn-quantity plus"  data-id="${item.id}" data-change="1">+</button>
+          <button class="btn-quantity plus" data-id="${item.id}" data-change="1">+</button>
           <i class="fas fa-trash-alt remove-item" data-id="${item.id}"></i>
         </div>
-      </div>
-    `);
+      </div>`);
   });
 
-  document.querySelectorAll('.btn-quantity').forEach(button => {
-    button.addEventListener('click', e => {
-      updateQuantity(e.currentTarget.dataset.id, parseInt(e.currentTarget.dataset.change, 10));
-    });
+  document.querySelectorAll('.btn-quantity').forEach(btn => {
+    btn.addEventListener('click', e => updateQuantity(e.currentTarget.dataset.id, parseInt(e.currentTarget.dataset.change, 10)));
   });
-
-  document.querySelectorAll('.remove-item').forEach(button => {
-    button.addEventListener('click', e => removeItem(e.currentTarget.dataset.id));
+  document.querySelectorAll('.remove-item').forEach(btn => {
+    btn.addEventListener('click', e => removeItem(e.currentTarget.dataset.id));
   });
 
   const subtotal    = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -373,12 +718,8 @@ function updateCartUI() {
   if (cartTotalElement)         cartTotalElement.textContent         = formatCurrency(grandTotal);
 
   if (checkoutButton) {
-    const name  = (customerNameInput?.value  || '').trim();
-    const email = (customerEmailInput?.value || '').trim();
-    const phone = (customerPhoneInput?.value || '').trim();
     const valid = validateCustomerInfo({ silent: true });
-
-    if (!valid || !name || !email || !phone) {
+    if (!valid) {
       checkoutButton.disabled = true;
       checkoutButton.innerHTML = '<i class="fas fa-info-circle"></i> Complete Info to Continue';
     } else {
@@ -391,16 +732,13 @@ function updateCartUI() {
 function addToCart(productId, quantity = 1) {
   const product = getProductById(productId);
   if (!product || product.outOfStock) { alert('Product is out of stock.'); return; }
-
   const cartItem = cart.find(item => String(item.id) === String(productId));
-  if (cartItem) {
-    cartItem.quantity += quantity;
-  } else {
+  if (cartItem) { cartItem.quantity += quantity; }
+  else {
     const rawImg  = product.image || '';
     const safeImg = (rawImg.startsWith('data:') || rawImg.length > 300) ? '' : rawImg;
     cart.push({ id: product.id, name: product.name, price: product.price, quantity, image: safeImg });
   }
-
   localStorage.setItem('cart', JSON.stringify(cart));
   updateCartUI();
   alert(`${product.name} added to cart!`);
@@ -422,233 +760,174 @@ function removeItem(productId) {
   updateCartUI();
 }
 
-// ------------------------------
-// 7) VALIDATION
-// ------------------------------
+// ─────────────────────────────────────────────────────────────────────
+// ✅ VALIDATION — aware of auth state
+// ─────────────────────────────────────────────────────────────────────
 function validateCustomerInfo({ silent = false } = {}) {
   let isValid = true;
   if (nameError)  nameError.style.display  = 'none';
   if (emailError) emailError.style.display = 'none';
   if (phoneError) phoneError.style.display = 'none';
 
-  const name  = (customerNameInput?.value  || '').trim();
-  const email = (customerEmailInput?.value || '').trim();
   const phone = (customerPhoneInput?.value || '').trim();
 
-  if (!name || name.length < 3 || name.includes('@') || name.includes('.')) {
-    if (!silent && nameError) { nameError.textContent = 'Please enter your full name (not email).'; nameError.style.display = 'block'; }
-    isValid = false;
-  }
+  if (currentUser) {
+    // Logged in — only validate phone + state
+    const phoneRegex = /^(0[789][01])\d{8}$/;
+    if (!phone || !phoneRegex.test(phone)) {
+      if (!silent && phoneError) { phoneError.textContent = 'Enter a valid Nigerian WhatsApp number (e.g., 08031234567).'; phoneError.style.display = 'block'; }
+      isValid = false;
+    }
+  } else {
+    // Guest — validate all fields
+    const name  = (customerNameInput?.value  || '').trim();
+    const email = (customerEmailInput?.value || '').trim();
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!email || !emailRegex.test(email)) {
-    if (!silent && emailError) { emailError.textContent = 'Enter a valid email (e.g., name@example.com).'; emailError.style.display = 'block'; }
-    isValid = false;
-  }
-
-  const phoneRegex = /^(0[789][01])\d{8}$/;
-  if (!phone || !phoneRegex.test(phone)) {
-    if (!silent && phoneError) { phoneError.textContent = 'Enter a valid Nigerian phone number (e.g., 08031234567).'; phoneError.style.display = 'block'; }
-    isValid = false;
+    if (!name || name.length < 3 || name.includes('@') || name.includes('.')) {
+      if (!silent && nameError) { nameError.textContent = 'Please enter your full name (not email).'; nameError.style.display = 'block'; }
+      isValid = false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      if (!silent && emailError) { emailError.textContent = 'Enter a valid email (e.g., name@example.com).'; emailError.style.display = 'block'; }
+      isValid = false;
+    }
+    const phoneRegex = /^(0[789][01])\d{8}$/;
+    if (!phone || !phoneRegex.test(phone)) {
+      if (!silent && phoneError) { phoneError.textContent = 'Enter a valid Nigerian WhatsApp number (e.g., 08031234567).'; phoneError.style.display = 'block'; }
+      isValid = false;
+    }
   }
 
   if (!(shippingStateSelect?.value || '')) isValid = false;
   return isValid;
 }
 
-// ------------------------------
-// 8) PRODUCT DETAIL MODAL
-// ------------------------------
+// ─────────────────────────────────────────────────────────────────────
+// PRODUCT DETAIL MODAL (unchanged)
+// ─────────────────────────────────────────────────────────────────────
 function openProductDetail(productId) {
   const product = getProductById(productId);
   if (!product) return;
-
   currentProduct = product;
   zoomEnabled    = false;
   const mainContainer = document.querySelector('.main-image-container');
   if (mainContainer) mainContainer.classList.remove('zoom-active');
-
   if (detailCategory) detailCategory.textContent = product.category || 'Product';
   if (detailTitle)    detailTitle.textContent    = product.name;
   if (detailPrice)    detailPrice.textContent    = formatCurrency(product.price);
-
   if (detailBadge) {
     detailBadge.textContent = '';
     detailBadge.className   = 'detail-badge';
-    if (product.sold)               { detailBadge.textContent = 'SOLD'; detailBadge.classList.add('badge-sold'); detailBadge.style.display = 'inline-block'; }
-    else if (product.tag === 'new') { detailBadge.textContent = 'NEW';  detailBadge.classList.add('badge-new');  detailBadge.style.display = 'inline-block'; }
-    else if (product.tag === 'sale'){ detailBadge.textContent = 'SALE'; detailBadge.classList.add('badge-sale'); detailBadge.style.display = 'inline-block'; }
+    if (product.sold)                { detailBadge.textContent = 'SOLD'; detailBadge.classList.add('badge-sold'); detailBadge.style.display = 'inline-block'; }
+    else if (product.tag === 'new')  { detailBadge.textContent = 'NEW';  detailBadge.classList.add('badge-new');  detailBadge.style.display = 'inline-block'; }
+    else if (product.tag === 'sale') { detailBadge.textContent = 'SALE'; detailBadge.classList.add('badge-sale'); detailBadge.style.display = 'inline-block'; }
     else detailBadge.style.display = 'none';
   }
-
   if (detailDescription) detailDescription.textContent = product.description || 'No description available.';
-
   if (detailSpecsList) {
     detailSpecsList.innerHTML = '';
-    const specs = product.specifications || {
-      'Category':     product.category,
-      'Availability': product.outOfStock ? 'Out of Stock' : 'In Stock',
-      'Price':        formatCurrency(product.price),
-    };
+    const specs = product.specifications || { 'Category': product.category, 'Availability': product.outOfStock ? 'Out of Stock' : 'In Stock', 'Price': formatCurrency(product.price) };
     Object.entries(specs).forEach(([key, value]) => {
       const li = document.createElement('li');
       li.innerHTML = `<i class="fas fa-check-circle"></i> <strong>${key}:</strong> ${value}`;
       detailSpecsList.appendChild(li);
     });
   }
-
-  const imgs   = Array.isArray(product.images) && product.images.length
-    ? product.images.slice(0, 4)
-    : [product.image, product.image, product.image];
+  const imgs   = Array.isArray(product.images) && product.images.length ? product.images.slice(0, 4) : [product.image, product.image, product.image];
   const images = imgs.map(img => resolveAssetUrl(img || product.image));
-
   if (detailMainImage) { detailMainImage.src = images[0]; detailMainImage.alt = product.name; }
-
   if (detailThumbnails) {
     detailThumbnails.innerHTML = '';
     images.forEach((imgSrc, index) => {
       const thumb = document.createElement('img');
-      thumb.src   = imgSrc;
-      thumb.alt   = `${product.name} ${index + 1}`;
-      thumb.classList.add('detail-thumb');
+      thumb.src = imgSrc; thumb.alt = `${product.name} ${index + 1}`; thumb.classList.add('detail-thumb');
       if (index === 0) thumb.classList.add('active');
-      thumb.addEventListener('click', () => {
-        detailMainImage.src = imgSrc;
-        detailThumbnails.querySelectorAll('img').forEach(t => t.classList.remove('active'));
-        thumb.classList.add('active');
-      });
+      thumb.addEventListener('click', () => { detailMainImage.src = imgSrc; detailThumbnails.querySelectorAll('img').forEach(t => t.classList.remove('active')); thumb.classList.add('active'); });
       detailThumbnails.appendChild(thumb);
     });
   }
-
   const isSoldOrOut = product.sold || product.outOfStock;
-  if (detailAddCart) {
-    detailAddCart.disabled  = isSoldOrOut;
-    detailAddCart.innerHTML = isSoldOrOut ? '<i class="fas fa-ban"></i> Out of Stock' : '<i class="fas fa-cart-plus"></i> Add to Cart';
-  }
-  if (detailBuyNow) {
-    detailBuyNow.disabled  = isSoldOrOut;
-    detailBuyNow.innerHTML = isSoldOrOut ? '<i class="fas fa-ban"></i> Out of Stock' : '<i class="fas fa-bolt"></i> Buy Now';
-  }
-
+  if (detailAddCart) { detailAddCart.disabled = isSoldOrOut; detailAddCart.innerHTML = isSoldOrOut ? '<i class="fas fa-ban"></i> Out of Stock' : '<i class="fas fa-cart-plus"></i> Add to Cart'; }
+  if (detailBuyNow)  { detailBuyNow.disabled  = isSoldOrOut; detailBuyNow.innerHTML  = isSoldOrOut ? '<i class="fas fa-ban"></i> Out of Stock' : '<i class="fas fa-bolt"></i> Buy Now'; }
   if (productDetailModal) { productDetailModal.style.display = 'block'; document.body.style.overflow = 'hidden'; }
   initImageZoom();
 }
 
 function closeProductDetail() {
   if (productDetailModal) { productDetailModal.style.display = 'none'; document.body.style.overflow = 'auto'; }
-  currentProduct = null;
-  zoomEnabled    = false;
+  currentProduct = null; zoomEnabled = false;
   const mainContainer = document.querySelector('.main-image-container');
   if (mainContainer) mainContainer.classList.remove('zoom-active');
 }
 
-// ------------------------------
-// 9) IMAGE ZOOM
-// ------------------------------
+// ─────────────────────────────────────────────────────────────────────
+// IMAGE ZOOM (unchanged)
+// ─────────────────────────────────────────────────────────────────────
 function initImageZoom() {
   const mainImage = detailMainImage;
-  const lens      = zoomLens;
-  const result    = zoomResult;
+  const lens = zoomLens; const result = zoomResult;
   const container = document.querySelector('.main-image-container');
   if (!mainImage || !lens || !result || !container) return;
-
   let cx, cy;
-
   function updateZoomRatio() {
-    cx = result.offsetWidth  / lens.offsetWidth;
+    cx = result.offsetWidth / lens.offsetWidth;
     cy = result.offsetHeight / lens.offsetHeight;
     result.style.backgroundImage = `url('${mainImage.src}')`;
     result.style.backgroundSize  = `${mainImage.width * cx}px ${mainImage.height * cy}px`;
   }
-
   function moveLens(e) {
     if (!zoomEnabled) return;
     e.preventDefault();
     const pos = getCursorPos(e);
-    let x = pos.x - lens.offsetWidth  / 2;
+    let x = pos.x - lens.offsetWidth / 2;
     let y = pos.y - lens.offsetHeight / 2;
-    if (x > mainImage.width  - lens.offsetWidth)  x = mainImage.width  - lens.offsetWidth;
+    if (x > mainImage.width - lens.offsetWidth)   x = mainImage.width - lens.offsetWidth;
     if (x < 0) x = 0;
     if (y > mainImage.height - lens.offsetHeight) y = mainImage.height - lens.offsetHeight;
     if (y < 0) y = 0;
-    lens.style.left = x + 'px';
-    lens.style.top  = y + 'px';
+    lens.style.left = x + 'px'; lens.style.top = y + 'px';
     result.style.backgroundPosition = `-${x * cx}px -${y * cy}px`;
   }
-
   function getCursorPos(e) {
     const rect = mainImage.getBoundingClientRect();
-    const x    = (e.pageX || e.touches[0].pageX) - rect.left - window.pageXOffset;
-    const y    = (e.pageY || e.touches[0].pageY) - rect.top  - window.pageYOffset;
-    return { x, y };
+    return { x: (e.pageX || e.touches[0].pageX) - rect.left - window.pageXOffset, y: (e.pageY || e.touches[0].pageY) - rect.top - window.pageYOffset };
   }
-
   if (zoomToggle) {
     zoomToggle.onclick = function () {
       zoomEnabled = !zoomEnabled;
-      if (zoomEnabled) {
-        container.classList.add('zoom-active');
-        updateZoomRatio();
-        this.querySelector('i').classList.replace('fa-search-plus', 'fa-search-minus');
-      } else {
-        container.classList.remove('zoom-active');
-        this.querySelector('i').classList.replace('fa-search-minus', 'fa-search-plus');
-      }
+      if (zoomEnabled) { container.classList.add('zoom-active'); updateZoomRatio(); this.querySelector('i').classList.replace('fa-search-plus', 'fa-search-minus'); }
+      else { container.classList.remove('zoom-active'); this.querySelector('i').classList.replace('fa-search-minus', 'fa-search-plus'); }
     };
   }
-
   container.addEventListener('mousemove', moveLens);
   container.addEventListener('touchmove', moveLens);
-  mainImage.addEventListener('load',   updateZoomRatio);
-  window.addEventListener('resize',    updateZoomRatio);
+  mainImage.addEventListener('load', updateZoomRatio);
+  window.addEventListener('resize', updateZoomRatio);
 }
 
-// ------------------------------
-// 10) PRODUCTS UI
-// ------------------------------
+// ─────────────────────────────────────────────────────────────────────
+// PRODUCTS DISPLAY (unchanged)
+// ─────────────────────────────────────────────────────────────────────
 function displayProducts(productsToShow) {
   if (!productsGrid) return;
   productsGrid.innerHTML = '';
-
   if (!productsToShow || productsToShow.length === 0) {
-    productsGrid.innerHTML = `
-      <div style="grid-column:1/-1;text-align:center;padding:40px;color:#555;">
-        <i class="fas fa-box-open" style="font-size:48px;color:#ccc;margin-bottom:15px;display:block;"></i>
-        <p style="font-size:18px;margin:0;">No products found</p>
-      </div>
-    `;
+    productsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#555;"><i class="fas fa-box-open" style="font-size:48px;color:#ccc;margin-bottom:15px;display:block;"></i><p style="font-size:18px;margin:0;">No products found</p></div>`;
     return;
   }
-
   productsToShow.forEach(product => {
-    const isSold       = !!product.sold;
-    const isOutOfStock = !!product.outOfStock;
-
+    const isSold = !!product.sold; const isOutOfStock = !!product.outOfStock;
     let badgeClass = '', badgeText = '';
     if (isSold)                    { badgeClass = 'badge-sold'; badgeText = 'SOLD'; }
     else if (product.tag === 'new') { badgeClass = 'badge-new';  badgeText = 'NEW';  }
     else if (product.tag === 'sale'){ badgeClass = 'badge-sale'; badgeText = 'SALE'; }
-
     let buttonText = 'Add to Cart', buttonClass = 'btn-add-to-cart add-to-cart';
     let buyNowText = 'Buy Now',     buyNowClass  = 'btn-buy-now buy-now';
     let isDisabled = '';
-
-    if (isSold || isOutOfStock) {
-      const label = isSold ? 'SOLD' : 'Out of Stock';
-      buttonText = label; buttonClass = 'btn-secondary';
-      buyNowText = label; buyNowClass  = 'btn-secondary'; isDisabled = 'disabled';
-    }
-
-    const imgs   = Array.isArray(product.images) && product.images.length
-      ? product.images.slice(0, 3)
-      : [product.image, product.image, product.image];
-    const images = [
-      resolveAssetUrl(imgs[0] || product.image),
-      resolveAssetUrl(imgs[1] || product.image),
-      resolveAssetUrl(imgs[2] || product.image),
-    ];
-
+    if (isSold || isOutOfStock) { const label = isSold ? 'SOLD' : 'Out of Stock'; buttonText = label; buttonClass = 'btn-secondary'; buyNowText = label; buyNowClass = 'btn-secondary'; isDisabled = 'disabled'; }
+    const imgs   = Array.isArray(product.images) && product.images.length ? product.images.slice(0, 3) : [product.image, product.image, product.image];
+    const images = [ resolveAssetUrl(imgs[0] || product.image), resolveAssetUrl(imgs[1] || product.image), resolveAssetUrl(imgs[2] || product.image) ];
     productsGrid.insertAdjacentHTML('beforeend', `
       <div class="product-card" data-category="${product.category}" data-product-id="${product.id}">
         <div class="product-image-slider" data-images='${JSON.stringify(images)}'>
@@ -670,62 +949,32 @@ function displayProducts(productsToShow) {
             <button class="btn ${buyNowClass}"  ${isDisabled} data-id="${product.id}">${buyNowText}</button>
           </div>
         </div>
-      </div>
-    `);
+      </div>`);
   });
 }
 
 function filterProducts(category) {
-  const filtered = category === 'all'
-    ? products
-    : products.filter(p => (p.category || '').toLowerCase() === category.toLowerCase());
+  const filtered = category === 'all' ? products : products.filter(p => (p.category || '').toLowerCase() === category.toLowerCase());
   displayProducts(filtered);
 }
 
 function searchProducts(query) {
   const text = (query || '').toLowerCase();
-  const filtered = products.filter(p =>
-    (p.name        || '').toLowerCase().includes(text) ||
-    (p.category    || '').toLowerCase().includes(text) ||
-    (p.description || '').toLowerCase().includes(text)
-  );
-  displayProducts(filtered);
+  displayProducts(products.filter(p => (p.name || '').toLowerCase().includes(text) || (p.category || '').toLowerCase().includes(text) || (p.description || '').toLowerCase().includes(text)));
 }
 
-// ------------------------------
-// 11) EVENT LISTENERS
-// ------------------------------
+// ─────────────────────────────────────────────────────────────────────
+// EVENT LISTENERS
+// ─────────────────────────────────────────────────────────────────────
 function setActiveFilterButton(category) {
-  filterButtons.forEach(btn => {
-    const isActive = btn.dataset.category === category;
-    btn.classList.toggle('active', isActive);
-    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-  });
+  filterButtons.forEach(btn => { const isActive = btn.dataset.category === category; btn.classList.toggle('active', isActive); btn.setAttribute('aria-pressed', isActive ? 'true' : 'false'); });
 }
 
 function setupEventListeners() {
-  searchIconBtn?.addEventListener('click', () => {
-    document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setTimeout(() => searchInput?.focus(), 400);
-  });
-
+  searchIconBtn?.addEventListener('click', () => { document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setTimeout(() => searchInput?.focus(), 400); });
   searchInput?.addEventListener('input', e => searchProducts(e.target.value));
-
-  filterButtons.forEach(button => {
-    button.setAttribute('aria-pressed', button.classList.contains('active') ? 'true' : 'false');
-    button.addEventListener('click', () => {
-      setActiveFilterButton(button.dataset.category);
-      filterProducts(button.dataset.category);
-    });
-  });
-
-  categoryCards.forEach(card => {
-    card.addEventListener('click', () => {
-      setActiveFilterButton(card.dataset.category);
-      filterProducts(card.dataset.category);
-      document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
-    });
-  });
+  filterButtons.forEach(btn => { btn.setAttribute('aria-pressed', btn.classList.contains('active') ? 'true' : 'false'); btn.addEventListener('click', () => { setActiveFilterButton(btn.dataset.category); filterProducts(btn.dataset.category); }); });
+  categoryCards.forEach(card => { card.addEventListener('click', () => { setActiveFilterButton(card.dataset.category); filterProducts(card.dataset.category); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); }); });
 
   cartIcon?.addEventListener('click', openCartModal);
   footerOpenCart?.addEventListener('click', e => { e.preventDefault(); openCartModal(); });
@@ -733,40 +982,39 @@ function setupEventListeners() {
   continueShoppingButton?.addEventListener('click', closeCartModal);
   closeProductModal?.addEventListener('click', closeProductDetail);
 
-  detailAddCart?.addEventListener('click', () => {
-    if (currentProduct && !currentProduct.sold && !currentProduct.outOfStock) {
-      addToCart(String(currentProduct.id));
-    }
-  });
-
-  detailBuyNow?.addEventListener('click', () => {
-    if (currentProduct && !currentProduct.sold && !currentProduct.outOfStock) {
-      addToCart(String(currentProduct.id), 1);
-      closeProductDetail();
-      openCartModal();
-    }
-  });
+  detailAddCart?.addEventListener('click', () => { if (currentProduct && !currentProduct.sold && !currentProduct.outOfStock) addToCart(String(currentProduct.id)); });
+  detailBuyNow?.addEventListener('click',  () => { if (currentProduct && !currentProduct.sold && !currentProduct.outOfStock) { addToCart(String(currentProduct.id), 1); closeProductDetail(); openCartModal(); } });
 
   window.addEventListener('click', e => {
     if (cartModal          && e.target === cartModal)          closeCartModal();
     if (productDetailModal && e.target === productDetailModal) closeProductDetail();
+    if (authModal          && e.target === authModal)          closeAuthModal_fn();
+    if (orderHistoryModal  && e.target === orderHistoryModal)  { orderHistoryModal.style.display = 'none'; document.body.style.overflow = 'auto'; }
+    if (receiptModal       && e.target === receiptModal)       { receiptModal.style.display = 'none'; document.body.style.overflow = 'auto'; }
+    // Close dropdown when clicking outside
+    if (!e.target.closest('.user-avatar-wrap')) closeDropdown();
   });
 
   shippingStateSelect?.addEventListener('change', updateCartUI);
   customerNameInput?.addEventListener('input',  updateCartUI);
   customerEmailInput?.addEventListener('input', updateCartUI);
-  customerPhoneInput?.addEventListener('input', updateCartUI);
+  customerPhoneInput?.addEventListener('input', () => {
+    updateCartUI();
+    // Save phone for logged-in users
+    if (currentUser && customerPhoneInput.value) {
+      currentUser.phone = customerPhoneInput.value.trim();
+      localStorage.setItem('fh_auth', JSON.stringify(currentUser));
+      // Sync phone to backend (fire-and-forget)
+      fetch(`${API_BASE_URL}/api/auth/me`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ phone: currentUser.phone }) }).catch(() => {});
+    }
+  });
 
   checkoutButton?.addEventListener('click', initiatePaystackPayment);
 
   productsGrid?.addEventListener('click', e => {
     const target = e.target;
     const card   = target.closest('.product-card');
-
-    if (card && !target.closest('button') && !target.closest('.thumb')) {
-      openProductDetail(card.dataset.productId);
-      return;
-    }
+    if (card && !target.closest('button') && !target.closest('.thumb')) { openProductDetail(card.dataset.productId); return; }
     if (target?.classList?.contains('add-to-cart')) { e.stopPropagation(); addToCart(target.dataset.id); return; }
     if (target?.classList?.contains('buy-now'))     { e.stopPropagation(); addToCart(target.dataset.id, 1); openCartModal(); return; }
     if (target?.classList?.contains('thumb')) {
@@ -781,64 +1029,75 @@ function setupEventListeners() {
       target.classList.add('active');
     }
   });
+
+  // ──── AUTH EVENT LISTENERS ─────────────────────────────
+  headerSignInBtn?.addEventListener('click', () => openAuthModal('signin'));
+  closeAuthModal?.addEventListener('click', closeAuthModal_fn);
+  tabSignIn?.addEventListener('click', () => switchAuthTab('signin'));
+  tabSignUp?.addEventListener('click', () => switchAuthTab('signup'));
+  signInForm?.addEventListener('submit', handleEmailSignIn);
+  signUpForm?.addEventListener('submit', handleEmailSignUp);
+
+  userAvatarBtn?.addEventListener('click', e => { e.stopPropagation(); toggleDropdown(); });
+  signOutBtn?.addEventListener('click', signOut);
+  viewHistoryBtn?.addEventListener('click', openOrderHistory);
+  changeAccountBtn?.addEventListener('click', () => { closeCartModal(); openAuthModal('signin'); });
+  cartSignInPromptBtn?.addEventListener('click', () => { closeCartModal(); openAuthModal('signin'); });
+
+  // Close order history + receipt modals
+  closeOrderHistoryModal?.addEventListener('click', () => { orderHistoryModal.style.display = 'none'; document.body.style.overflow = 'auto'; });
+  closeReceiptModal?.addEventListener('click',      () => { receiptModal.style.display = 'none'; document.body.style.overflow = 'auto'; });
+
+  // Password toggle
+  document.querySelectorAll('.toggle-pw').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = document.getElementById(btn.dataset.target);
+      if (!target) return;
+      const isText = target.type === 'text';
+      target.type = isText ? 'password' : 'text';
+      const icon = btn.querySelector('i');
+      if (icon) { icon.classList.toggle('fa-eye', isText); icon.classList.toggle('fa-eye-slash', !isText); }
+    });
+  });
 }
 
-// ------------------------------
-// 12) MODAL
-// ------------------------------
+// ─────────────────────────────────────────────────────────────────────
+// MODAL OPENERS
+// ─────────────────────────────────────────────────────────────────────
 function openCartModal() {
   if (!cartModal) return;
   cartModal.style.display = 'block';
   document.body.style.overflow = 'hidden';
   updateCartUI();
 }
-
 function closeCartModal() {
   if (!cartModal) return;
   cartModal.style.display = 'none';
   document.body.style.overflow = 'auto';
 }
 
-// ------------------------------
-// 13) PAYSTACK PAYMENT — LAZY LOADED
-// ------------------------------
+// ─────────────────────────────────────────────────────────────────────
+// ✅ PAYSTACK PAYMENT — sends userId via auth header
+// ─────────────────────────────────────────────────────────────────────
 async function initiatePaystackPayment() {
   if (cart.length === 0) { alert('Your cart is empty.'); return; }
 
-  const name  = (customerNameInput?.value  || '').trim();
-  const email = (customerEmailInput?.value || '').trim();
+  // Resolve name + email from auth or form
+  const name  = currentUser ? currentUser.name  : (customerNameInput?.value  || '').trim();
+  const email = currentUser ? currentUser.email : (customerEmailInput?.value || '').trim();
   const phone = (customerPhoneInput?.value || '').trim();
 
-  if (!validateCustomerInfo()) {
-    alert('Please complete all required information correctly.');
-    return;
-  }
+  if (!validateCustomerInfo()) { alert('Please complete all required information correctly.'); return; }
 
   showLoadingOverlay('Loading payment system…');
-
-  try {
-    await loadPaystackScript();
-  } catch (err) {
-    hideLoadingOverlay();
-    alert('Could not load payment system: ' + err.message + '\n\nPlease disable ad-blockers, try incognito mode, or try another network.');
-    return;
-  }
-
-  if (typeof PaystackPop === 'undefined') {
-    hideLoadingOverlay();
-    alert('Paystack could not load on this browser/network. Please try again.');
-    return;
-  }
+  try { await loadPaystackScript(); }
+  catch (err) { hideLoadingOverlay(); alert('Could not load payment system: ' + err.message + '\n\nPlease disable ad-blockers or try another network.'); return; }
+  if (typeof PaystackPop === 'undefined') { hideLoadingOverlay(); alert('Paystack could not load. Please try again.'); return; }
 
   const shippingFeeNaira = parseInt(shippingStateSelect?.value || '0', 10) || 0;
   const subtotalNaira    = cart.reduce((sum, item) => sum + Number(item.price || 0) * (item.quantity || 1), 0);
   const totalNaira       = subtotalNaira + shippingFeeNaira;
-
-  if (!Number.isFinite(totalNaira) || totalNaira <= 0) {
-    hideLoadingOverlay();
-    alert('Invalid total amount. Please refresh the page and try again.');
-    return;
-  }
+  if (!Number.isFinite(totalNaira) || totalNaira <= 0) { hideLoadingOverlay(); alert('Invalid total. Please refresh and try again.'); return; }
 
   const totalKobo = Math.round(totalNaira * 100);
   const metadata  = {
@@ -854,52 +1113,46 @@ async function initiatePaystackPayment() {
 
   fetch(`${API_BASE_URL}/api/payment/initialize`, {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...authHeaders() },
     body:    JSON.stringify({ email, amount: totalNaira, metadata }),
   })
     .then(r => { if (!r.ok) throw new Error(`Initialize failed (HTTP ${r.status})`); return r.json(); })
     .then(init => {
-      if (!init?.success || !init?.access_code) {
-        throw new Error(init?.message || 'Failed to initialize transaction');
-      }
-      if (init.public_key && init.public_key.startsWith('pk_')) {
-        PAYSTACK_PUBLIC_KEY = init.public_key;
-      }
+      if (!init?.success || !init?.access_code) throw new Error(init?.message || 'Failed to initialize transaction');
+      if (init.public_key && init.public_key.startsWith('pk_')) PAYSTACK_PUBLIC_KEY = init.public_key;
       hideLoadingOverlay();
 
       const handler = PaystackPop.setup({
-        key:         PAYSTACK_PUBLIC_KEY,
-        email,
-        amount:      totalKobo,
-        currency:    'NGN',
-        access_code: init.access_code,
-        ref:         init.reference,
-        metadata,
+        key: PAYSTACK_PUBLIC_KEY, email, amount: totalKobo, currency: 'NGN',
+        access_code: init.access_code, ref: init.reference, metadata,
         callback: function (response) {
           showLoadingOverlay('Verifying your payment…');
           const timeoutId = setTimeout(() => {
             hideLoadingOverlay();
-            alert('⏱️ Payment verification is taking longer than expected. Your payment was received. Please check your email for confirmation or contact support with reference: ' + response.reference);
+            alert('⏱️ Verification taking longer than expected. Check your email for confirmation.\nReference: ' + response.reference);
           }, 90000);
 
           fetch(`${API_BASE_URL}/api/payment/verify`, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body:    JSON.stringify({ reference: response.reference }),
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...authHeaders() },
+            body:   JSON.stringify({ reference: response.reference }),
           })
             .then(r => { clearTimeout(timeoutId); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
             .then(data => {
               hideLoadingOverlay();
               if (data.success) {
-                alert('✅ Payment successful! Order confirmed. Check your email for details.');
-                cart = [];
-                localStorage.setItem('cart', JSON.stringify(cart));
-                if (customerNameInput)   customerNameInput.value   = '';
-                if (customerEmailInput)  customerEmailInput.value  = '';
+                cart = []; localStorage.setItem('cart', JSON.stringify(cart));
                 if (customerPhoneInput)  customerPhoneInput.value  = '';
+                if (!currentUser) {
+                  if (customerNameInput)   customerNameInput.value   = '';
+                  if (customerEmailInput)  customerEmailInput.value  = '';
+                }
                 if (shippingStateSelect) shippingStateSelect.value = '';
                 updateCartUI();
                 closeCartModal();
+                showToast('✅ Payment successful! Check your email for your receipt.', 'success');
+                // Auto-open order history for logged-in users
+                if (currentUser) setTimeout(openOrderHistory, 800);
               } else {
                 alert('⚠️ Payment verification failed: ' + (data.message || 'Unknown error'));
               }
@@ -912,151 +1165,88 @@ async function initiatePaystackPayment() {
     })
     .catch(err => {
       hideLoadingOverlay();
-      alert(
-        '❌ Could not start payment: ' + (err?.message || 'Unknown error') +
-        '\n\nPossible causes:\n' +
-        '• Backend server is still waking up (wait 30 s and retry)\n' +
-        '• PAYSTACK_SECRET_KEY missing in server environment\n' +
-        '• Public/Secret key mode mismatch (test vs live)'
-      );
+      alert('❌ Could not start payment: ' + (err?.message || 'Unknown error') + '\n\nPossible causes:\n• Backend still waking up (wait 30s)\n• PAYSTACK_SECRET_KEY missing in server env');
     });
 }
 
-// ================================================================
-// 14) CORE FIX — fetchProductsWithRetry
-// ================================================================
-/**
- * Tries GET /api/products up to MAX_RETRIES times.
- * Between failures it waits RETRY_DELAYS[i] ms and updates the
- * loading UI so the user can see progress.
- *
- * Returns the products array on success, or null on total failure.
- */
+// ─────────────────────────────────────────────────────────────────────
+// FETCH PRODUCTS WITH RETRY (unchanged)
+// ─────────────────────────────────────────────────────────────────────
 async function fetchProductsWithRetry() {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-
-    // Update UI message for this attempt
-    if (attempt === 1) {
-      showProductsLoading('idle');
-    } else if (attempt === 2) {
-      showProductsLoading('waking');
-    } else {
-      showProductsLoading('retrying', { attempt, maxRetries: MAX_RETRIES });
-    }
+    if (attempt === 1)      showProductsLoading('idle');
+    else if (attempt === 2) showProductsLoading('waking');
+    else                    showProductsLoading('retrying', { attempt, maxRetries: MAX_RETRIES });
 
     const controller = new AbortController();
     const timerId    = setTimeout(() => controller.abort(), PER_ATTEMPT_TIMEOUT_MS);
-
     try {
-      const response = await fetch(`${API_BASE_URL}/api/products`, {
-        cache:  'no-store',
-        signal: controller.signal,
-      });
+      const response = await fetch(`${API_BASE_URL}/api/products`, { cache: 'no-store', signal: controller.signal });
       clearTimeout(timerId);
-
       if (response.ok) {
-        const data = await response.json();
-        let found = null;
-        if (data.success && Array.isArray(data.data) && data.data.length) {
-          found = data.data;
-        } else if (Array.isArray(data) && data.length) {
-          found = data;
-        }
-        if (found) {
-          console.log(`✅ Products loaded on attempt ${attempt}`);
-          return found;
-        }
-        // Response ok but empty — treat as failure and retry
-        console.warn(`⚠️ Attempt ${attempt}: backend returned empty product list`);
-      } else {
-        console.warn(`⚠️ Attempt ${attempt}: HTTP ${response.status}`);
-      }
+        const data  = await response.json();
+        let found   = null;
+        if (data.success && Array.isArray(data.data) && data.data.length) found = data.data;
+        else if (Array.isArray(data) && data.length) found = data;
+        if (found) { console.log(`✅ Products loaded on attempt ${attempt}`); return found; }
+        console.warn(`⚠️ Attempt ${attempt}: empty product list`);
+      } else { console.warn(`⚠️ Attempt ${attempt}: HTTP ${response.status}`); }
     } catch (err) {
       clearTimeout(timerId);
-      if (err.name === 'AbortError') {
-        console.warn(`⏱️ Attempt ${attempt}: timed out after ${PER_ATTEMPT_TIMEOUT_MS / 1000}s`);
-      } else {
-        console.warn(`⚠️ Attempt ${attempt}: ${err.message}`);
-      }
+      console.warn(`⚠️ Attempt ${attempt}:`, err.name === 'AbortError' ? 'timed out' : err.message);
     }
+    if (attempt < MAX_RETRIES) await sleep(RETRY_DELAYS[attempt - 1] || 10000);
+  }
+  return null;
+}
 
-    // If this was not the last attempt, wait before trying again
-    if (attempt < MAX_RETRIES) {
-      const delay = RETRY_DELAYS[attempt - 1] || 10000;
-      console.log(`⏳ Retrying in ${delay / 1000}s… (attempt ${attempt + 1}/${MAX_RETRIES})`);
-      await sleep(delay);
-    }
+function warmUpBackend() {
+  fetch(`${API_BASE_URL}/health`, { cache: 'no-store', method: 'GET' }).catch(() => {});
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────────
+async function initializeApp() {
+  // Load persisted auth state
+  loadAuthState();
+  updateAuthUI();
+
+  // Init Google Sign-In (may be called again later if GIS not ready yet)
+  if (typeof google !== 'undefined') initGoogleSignIn();
+  else {
+    // GIS script loads async — poll until ready
+    const poll = setInterval(() => {
+      if (typeof google !== 'undefined' && google.accounts) { clearInterval(poll); initGoogleSignIn(); }
+    }, 300);
+    setTimeout(() => clearInterval(poll), 10000); // give up after 10s
   }
 
-  return null; // All retries exhausted
-}
-
-// ================================================================
-// 15) WARM-UP PING — silently kick Render awake the instant page loads
-// ================================================================
-/**
- * Fires a tiny request to /health as soon as the page starts.
- * Render begins booting the container immediately on the FIRST request,
- * so this reduces the delay by the time the actual /api/products call
- * arrives (since JS parsing + DOMContentLoaded takes ~1-2 s anyway).
- * This is fire-and-forget — we deliberately ignore errors.
- */
-function warmUpBackend() {
-  fetch(`${API_BASE_URL}/health`, {
-    cache:  'no-store',
-    method: 'GET',
-  }).catch(() => { /* intentionally silent */ });
-}
-
-// ================================================================
-// 16) INIT — cold-start-safe product loader
-// ================================================================
-async function initializeApp() {
-  // ── Step 1: Kick Render awake immediately (fire-and-forget) ──────────────
   warmUpBackend();
 
-  // ── Step 2: Try the backend with retries ─────────────────────────────────
   const fetched = await fetchProductsWithRetry();
-
   if (fetched) {
-    // ✅ Backend responded — use live DB products
     products = fetched;
-
   } else {
-    // ⚠️ All retries failed.
-    // Last resort: try products.json (useful only if you ever populate it
-    // as a static cache; safe to keep even when products.json doesn't exist).
-    console.warn('❌ Backend unreachable after all retries. Trying products.json fallback…');
+    console.warn('❌ Backend unreachable. Trying products.json fallback…');
     try {
       const fallbackResp = await fetch(getProductsJsonUrl(), { cache: 'no-store' });
       if (!fallbackResp.ok) throw new Error(`HTTP ${fallbackResp.status}`);
       const rawProducts = await fallbackResp.json();
       if (Array.isArray(rawProducts) && rawProducts.length) {
-        // products.json stores prices in KOBO → convert to NAIRA
         products = rawProducts.map(p => ({ ...p, price: (Number(p.price) || 0) / 100 }));
-        console.log('📦 Loaded products from products.json fallback');
-      } else {
-        throw new Error('products.json is empty');
-      }
+      } else throw new Error('products.json is empty');
     } catch (fallbackErr) {
-      console.error('❌ products.json fallback also failed:', fallbackErr.message);
+      console.error('❌ products.json fallback failed:', fallbackErr.message);
       products = [];
-
-      // Show the error state with a Retry button
-      showProductsLoading('error', {
-        retryFn: () => {
-          // Re-run the full init when the user clicks Retry
-          initializeApp();
-        },
-      });
+      showProductsLoading('error', { retryFn: () => initializeApp() });
       setupEventListeners();
       updateCartUI();
       setActiveFilterButton('all');
-      return; // Exit early — don't call displayProducts yet
+      return;
     }
   }
 
-  // ── Step 3: Render products ───────────────────────────────────────────────
   displayProducts(products);
   setupEventListeners();
   updateCartUI();
