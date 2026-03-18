@@ -981,6 +981,13 @@
       0%,100% { opacity:1; transform:scale(1); }
       50%      { opacity:.5; transform:scale(.7); }
     }
+    /* FIX: Cancelled status badge style */
+    #view-payments .status-cancelled {
+      background: #f3f4f6;
+      color: #374151;
+    }
+    #view-payments .status-cancelled::before { background: #9ca3af; }
+
     #view-payments .status-success {
       background: rgba(16,185,129,.1); color: #059669;
       border: 1.5px solid rgba(16,185,129,.25);
@@ -1610,7 +1617,7 @@
             <div class="stat-icon blue"><i class="fas fa-naira-sign"></i></div>
             <div class="stat-info">
               <div class="stat-value" id="payStatRevenue">₦0</div>
-              <div class="stat-label">Total Revenue</div>
+              <div class="stat-label">Revenue (Paid Only)</div>
             </div>
           </div>
         </div>
@@ -1626,6 +1633,7 @@
                 <option value="success">Success</option>
                 <option value="pending">Pending</option>
                 <option value="failed">Failed</option>
+                <option value="cancelled">Cancelled</option>
               </select>
             </div>
 
@@ -2767,11 +2775,12 @@ async function loadPayments(page = 1) {
     if (elTotal)   elTotal.textContent   = totalTx.toLocaleString();
     if (elSuccess) elSuccess.textContent = (stats.successCount || 0).toLocaleString();
     if (elPending) elPending.textContent = (stats.pendingCount || 0).toLocaleString();
-    if (elRevenue) elRevenue.textContent = fmt(stats.totalAmount || 0);
+    // FIX: Only count successful payments in revenue (not pending/cancelled)
+    if (elRevenue) elRevenue.textContent = fmt(stats.successAmount || 0);
 
     // Keep the dashboard total payments card updated if present
     const dashRevenue = document.getElementById('statRevenue');
-    if (dashRevenue) dashRevenue.textContent = fmt(stats.totalAmount || 0);
+    if (dashRevenue) dashRevenue.textContent = fmt(stats.successAmount || 0);
 
     // Update count label
     const txLabel = document.getElementById('txCountLabel');
@@ -2804,8 +2813,9 @@ async function loadPayments(page = 1) {
       if (cardList) cardList.innerHTML = '';
 
       payments.forEach(p => {
-        const statusClass = p.status === 'success' ? 'status-success' :
-                           p.status === 'pending' ? 'status-pending' : 'status-failed';
+        const statusClass = p.status === 'success'   ? 'status-success'   :
+                           p.status === 'pending'   ? 'status-pending'   :
+                           p.status === 'cancelled' ? 'status-cancelled' : 'status-failed';
         const customerName = p.metadata?.customer_name || 'N/A';
         const date = fmtDate(p.createdAt || p.paymentDate);
         const pid = p._id || '';
