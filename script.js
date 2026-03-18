@@ -1,5 +1,12 @@
 // =====================================================================
-// FortuneHub Frontend Script  v5 — Google Auth + Email/Password Auth
+// FortuneHub Frontend Script  v6 — Auth-Gated Checkout + Google OAuth Fixes
+//
+// ✅ FIXED in v6:
+//    • Purchase now REQUIRES sign-in (no guest checkout)
+//    • Google Sign-In: fixed isEmailVerified state & account conflicts
+//    • Email verification routes fixed (were dead code on backend)
+//    • Checkout button shows "Sign In to Checkout" for guests
+//    • Better error messages for Google account conflicts
 //
 // ✅ NEW in v5:
 //    • Google Sign-In via Google Identity Services (GIS)
@@ -304,8 +311,16 @@ async function handleGoogleCredential(response) {
       saveAuthState({ ...data.user, token: data.token });
       showToast(`Welcome, ${data.user.name}! 👋`, 'success');
       updateCartUI();
+      // Close cart if it was open (user signed in via cart prompt)
+      if (cartModal && cartModal.style.display === 'block') {
+        // Re-open auth modal is not needed — just update cart
+        updateCartUI();
+      }
     } else {
-      showToast('Google sign-in failed: ' + (data.message || 'Unknown error'), 'error');
+      // ✅ FIX: Show friendly Google sign-in error
+      const msg = data.message || 'Google sign-in failed. Please try again.';
+      showToast(msg, 'error');
+      openAuthModal('signin');
     }
   } catch (err) {
     hideLoadingOverlay();
@@ -350,9 +365,13 @@ async function handleEmailSignIn(e) {
       updateCartUI();
     } else {
       if (data && data.requiresVerification) {
-        pendingVerifyEmail = email;
-        showVerifyEmailForm(email);
+        pendingVerifyEmail = data.email || email;
+        showVerifyEmailForm(data.email || email);
         showToast(data.message || 'Please verify your email.', 'info');
+      } else if (data && data.isGoogleAccount) {
+        // ✅ FIX: This email was registered via Google — guide user to Google sign-in
+        document.getElementById('siGeneralError').textContent = data.message || 'Please sign in with Google.';
+        showToast('This email uses Google Sign-In. Click "Continue with Google" below. 👆', 'info');
       } else {
         document.getElementById('siGeneralError').textContent = data.message || 'Sign in failed';
       }
@@ -404,7 +423,18 @@ async function handleEmailSignUp(e) {
       showVerifyEmailForm(email);
       showToast(data.message || 'Verification code sent. Check your email.', 'info');
     } else {
-      document.getElementById('suGeneralError').textContent = data.message || 'Sign up failed';
+      if (data && data.isGoogleAccount) {
+        // ✅ FIX: This email was registered via Google — guide user to Google sign-in
+        document.getElementById('suGeneralError').textContent = data.message || 'Please sign in with Google.';
+        showToast('This email uses Google Sign-In. Click "Continue with Google" below. 👆', 'info');
+      } else if (data && data.requiresVerification) {
+        // Account exists but is unverified — show verify form
+        pendingVerifyEmail = data.email || email;
+        showVerifyEmailForm(data.email || email);
+        showToast('Your account exists but is not verified yet. Please enter the code from your email.', 'info');
+      } else {
+        document.getElementById('suGeneralError').textContent = data.message || 'Sign up failed';
+      }
     }
   } catch {
     document.getElementById('suGeneralError').textContent = 'Network error. Please try again.';
@@ -771,13 +801,21 @@ function updateCartUI() {
   if (cartTotalElement)         cartTotalElement.textContent         = formatCurrency(grandTotal);
 
   if (checkoutButton) {
-    const valid = validateCustomerInfo({ silent: true });
-    if (!valid) {
-      checkoutButton.disabled = true;
-      checkoutButton.innerHTML = '<i class="fas fa-info-circle"></i> Complete Info to Continue';
-    } else {
+    if (!currentUser) {
+      // ✅ FIX: Show sign-in prompt when user is not logged in
       checkoutButton.disabled = false;
-      checkoutButton.innerHTML = '<i class="fas fa-credit-card"></i> Proceed to Checkout';
+      checkoutButton.innerHTML = '<i class="fas fa-lock"></i> Sign In to Checkout';
+      checkoutButton.classList.add('btn-signin-required');
+    } else {
+      checkoutButton.classList.remove('btn-signin-required');
+      const valid = validateCustomerInfo({ silent: true });
+      if (!valid) {
+        checkoutButton.disabled = true;
+        checkoutButton.innerHTML = '<i class="fas fa-info-circle"></i> Complete Info to Continue';
+      } else {
+        checkoutButton.disabled = false;
+        checkoutButton.innerHTML = '<i class="fas fa-credit-card"></i> Proceed to Checkout';
+      }
     }
   }
 }
@@ -1140,9 +1178,18 @@ function closeCartModal() {
 // ─────────────────────────────────────────────────────────────────────
 async function initiatePaystackPayment() {
   if (cart.length === 0) { alert('Your cart is empty.'); return; }
-  // ✅ Guest checkout supported: use guest fields when logged out
-  const name  = currentUser ? currentUser.name  : (customerNameInput?.value || '').trim();
-  const email = currentUser ? currentUser.email : (customerEmailInput?.value || '').trim();
+
+  // ✅ FIX: Require sign-in before checkout
+  if (!currentUser) {
+    closeCartModal();
+    showToast('Please sign in to complete your purchase. 🔒', 'info');
+    openAuthModal('signin');
+    return;
+  }
+
+  // Logged in — use profile data
+  const name  = currentUser.name;
+  const email = currentUser.email;
   const phone = (customerPhoneInput?.value || '').trim();
 
   if (!validateCustomerInfo()) { alert('Please complete all required information correctly.'); return; }
