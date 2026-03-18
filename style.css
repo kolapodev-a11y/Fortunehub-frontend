@@ -768,3 +768,37 @@ img { max-width:100%; display:block; }
   color: #595959;
   margin-top: 10px;
 }
+/* Checkout button states */
+#checkoutButton:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #6c757d !important;
+}
+
+#checkoutButton:not(:disabled) {
+    background: var(--brand-blue) !important;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(29, 35, 134, 0.4); }
+    50% { box-shadow: 0 0 0 10px rgba(29, 35, 134, 0); }
+}
+
+/* Required field indicator */
+.required-field::after {
+    content: ' *';
+    color: var(--danger);
+}
+
+/* Form validation styles */
+.form-input.invalid {
+    border-color: var(--danger);
+    animation: shake 0.3s;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
