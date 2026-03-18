@@ -59,6 +59,7 @@ let _pendingPaymentRef = null;  // set when Paystack popup opens, cleared on ver
 // ✅ AUTH STATE
 // ─────────────────────────────────────────────────────────────────────
 let currentUser = null; // { id, name, email, picture, phone, token, authProvider }
+let pendingVerifyEmail = null;
 
 function loadAuthState() {
   try {
@@ -138,6 +139,15 @@ const tabSignIn                = document.getElementById('tabSignIn');
 const tabSignUp                = document.getElementById('tabSignUp');
 const signInForm               = document.getElementById('signInForm');
 const signUpForm               = document.getElementById('signUpForm');
+
+// Verify / Forgot forms
+const verifyEmailForm          = document.getElementById('verifyEmailForm');
+const forgotPasswordForm       = document.getElementById('forgotPasswordForm');
+const veEmailText              = document.getElementById('veEmailText');
+const resendVerificationBtn     = document.getElementById('resendVerificationBtn');
+const backToSignInBtn           = document.getElementById('backToSignInBtn');
+const forgotPasswordLink        = document.getElementById('forgotPasswordLink');
+const fpBackBtn                 = document.getElementById('fpBackBtn');
 
 // Cart auth elements
 const authUserBanner           = document.getElementById('authUserBanner');
@@ -339,7 +349,13 @@ async function handleEmailSignIn(e) {
       showToast(`Welcome back, ${data.user.name}! 👋`, 'success');
       updateCartUI();
     } else {
-      document.getElementById('siGeneralError').textContent = data.message || 'Sign in failed';
+      if (data && data.requiresVerification) {
+        pendingVerifyEmail = email;
+        showVerifyEmailForm(email);
+        showToast(data.message || 'Please verify your email.', 'info');
+      } else {
+        document.getElementById('siGeneralError').textContent = data.message || 'Sign in failed';
+      }
     }
   } catch {
     document.getElementById('siGeneralError').textContent = 'Network error. Please try again.';
@@ -355,16 +371,20 @@ async function handleEmailSignUp(e) {
   const name     = document.getElementById('suName')?.value.trim()  || '';
   const email    = document.getElementById('suEmail')?.value.trim() || '';
   const password = document.getElementById('suPassword')?.value     || '';
+  const confirm  = document.getElementById('suConfirmPassword')?.value || '';
 
   document.getElementById('suNameError').textContent     = '';
   document.getElementById('suEmailError').textContent    = '';
   document.getElementById('suPasswordError').textContent = '';
+  const cpErr = document.getElementById('suConfirmPasswordError');
+  if (cpErr) cpErr.textContent = '';
   document.getElementById('suGeneralError').textContent  = '';
 
   let valid = true;
   if (!name || name.length < 2)                     { document.getElementById('suNameError').textContent     = 'Enter your full name'; valid = false; }
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { document.getElementById('suEmailError').textContent    = 'Enter a valid email'; valid = false; }
   if (!password || password.length < 6)             { document.getElementById('suPasswordError').textContent = 'Password must be at least 6 characters'; valid = false; }
+  if (!confirm || confirm !== password) { const el = document.getElementById('suConfirmPasswordError'); if (el) el.textContent = 'Passwords do not match'; valid = false; }
   if (!valid) return;
 
   document.getElementById('suSubmitText').style.display   = 'none';
@@ -375,15 +395,14 @@ async function handleEmailSignUp(e) {
     const res  = await fetch(`${API_BASE_URL}/api/auth/signup`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ name, email, password }),
+      body:    JSON.stringify({ name, email, password, confirmPassword: confirm }),
     });
     const data = await res.json();
 
     if (data.success) {
-      closeAuthModal_fn();
-      saveAuthState({ ...data.user, token: data.token });
-      showToast(`Account created! Welcome, ${data.user.name}! 🎉`, 'success');
-      updateCartUI();
+      pendingVerifyEmail = email;
+      showVerifyEmailForm(email);
+      showToast(data.message || 'Verification code sent. Check your email.', 'info');
     } else {
       document.getElementById('suGeneralError').textContent = data.message || 'Sign up failed';
     }
@@ -408,6 +427,33 @@ function signOut() {
   updateCartUI();
 }
 
+
+
+// ─────────────────────────────────────────────────────────────────────
+// ✅ VERIFY EMAIL + FORGOT PASSWORD UI HELPERS
+// ─────────────────────────────────────────────────────────────────────
+function showVerifyEmailForm(email) {
+  if (tabSignIn) tabSignIn.classList.remove('active');
+  if (tabSignUp) tabSignUp.classList.remove('active');
+  if (signInForm) signInForm.style.display = 'none';
+  if (signUpForm) signUpForm.style.display = 'none';
+  if (forgotPasswordForm) forgotPasswordForm.style.display = 'none';
+  if (verifyEmailForm) verifyEmailForm.style.display = 'block';
+  if (veEmailText) veEmailText.textContent = email || '';
+  const code = document.getElementById('veCode');
+  if (code) code.value = '';
+}
+
+function showForgotPasswordForm(prefillEmail = '') {
+  if (tabSignIn) tabSignIn.classList.remove('active');
+  if (tabSignUp) tabSignUp.classList.remove('active');
+  if (signInForm) signInForm.style.display = 'none';
+  if (signUpForm) signUpForm.style.display = 'none';
+  if (verifyEmailForm) verifyEmailForm.style.display = 'none';
+  if (forgotPasswordForm) forgotPasswordForm.style.display = 'block';
+  const fpEmail = document.getElementById('fpEmail');
+  if (fpEmail && prefillEmail) fpEmail.value = prefillEmail;
+}
 // ─────────────────────────────────────────────────────────────────────
 // ✅ AUTH MODAL
 // ─────────────────────────────────────────────────────────────────────
@@ -425,7 +471,7 @@ function closeAuthModal_fn() {
   authModal.style.display = 'none';
   document.body.style.overflow = 'auto';
   // Clear form errors
-  ['siEmailError','siPasswordError','siGeneralError','suNameError','suEmailError','suPasswordError','suGeneralError']
+  ['siEmailError','siPasswordError','siGeneralError','suNameError','suEmailError','suPasswordError','suConfirmPasswordError','suGeneralError','veCodeError','veGeneralError','fpEmailError','fpGeneralError']
     .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
 }
 
@@ -434,11 +480,15 @@ function switchAuthTab(tab) {
     tabSignIn?.classList.add('active');
     tabSignUp?.classList.remove('active');
     if (signInForm) signInForm.style.display = 'block';
+    if (verifyEmailForm) verifyEmailForm.style.display = 'none';
+    if (forgotPasswordForm) forgotPasswordForm.style.display = 'none';
     if (signUpForm) signUpForm.style.display = 'none';
   } else {
     tabSignUp?.classList.add('active');
     tabSignIn?.classList.remove('active');
     if (signUpForm) signUpForm.style.display = 'block';
+    if (verifyEmailForm) verifyEmailForm.style.display = 'none';
+    if (forgotPasswordForm) forgotPasswordForm.style.display = 'none';
     if (signInForm) signInForm.style.display = 'none';
   }
 }
@@ -1040,6 +1090,12 @@ function setupEventListeners() {
   tabSignUp?.addEventListener('click', () => switchAuthTab('signup'));
   signInForm?.addEventListener('submit', handleEmailSignIn);
   signUpForm?.addEventListener('submit', handleEmailSignUp);
+  verifyEmailForm?.addEventListener('submit', handleVerifyEmailCode);
+  forgotPasswordForm?.addEventListener('submit', handleForgotPassword);
+  forgotPasswordLink?.addEventListener('click', () => showForgotPasswordForm(document.getElementById('siEmail')?.value.trim() || ''));
+  resendVerificationBtn?.addEventListener('click', resendVerificationCode);
+  backToSignInBtn?.addEventListener('click', () => switchAuthTab('signin'));
+  fpBackBtn?.addEventListener('click', () => switchAuthTab('signin'));
 
   userAvatarBtn?.addEventListener('click', e => { e.stopPropagation(); toggleDropdown(); });
   signOutBtn?.addEventListener('click', signOut);
@@ -1084,19 +1140,9 @@ function closeCartModal() {
 // ─────────────────────────────────────────────────────────────────────
 async function initiatePaystackPayment() {
   if (cart.length === 0) { alert('Your cart is empty.'); return; }
-
-  // ✅ FIX: Require login before purchase — open auth modal if not logged in
-  if (!currentUser) {
-    // Close cart modal temporarily and open auth modal
-    closeCartModal();
-    showToast('Please sign in to complete your purchase.', 'info');
-    openAuthModal('signin');
-    return;
-  }
-
-  // Resolve name + email from auth (user is now guaranteed to be logged in)
-  const name  = currentUser.name;
-  const email = currentUser.email;
+  // ✅ Guest checkout supported: use guest fields when logged out
+  const name  = currentUser ? currentUser.name  : (customerNameInput?.value || '').trim();
+  const email = currentUser ? currentUser.email : (customerEmailInput?.value || '').trim();
   const phone = (customerPhoneInput?.value || '').trim();
 
   if (!validateCustomerInfo()) { alert('Please complete all required information correctly.'); return; }
@@ -1281,3 +1327,127 @@ async function initializeApp() {
 }
 
 document.addEventListener('DOMContentLoaded', initializeApp);
+
+
+// ─────────────────────────────────────────────────────────────────────
+// ✅ VERIFY EMAIL (CODE)
+// ─────────────────────────────────────────────────────────────────────
+async function handleVerifyEmailCode(e) {
+  e.preventDefault();
+  const email = (pendingVerifyEmail || '').trim();
+  const code  = document.getElementById('veCode')?.value.trim() || '';
+
+  const err = document.getElementById('veCodeError');
+  const gen = document.getElementById('veGeneralError');
+  if (err) err.textContent = '';
+  if (gen) gen.textContent = '';
+
+  if (!email) {
+    if (gen) gen.textContent = 'Missing email for verification. Please sign up again.';
+    return;
+  }
+  if (!/^\d{6}$/.test(code)) {
+    if (err) err.textContent = 'Enter the 6-digit code.';
+    return;
+  }
+
+  const t = document.getElementById('veSubmitText');
+  const l = document.getElementById('veSubmitLoader');
+  const b = document.getElementById('veSubmitBtn');
+  if (t) t.style.display = 'none';
+  if (l) l.style.display = 'inline-flex';
+  if (b) b.disabled = true;
+
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/verify-email-code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ email, code })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      showToast('Email verified! Please sign in.', 'success');
+      const siEmail = document.getElementById('siEmail');
+      if (siEmail) siEmail.value = email;
+      pendingVerifyEmail = null;
+      switchAuthTab('signin');
+    } else {
+      if (gen) gen.textContent = data.message || 'Verification failed.';
+    }
+  } catch {
+    if (gen) gen.textContent = 'Network error. Please try again.';
+  } finally {
+    if (t) t.style.display = 'inline';
+    if (l) l.style.display = 'none';
+    if (b) b.disabled = false;
+  }
+}
+
+async function resendVerificationCode() {
+  const email = (pendingVerifyEmail || '').trim();
+  const gen = document.getElementById('veGeneralError');
+  if (gen) gen.textContent = '';
+  if (!email) { if (gen) gen.textContent = 'Missing email. Please sign up again.'; return; }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/resend-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (data.success) showToast('Verification code sent again. Check your email.', 'info');
+    else if (gen) gen.textContent = data.message || 'Could not resend.';
+  } catch {
+    if (gen) gen.textContent = 'Network error. Please try again.';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ✅ FORGOT PASSWORD
+// ─────────────────────────────────────────────────────────────────────
+async function handleForgotPassword(e) {
+  e.preventDefault();
+  const email = document.getElementById('fpEmail')?.value.trim() || '';
+  const eErr  = document.getElementById('fpEmailError');
+  const gen   = document.getElementById('fpGeneralError');
+  if (eErr) eErr.textContent = '';
+  if (gen)  gen.textContent  = '';
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (eErr) eErr.textContent = 'Enter a valid email.';
+    return;
+  }
+
+  const t = document.getElementById('fpSubmitText');
+  const l = document.getElementById('fpSubmitLoader');
+  const b = document.getElementById('fpSubmitBtn');
+  if (t) t.style.display = 'none';
+  if (l) l.style.display = 'inline-flex';
+  if (b) b.disabled = true;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('If that email exists, a reset link/code has been sent.', 'info');
+      switchAuthTab('signin');
+      const siEmail = document.getElementById('siEmail');
+      if (siEmail) siEmail.value = email;
+    } else {
+      if (gen) gen.textContent = data.message || 'Could not send reset email.';
+    }
+  } catch {
+    if (gen) gen.textContent = 'Network error. Please try again.';
+  } finally {
+    if (t) t.style.display = 'inline';
+    if (l) l.style.display = 'none';
+    if (b) b.disabled = false;
+  }
+}

@@ -330,6 +330,9 @@
           </div>
           <small id="siPasswordError" class="error-msg"></small>
         </div>
+        <div class=\"auth-helper-links\">
+          <button type=\"button\" class=\"auth-link-btn\" id=\"forgotPasswordLink\">Forgot password?</button>
+        </div>
         <small id="siGeneralError" class="error-msg" style="display:block;margin-bottom:10px;"></small>
         <button type="submit" class="btn btn-auth-submit" id="siSubmitBtn">
           <span id="siSubmitText"><i class="fas fa-sign-in-alt"></i> Sign In</span>
@@ -359,12 +362,69 @@
           </div>
           <small id="suPasswordError" class="error-msg"></small>
         </div>
+
+<div class="form-group">
+  <label for="suConfirmPassword">Confirm Password</label>
+  <div class="password-wrap">
+    <input type="password" id="suConfirmPassword" class="form-input" placeholder="Re-enter password" required />
+    <button type="button" class="toggle-pw" data-target="suConfirmPassword" aria-label="Show/hide password">
+      <i class="fas fa-eye"></i>
+    </button>
+  </div>
+  <small id="suConfirmPasswordError" class="error-msg"></small>
+</div>
+
         <small id="suGeneralError" class="error-msg" style="display:block;margin-bottom:10px;"></small>
         <button type="submit" class="btn btn-auth-submit" id="suSubmitBtn">
           <span id="suSubmitText"><i class="fas fa-user-plus"></i> Create Account</span>
           <span id="suSubmitLoader" style="display:none;"><div class="btn-spinner"></div> Creating…</span>
         </button>
-      </form>
+      
+
+<!-- VERIFY EMAIL FORM (shown after signup) -->
+<form id="verifyEmailForm" class="auth-form" novalidate style="display:none;">
+  <div class="auth-verify-note">
+    <strong>Verify your email</strong>
+    <p>We sent a 6-digit verification code to <span id="veEmailText"></span>. Enter it below or use the verification link in your email.</p>
+  </div>
+  <div class="form-group">
+    <label for="veCode">Verification Code</label>
+    <input type="text" id="veCode" class="form-input" placeholder="e.g. 123456" inputmode="numeric" autocomplete="one-time-code" required />
+    <small id="veCodeError" class="error-msg"></small>
+  </div>
+  <small id="veGeneralError" class="error-msg" style="display:block;margin-bottom:10px;"></small>
+  <button type="submit" class="btn btn-auth-submit" id="veSubmitBtn">
+    <span id="veSubmitText"><i class="fas fa-shield-check"></i> Verify Email</span>
+    <span id="veSubmitLoader" style="display:none;"><div class="btn-spinner"></div> Verifying…</span>
+  </button>
+  <div class="auth-helper-links" style="margin-top:12px;">
+    <button type="button" class="auth-link-btn" id="resendVerificationBtn">Resend code</button>
+    <button type="button" class="auth-link-btn" id="backToSignInBtn">Back to sign in</button>
+  </div>
+</form>
+
+<!-- FORGOT PASSWORD FORM -->
+<form id="forgotPasswordForm" class="auth-form" novalidate style="display:none;">
+  <div class="auth-verify-note">
+    <strong>Reset your password</strong>
+    <p>Enter your email address. We'll send a reset code + link.</p>
+  </div>
+  <div class="form-group">
+    <label for="fpEmail">Email Address</label>
+    <input type="email" id="fpEmail" class="form-input" placeholder="you@example.com" autocomplete="email" required />
+    <small id="fpEmailError" class="error-msg"></small>
+  </div>
+  <small id="fpGeneralError" class="error-msg" style="display:block;margin-bottom:10px;"></small>
+  <button type="submit" class="btn btn-auth-submit" id="fpSubmitBtn">
+    <span id="fpSubmitText"><i class="fas fa-paper-plane"></i> Send reset email</span>
+    <span id="fpSubmitLoader" style="display:none;"><div class="btn-spinner"></div> Sending…</span>
+  </button>
+  <div class="auth-helper-links" style="margin-top:12px;">
+    <button type="button" class="auth-link-btn" id="fpBackBtn">Back</button>
+  </div>
+</form>
+
+</form>
     </div>
   </div>
 
