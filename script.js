@@ -1,6 +1,5 @@
 // =====================================================================
-// FortuneHub Frontend Script  v6 — No Email Verification, No Forgot Password,
-// Dedicated /checkout page, Login required for purchase
+// FortuneHub Frontend Script  v5 — Google Auth + Email/Password Auth
 //
 // ✅ NEW in v5:
 //    • Google Sign-In via Google Identity Services (GIS)
@@ -60,7 +59,6 @@ let _pendingPaymentRef = null;  // set when Paystack popup opens, cleared on ver
 // ✅ AUTH STATE
 // ─────────────────────────────────────────────────────────────────────
 let currentUser = null; // { id, name, email, picture, phone, token, authProvider }
-// ✅ v6: pendingVerifyEmail removed (no email verification)
 
 function loadAuthState() {
   try {
@@ -140,8 +138,6 @@ const tabSignIn                = document.getElementById('tabSignIn');
 const tabSignUp                = document.getElementById('tabSignUp');
 const signInForm               = document.getElementById('signInForm');
 const signUpForm               = document.getElementById('signUpForm');
-
-// ✅ v6: verifyEmailForm, forgotPasswordForm DOM refs removed (features removed)
 
 // Cart auth elements
 const authUserBanner           = document.getElementById('authUserBanner');
@@ -343,7 +339,6 @@ async function handleEmailSignIn(e) {
       showToast(`Welcome back, ${data.user.name}! 👋`, 'success');
       updateCartUI();
     } else {
-      // ✅ v6: No email verification step — show error directly
       document.getElementById('siGeneralError').textContent = data.message || 'Sign in failed';
     }
   } catch {
@@ -360,20 +355,16 @@ async function handleEmailSignUp(e) {
   const name     = document.getElementById('suName')?.value.trim()  || '';
   const email    = document.getElementById('suEmail')?.value.trim() || '';
   const password = document.getElementById('suPassword')?.value     || '';
-  const confirm  = document.getElementById('suConfirmPassword')?.value || '';
 
   document.getElementById('suNameError').textContent     = '';
   document.getElementById('suEmailError').textContent    = '';
   document.getElementById('suPasswordError').textContent = '';
-  const cpErr = document.getElementById('suConfirmPasswordError');
-  if (cpErr) cpErr.textContent = '';
   document.getElementById('suGeneralError').textContent  = '';
 
   let valid = true;
   if (!name || name.length < 2)                     { document.getElementById('suNameError').textContent     = 'Enter your full name'; valid = false; }
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { document.getElementById('suEmailError').textContent    = 'Enter a valid email'; valid = false; }
   if (!password || password.length < 6)             { document.getElementById('suPasswordError').textContent = 'Password must be at least 6 characters'; valid = false; }
-  if (!confirm || confirm !== password) { const el = document.getElementById('suConfirmPasswordError'); if (el) el.textContent = 'Passwords do not match'; valid = false; }
   if (!valid) return;
 
   document.getElementById('suSubmitText').style.display   = 'none';
@@ -384,23 +375,15 @@ async function handleEmailSignUp(e) {
     const res  = await fetch(`${API_BASE_URL}/api/auth/signup`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ name, email, password, confirmPassword: confirm }),
+      body:    JSON.stringify({ name, email, password }),
     });
     const data = await res.json();
 
     if (data.success) {
-      // ✅ v6: No email verification — auto-login if token returned, else prompt signin
-      if (data.token && data.user) {
-        closeAuthModal_fn();
-        saveAuthState({ ...data.user, token: data.token });
-        showToast(`Welcome, ${data.user.name}! 👋`, 'success');
-        updateCartUI();
-      } else {
-        // Backend created account but didn't return token — prompt sign in
-        closeAuthModal_fn();
-        showToast('Account created successfully! Please sign in.', 'success');
-        setTimeout(() => openAuthModal('signin'), 400);
-      }
+      closeAuthModal_fn();
+      saveAuthState({ ...data.user, token: data.token });
+      showToast(`Account created! Welcome, ${data.user.name}! 🎉`, 'success');
+      updateCartUI();
     } else {
       document.getElementById('suGeneralError').textContent = data.message || 'Sign up failed';
     }
@@ -425,9 +408,6 @@ function signOut() {
   updateCartUI();
 }
 
-
-
-// ✅ v6: showVerifyEmailForm + showForgotPasswordForm removed (features removed)
 // ─────────────────────────────────────────────────────────────────────
 // ✅ AUTH MODAL
 // ─────────────────────────────────────────────────────────────────────
@@ -445,7 +425,7 @@ function closeAuthModal_fn() {
   authModal.style.display = 'none';
   document.body.style.overflow = 'auto';
   // Clear form errors
-  ['siEmailError','siPasswordError','siGeneralError','suNameError','suEmailError','suPasswordError','suConfirmPasswordError','suGeneralError']
+  ['siEmailError','siPasswordError','siGeneralError','suNameError','suEmailError','suPasswordError','suGeneralError']
     .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
 }
 
@@ -741,17 +721,13 @@ function updateCartUI() {
   if (cartTotalElement)         cartTotalElement.textContent         = formatCurrency(grandTotal);
 
   if (checkoutButton) {
-    if (!currentUser) {
-      // ✅ v6: Not logged in — show login-required message
+    const valid = validateCustomerInfo({ silent: true });
+    if (!valid) {
       checkoutButton.disabled = true;
-      checkoutButton.innerHTML = '<i class="fas fa-lock"></i> Sign In to Checkout';
-    } else if (cart.length === 0) {
-      checkoutButton.disabled = true;
-      checkoutButton.innerHTML = '<i class="fas fa-shopping-bag"></i> Proceed to Checkout';
+      checkoutButton.innerHTML = '<i class="fas fa-info-circle"></i> Complete Info to Continue';
     } else {
-      // Logged in + has items → enable checkout navigation
       checkoutButton.disabled = false;
-      checkoutButton.innerHTML = '<i class="fas fa-shopping-bag"></i> Proceed to Checkout';
+      checkoutButton.innerHTML = '<i class="fas fa-credit-card"></i> Proceed to Checkout';
     }
   }
 }
@@ -791,22 +767,43 @@ function removeItem(productId) {
 // ✅ VALIDATION — aware of auth state
 // ─────────────────────────────────────────────────────────────────────
 function validateCustomerInfo({ silent = false } = {}) {
-  // ✅ v6: Login required — guests cannot checkout
-  // Cart modal just shows items & subtotal; actual checkout happens on /checkout page
-  // This function only validates for logged-in users in the cart summary display
   let isValid = true;
   if (nameError)  nameError.style.display  = 'none';
   if (emailError) emailError.style.display = 'none';
   if (phoneError) phoneError.style.display = 'none';
 
-  if (!currentUser) {
-    // Not logged in — checkout button stays disabled
-    return false;
+  const phone = (customerPhoneInput?.value || '').trim();
+
+  if (currentUser) {
+    // Logged in — only validate phone + state
+    const phoneRegex = /^(0[789][01])\d{8}$/;
+    if (!phone || !phoneRegex.test(phone)) {
+      if (!silent && phoneError) { phoneError.textContent = 'Enter a valid Nigerian WhatsApp number (e.g., 08031234567).'; phoneError.style.display = 'block'; }
+      isValid = false;
+    }
+  } else {
+    // Guest — validate all fields
+    const name  = (customerNameInput?.value  || '').trim();
+    const email = (customerEmailInput?.value || '').trim();
+
+    if (!name || name.length < 3 || name.includes('@') || name.includes('.')) {
+      if (!silent && nameError) { nameError.textContent = 'Please enter your full name (not email).'; nameError.style.display = 'block'; }
+      isValid = false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      if (!silent && emailError) { emailError.textContent = 'Enter a valid email (e.g., name@example.com).'; emailError.style.display = 'block'; }
+      isValid = false;
+    }
+    const phoneRegex = /^(0[789][01])\d{8}$/;
+    if (!phone || !phoneRegex.test(phone)) {
+      if (!silent && phoneError) { phoneError.textContent = 'Enter a valid Nigerian WhatsApp number (e.g., 08031234567).'; phoneError.style.display = 'block'; }
+      isValid = false;
+    }
   }
 
-  // Logged in — only validate phone + state (if provided in cart modal preview)
-  // Note: Full validation happens on the dedicated /checkout page
-  return true; // ✅ Allow "Proceed to Checkout" navigation for logged-in users
+  if (!(shippingStateSelect?.value || '')) isValid = false;
+  return isValid;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -1015,21 +1012,7 @@ function setupEventListeners() {
     }
   });
 
-  checkoutButton?.addEventListener('click', () => {
-    // ✅ v6: Login required — redirect to /checkout page
-    if (!currentUser) {
-      closeCartModal();
-      openAuthModal('signin');
-      return;
-    }
-    if (cart.length === 0) {
-      showToast('Your cart is empty.', 'info');
-      return;
-    }
-    // Navigate to dedicated checkout page
-    closeCartModal();
-    window.location.href = 'checkout.html';
-  });
+  checkoutButton?.addEventListener('click', initiatePaystackPayment);
 
   productsGrid?.addEventListener('click', e => {
     const target = e.target;
@@ -1057,13 +1040,12 @@ function setupEventListeners() {
   tabSignUp?.addEventListener('click', () => switchAuthTab('signup'));
   signInForm?.addEventListener('submit', handleEmailSignIn);
   signUpForm?.addEventListener('submit', handleEmailSignUp);
-  // ✅ v6: verifyEmailForm, forgotPasswordForm, resendVerificationBtn, fpBackBtn event listeners removed
 
   userAvatarBtn?.addEventListener('click', e => { e.stopPropagation(); toggleDropdown(); });
   signOutBtn?.addEventListener('click', signOut);
   viewHistoryBtn?.addEventListener('click', openOrderHistory);
   changeAccountBtn?.addEventListener('click', () => { closeCartModal(); openAuthModal('signin'); });
-  cartSignInPromptBtn?.addEventListener('click', () => { closeCartModal(); openAuthModal('signin'); }); // ✅ v6: login required to checkout
+  cartSignInPromptBtn?.addEventListener('click', () => { closeCartModal(); openAuthModal('signin'); });
 
   // Close order history + receipt modals
   closeOrderHistoryModal?.addEventListener('click', () => { orderHistoryModal.style.display = 'none'; document.body.style.overflow = 'auto'; });
@@ -1102,9 +1084,19 @@ function closeCartModal() {
 // ─────────────────────────────────────────────────────────────────────
 async function initiatePaystackPayment() {
   if (cart.length === 0) { alert('Your cart is empty.'); return; }
-  // ✅ Guest checkout supported: use guest fields when logged out
-  const name  = currentUser ? currentUser.name  : (customerNameInput?.value || '').trim();
-  const email = currentUser ? currentUser.email : (customerEmailInput?.value || '').trim();
+
+  // ✅ FIX: Require login before purchase — open auth modal if not logged in
+  if (!currentUser) {
+    // Close cart modal temporarily and open auth modal
+    closeCartModal();
+    showToast('Please sign in to complete your purchase.', 'info');
+    openAuthModal('signin');
+    return;
+  }
+
+  // Resolve name + email from auth (user is now guaranteed to be logged in)
+  const name  = currentUser.name;
+  const email = currentUser.email;
   const phone = (customerPhoneInput?.value || '').trim();
 
   if (!validateCustomerInfo()) { alert('Please complete all required information correctly.'); return; }
@@ -1289,8 +1281,3 @@ async function initializeApp() {
 }
 
 document.addEventListener('DOMContentLoaded', initializeApp);
-
-
-// ✅ v6: handleVerifyEmailCode + resendVerificationCode REMOVED (no email verification)
-
-// ✅ v6: handleForgotPassword REMOVED (no forgot password feature)
