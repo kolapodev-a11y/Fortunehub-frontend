@@ -235,23 +235,21 @@
           <button type="button" class="btn-change-account" id="changeAccountBtn">Change</button>
         </div>
 
-        <!-- Shown when user is NOT logged in -->
+        <!-- ✅ UPDATED: Login required — shown when user is NOT logged in -->
         <div id="guestFields">
-          <div class="form-group">
-            <label for="customerName"><i class="fas fa-user" aria-hidden="true"></i> Full Name</label>
-            <input type="text" id="customerName" class="form-input" placeholder="e.g. John Doe" autocomplete="name" required />
-            <small id="nameError" class="error-msg"></small>
-          </div>
-          <div class="form-group">
-            <label for="customerEmail"><i class="fas fa-envelope" aria-hidden="true"></i> Email Address</label>
-            <input type="email" id="customerEmail" class="form-input" placeholder="e.g. john@example.com" autocomplete="email" required />
-            <small id="emailError" class="error-msg"></small>
-            <small class="helper-text">We'll send your receipt and delivery updates here.</small>
-          </div>
-          <!-- Sign-in prompt inside cart -->
-          <div class="cart-signin-prompt">
-            <span><i class="fas fa-info-circle"></i> Already have an account?</span>
-            <button type="button" class="btn-inline-signin" id="cartSignInPromptBtn">Sign in to auto-fill</button>
+          <!-- Hidden inputs to keep JS DOM refs intact -->
+          <input type="text" id="customerName" style="display:none;" autocomplete="name" />
+          <input type="email" id="customerEmail" style="display:none;" autocomplete="email" />
+          <small id="nameError" class="error-msg"></small>
+          <small id="emailError" class="error-msg"></small>
+          <!-- Login required notice -->
+          <div class="cart-login-required">
+            <div class="cart-login-icon"><i class="fas fa-lock"></i></div>
+            <p><strong>Login required to checkout</strong></p>
+            <p style="font-size:0.88rem;color:#595959;margin:0 0 12px;">You must be signed in to place an order.</p>
+            <button type="button" class="btn-inline-signin" id="cartSignInPromptBtn">
+              <i class="fas fa-sign-in-alt"></i> Sign In / Create Account
+            </button>
           </div>
         </div>
 
@@ -288,7 +286,7 @@
         </div>
         <div class="cart-actions">
           <button id="checkoutButton" class="btn btn-tertiary" type="button">
-            <i class="fas fa-credit-card" aria-hidden="true"></i> Proceed to Checkout
+            <i class="fas fa-shopping-bag" aria-hidden="true"></i> Proceed to Checkout
           </button>
           <button id="continueShoppingButton" class="btn btn-secondary" type="button">Continue Shopping</button>
         </div>
@@ -329,9 +327,6 @@
             </button>
           </div>
           <small id="siPasswordError" class="error-msg"></small>
-        </div>
-        <div class=\"auth-helper-links\">
-          <button type=\"button\" class=\"auth-link-btn\" id=\"forgotPasswordLink\">Forgot password?</button>
         </div>
         <small id="siGeneralError" class="error-msg" style="display:block;margin-bottom:10px;"></small>
         <button type="submit" class="btn btn-auth-submit" id="siSubmitBtn">
@@ -381,48 +376,7 @@
         </button>
       
 
-<!-- VERIFY EMAIL FORM (shown after signup) -->
-<form id="verifyEmailForm" class="auth-form" novalidate style="display:none;">
-  <div class="auth-verify-note">
-    <strong>Verify your email</strong>
-    <p>We sent a 6-digit verification code to <span id="veEmailText"></span>. Enter it below or use the verification link in your email.</p>
-  </div>
-  <div class="form-group">
-    <label for="veCode">Verification Code</label>
-    <input type="text" id="veCode" class="form-input" placeholder="e.g. 123456" inputmode="numeric" autocomplete="one-time-code" required />
-    <small id="veCodeError" class="error-msg"></small>
-  </div>
-  <small id="veGeneralError" class="error-msg" style="display:block;margin-bottom:10px;"></small>
-  <button type="submit" class="btn btn-auth-submit" id="veSubmitBtn">
-    <span id="veSubmitText"><i class="fas fa-shield-check"></i> Verify Email</span>
-    <span id="veSubmitLoader" style="display:none;"><div class="btn-spinner"></div> Verifying…</span>
-  </button>
-  <div class="auth-helper-links" style="margin-top:12px;">
-    <button type="button" class="auth-link-btn" id="resendVerificationBtn">Resend code</button>
-    <button type="button" class="auth-link-btn" id="backToSignInBtn">Back to sign in</button>
-  </div>
-</form>
 
-<!-- FORGOT PASSWORD FORM -->
-<form id="forgotPasswordForm" class="auth-form" novalidate style="display:none;">
-  <div class="auth-verify-note">
-    <strong>Reset your password</strong>
-    <p>Enter your email address. We'll send a reset code + link.</p>
-  </div>
-  <div class="form-group">
-    <label for="fpEmail">Email Address</label>
-    <input type="email" id="fpEmail" class="form-input" placeholder="you@example.com" autocomplete="email" required />
-    <small id="fpEmailError" class="error-msg"></small>
-  </div>
-  <small id="fpGeneralError" class="error-msg" style="display:block;margin-bottom:10px;"></small>
-  <button type="submit" class="btn btn-auth-submit" id="fpSubmitBtn">
-    <span id="fpSubmitText"><i class="fas fa-paper-plane"></i> Send reset email</span>
-    <span id="fpSubmitLoader" style="display:none;"><div class="btn-spinner"></div> Sending…</span>
-  </button>
-  <div class="auth-helper-links" style="margin-top:12px;">
-    <button type="button" class="auth-link-btn" id="fpBackBtn">Back</button>
-  </div>
-</form>
 
 </form>
     </div>
@@ -487,7 +441,7 @@
           <ul class="footer-contact">
             <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span>Aloba complex, Idiope Awule Road, Akure.</span></li>
             <li><i class="fas fa-phone" aria-hidden="true"></i><span>09033489520</span></li>
-            <li><i class="fas fa-envelope" aria-hidden="true"></i><span><a href="mailto:fortunehabib9@gmail.com" style="color:inherit;">fortunehabib9@gmail.com</a></span></li>
+            <li><i class="fas fa-envelope" aria-hidden="true"></i><span><a href="/cdn-cgi/l/email-protection#f99f968b8d8c979c91989b909bc0b99e94989095d79a9694" style="color:inherit;"><span class="__cf_email__" data-cfemail="63050c1117160d060b02010a015a23040e020a0f4d000c0e">[email&#160;protected]</span></a></span></li>
           </ul>
           <div class="footer-mini-note"><i class="fas fa-clock" aria-hidden="true"></i><span>Mon–Sat: 9:00am – 6:00pm</span></div>
         </div>
@@ -503,6 +457,6 @@
     </div>
   </footer>
 
-  <script src="script.js" defer></script>
+  <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="script.js" defer></script>
 </body>
 </html>

@@ -1,5 +1,6 @@
 // =====================================================================
-// FortuneHub Frontend Script  v5 — Google Auth + Email/Password Auth
+// FortuneHub Frontend Script  v6 — No Email Verification, No Forgot Password,
+// Dedicated /checkout page, Login required for purchase
 //
 // ✅ NEW in v5:
 //    • Google Sign-In via Google Identity Services (GIS)
@@ -59,7 +60,7 @@ let _pendingPaymentRef = null;  // set when Paystack popup opens, cleared on ver
 // ✅ AUTH STATE
 // ─────────────────────────────────────────────────────────────────────
 let currentUser = null; // { id, name, email, picture, phone, token, authProvider }
-let pendingVerifyEmail = null;
+// ✅ v6: pendingVerifyEmail removed (no email verification)
 
 function loadAuthState() {
   try {
@@ -140,14 +141,7 @@ const tabSignUp                = document.getElementById('tabSignUp');
 const signInForm               = document.getElementById('signInForm');
 const signUpForm               = document.getElementById('signUpForm');
 
-// Verify / Forgot forms
-const verifyEmailForm          = document.getElementById('verifyEmailForm');
-const forgotPasswordForm       = document.getElementById('forgotPasswordForm');
-const veEmailText              = document.getElementById('veEmailText');
-const resendVerificationBtn     = document.getElementById('resendVerificationBtn');
-const backToSignInBtn           = document.getElementById('backToSignInBtn');
-const forgotPasswordLink        = document.getElementById('forgotPasswordLink');
-const fpBackBtn                 = document.getElementById('fpBackBtn');
+// ✅ v6: verifyEmailForm, forgotPasswordForm DOM refs removed (features removed)
 
 // Cart auth elements
 const authUserBanner           = document.getElementById('authUserBanner');
@@ -349,13 +343,8 @@ async function handleEmailSignIn(e) {
       showToast(`Welcome back, ${data.user.name}! 👋`, 'success');
       updateCartUI();
     } else {
-      if (data && data.requiresVerification) {
-        pendingVerifyEmail = email;
-        showVerifyEmailForm(email);
-        showToast(data.message || 'Please verify your email.', 'info');
-      } else {
-        document.getElementById('siGeneralError').textContent = data.message || 'Sign in failed';
-      }
+      // ✅ v6: No email verification step — show error directly
+      document.getElementById('siGeneralError').textContent = data.message || 'Sign in failed';
     }
   } catch {
     document.getElementById('siGeneralError').textContent = 'Network error. Please try again.';
@@ -400,9 +389,18 @@ async function handleEmailSignUp(e) {
     const data = await res.json();
 
     if (data.success) {
-      pendingVerifyEmail = email;
-      showVerifyEmailForm(email);
-      showToast(data.message || 'Verification code sent. Check your email.', 'info');
+      // ✅ v6: No email verification — auto-login if token returned, else prompt signin
+      if (data.token && data.user) {
+        closeAuthModal_fn();
+        saveAuthState({ ...data.user, token: data.token });
+        showToast(`Welcome, ${data.user.name}! 👋`, 'success');
+        updateCartUI();
+      } else {
+        // Backend created account but didn't return token — prompt sign in
+        closeAuthModal_fn();
+        showToast('Account created successfully! Please sign in.', 'success');
+        setTimeout(() => openAuthModal('signin'), 400);
+      }
     } else {
       document.getElementById('suGeneralError').textContent = data.message || 'Sign up failed';
     }
@@ -429,31 +427,7 @@ function signOut() {
 
 
 
-// ─────────────────────────────────────────────────────────────────────
-// ✅ VERIFY EMAIL + FORGOT PASSWORD UI HELPERS
-// ─────────────────────────────────────────────────────────────────────
-function showVerifyEmailForm(email) {
-  if (tabSignIn) tabSignIn.classList.remove('active');
-  if (tabSignUp) tabSignUp.classList.remove('active');
-  if (signInForm) signInForm.style.display = 'none';
-  if (signUpForm) signUpForm.style.display = 'none';
-  if (forgotPasswordForm) forgotPasswordForm.style.display = 'none';
-  if (verifyEmailForm) verifyEmailForm.style.display = 'block';
-  if (veEmailText) veEmailText.textContent = email || '';
-  const code = document.getElementById('veCode');
-  if (code) code.value = '';
-}
-
-function showForgotPasswordForm(prefillEmail = '') {
-  if (tabSignIn) tabSignIn.classList.remove('active');
-  if (tabSignUp) tabSignUp.classList.remove('active');
-  if (signInForm) signInForm.style.display = 'none';
-  if (signUpForm) signUpForm.style.display = 'none';
-  if (verifyEmailForm) verifyEmailForm.style.display = 'none';
-  if (forgotPasswordForm) forgotPasswordForm.style.display = 'block';
-  const fpEmail = document.getElementById('fpEmail');
-  if (fpEmail && prefillEmail) fpEmail.value = prefillEmail;
-}
+// ✅ v6: showVerifyEmailForm + showForgotPasswordForm removed (features removed)
 // ─────────────────────────────────────────────────────────────────────
 // ✅ AUTH MODAL
 // ─────────────────────────────────────────────────────────────────────
@@ -471,7 +445,7 @@ function closeAuthModal_fn() {
   authModal.style.display = 'none';
   document.body.style.overflow = 'auto';
   // Clear form errors
-  ['siEmailError','siPasswordError','siGeneralError','suNameError','suEmailError','suPasswordError','suConfirmPasswordError','suGeneralError','veCodeError','veGeneralError','fpEmailError','fpGeneralError']
+  ['siEmailError','siPasswordError','siGeneralError','suNameError','suEmailError','suPasswordError','suConfirmPasswordError','suGeneralError']
     .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
 }
 
@@ -480,15 +454,11 @@ function switchAuthTab(tab) {
     tabSignIn?.classList.add('active');
     tabSignUp?.classList.remove('active');
     if (signInForm) signInForm.style.display = 'block';
-    if (verifyEmailForm) verifyEmailForm.style.display = 'none';
-    if (forgotPasswordForm) forgotPasswordForm.style.display = 'none';
     if (signUpForm) signUpForm.style.display = 'none';
   } else {
     tabSignUp?.classList.add('active');
     tabSignIn?.classList.remove('active');
     if (signUpForm) signUpForm.style.display = 'block';
-    if (verifyEmailForm) verifyEmailForm.style.display = 'none';
-    if (forgotPasswordForm) forgotPasswordForm.style.display = 'none';
     if (signInForm) signInForm.style.display = 'none';
   }
 }
@@ -771,13 +741,17 @@ function updateCartUI() {
   if (cartTotalElement)         cartTotalElement.textContent         = formatCurrency(grandTotal);
 
   if (checkoutButton) {
-    const valid = validateCustomerInfo({ silent: true });
-    if (!valid) {
+    if (!currentUser) {
+      // ✅ v6: Not logged in — show login-required message
       checkoutButton.disabled = true;
-      checkoutButton.innerHTML = '<i class="fas fa-info-circle"></i> Complete Info to Continue';
+      checkoutButton.innerHTML = '<i class="fas fa-lock"></i> Sign In to Checkout';
+    } else if (cart.length === 0) {
+      checkoutButton.disabled = true;
+      checkoutButton.innerHTML = '<i class="fas fa-shopping-bag"></i> Proceed to Checkout';
     } else {
+      // Logged in + has items → enable checkout navigation
       checkoutButton.disabled = false;
-      checkoutButton.innerHTML = '<i class="fas fa-credit-card"></i> Proceed to Checkout';
+      checkoutButton.innerHTML = '<i class="fas fa-shopping-bag"></i> Proceed to Checkout';
     }
   }
 }
@@ -817,43 +791,22 @@ function removeItem(productId) {
 // ✅ VALIDATION — aware of auth state
 // ─────────────────────────────────────────────────────────────────────
 function validateCustomerInfo({ silent = false } = {}) {
+  // ✅ v6: Login required — guests cannot checkout
+  // Cart modal just shows items & subtotal; actual checkout happens on /checkout page
+  // This function only validates for logged-in users in the cart summary display
   let isValid = true;
   if (nameError)  nameError.style.display  = 'none';
   if (emailError) emailError.style.display = 'none';
   if (phoneError) phoneError.style.display = 'none';
 
-  const phone = (customerPhoneInput?.value || '').trim();
-
-  if (currentUser) {
-    // Logged in — only validate phone + state
-    const phoneRegex = /^(0[789][01])\d{8}$/;
-    if (!phone || !phoneRegex.test(phone)) {
-      if (!silent && phoneError) { phoneError.textContent = 'Enter a valid Nigerian WhatsApp number (e.g., 08031234567).'; phoneError.style.display = 'block'; }
-      isValid = false;
-    }
-  } else {
-    // Guest — validate all fields
-    const name  = (customerNameInput?.value  || '').trim();
-    const email = (customerEmailInput?.value || '').trim();
-
-    if (!name || name.length < 3 || name.includes('@') || name.includes('.')) {
-      if (!silent && nameError) { nameError.textContent = 'Please enter your full name (not email).'; nameError.style.display = 'block'; }
-      isValid = false;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
-      if (!silent && emailError) { emailError.textContent = 'Enter a valid email (e.g., name@example.com).'; emailError.style.display = 'block'; }
-      isValid = false;
-    }
-    const phoneRegex = /^(0[789][01])\d{8}$/;
-    if (!phone || !phoneRegex.test(phone)) {
-      if (!silent && phoneError) { phoneError.textContent = 'Enter a valid Nigerian WhatsApp number (e.g., 08031234567).'; phoneError.style.display = 'block'; }
-      isValid = false;
-    }
+  if (!currentUser) {
+    // Not logged in — checkout button stays disabled
+    return false;
   }
 
-  if (!(shippingStateSelect?.value || '')) isValid = false;
-  return isValid;
+  // Logged in — only validate phone + state (if provided in cart modal preview)
+  // Note: Full validation happens on the dedicated /checkout page
+  return true; // ✅ Allow "Proceed to Checkout" navigation for logged-in users
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -1062,7 +1015,21 @@ function setupEventListeners() {
     }
   });
 
-  checkoutButton?.addEventListener('click', initiatePaystackPayment);
+  checkoutButton?.addEventListener('click', () => {
+    // ✅ v6: Login required — redirect to /checkout page
+    if (!currentUser) {
+      closeCartModal();
+      openAuthModal('signin');
+      return;
+    }
+    if (cart.length === 0) {
+      showToast('Your cart is empty.', 'info');
+      return;
+    }
+    // Navigate to dedicated checkout page
+    closeCartModal();
+    window.location.href = 'checkout.html';
+  });
 
   productsGrid?.addEventListener('click', e => {
     const target = e.target;
@@ -1090,18 +1057,13 @@ function setupEventListeners() {
   tabSignUp?.addEventListener('click', () => switchAuthTab('signup'));
   signInForm?.addEventListener('submit', handleEmailSignIn);
   signUpForm?.addEventListener('submit', handleEmailSignUp);
-  verifyEmailForm?.addEventListener('submit', handleVerifyEmailCode);
-  forgotPasswordForm?.addEventListener('submit', handleForgotPassword);
-  forgotPasswordLink?.addEventListener('click', () => showForgotPasswordForm(document.getElementById('siEmail')?.value.trim() || ''));
-  resendVerificationBtn?.addEventListener('click', resendVerificationCode);
-  backToSignInBtn?.addEventListener('click', () => switchAuthTab('signin'));
-  fpBackBtn?.addEventListener('click', () => switchAuthTab('signin'));
+  // ✅ v6: verifyEmailForm, forgotPasswordForm, resendVerificationBtn, fpBackBtn event listeners removed
 
   userAvatarBtn?.addEventListener('click', e => { e.stopPropagation(); toggleDropdown(); });
   signOutBtn?.addEventListener('click', signOut);
   viewHistoryBtn?.addEventListener('click', openOrderHistory);
   changeAccountBtn?.addEventListener('click', () => { closeCartModal(); openAuthModal('signin'); });
-  cartSignInPromptBtn?.addEventListener('click', () => { closeCartModal(); openAuthModal('signin'); });
+  cartSignInPromptBtn?.addEventListener('click', () => { closeCartModal(); openAuthModal('signin'); }); // ✅ v6: login required to checkout
 
   // Close order history + receipt modals
   closeOrderHistoryModal?.addEventListener('click', () => { orderHistoryModal.style.display = 'none'; document.body.style.overflow = 'auto'; });
@@ -1329,125 +1291,6 @@ async function initializeApp() {
 document.addEventListener('DOMContentLoaded', initializeApp);
 
 
-// ─────────────────────────────────────────────────────────────────────
-// ✅ VERIFY EMAIL (CODE)
-// ─────────────────────────────────────────────────────────────────────
-async function handleVerifyEmailCode(e) {
-  e.preventDefault();
-  const email = (pendingVerifyEmail || '').trim();
-  const code  = document.getElementById('veCode')?.value.trim() || '';
+// ✅ v6: handleVerifyEmailCode + resendVerificationCode REMOVED (no email verification)
 
-  const err = document.getElementById('veCodeError');
-  const gen = document.getElementById('veGeneralError');
-  if (err) err.textContent = '';
-  if (gen) gen.textContent = '';
-
-  if (!email) {
-    if (gen) gen.textContent = 'Missing email for verification. Please sign up again.';
-    return;
-  }
-  if (!/^\d{6}$/.test(code)) {
-    if (err) err.textContent = 'Enter the 6-digit code.';
-    return;
-  }
-
-  const t = document.getElementById('veSubmitText');
-  const l = document.getElementById('veSubmitLoader');
-  const b = document.getElementById('veSubmitBtn');
-  if (t) t.style.display = 'none';
-  if (l) l.style.display = 'inline-flex';
-  if (b) b.disabled = true;
-
-
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/auth/verify-email-code`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ email, code })
-    });
-    const data = await res.json();
-
-    if (data.success) {
-      showToast('Email verified! Please sign in.', 'success');
-      const siEmail = document.getElementById('siEmail');
-      if (siEmail) siEmail.value = email;
-      pendingVerifyEmail = null;
-      switchAuthTab('signin');
-    } else {
-      if (gen) gen.textContent = data.message || 'Verification failed.';
-    }
-  } catch {
-    if (gen) gen.textContent = 'Network error. Please try again.';
-  } finally {
-    if (t) t.style.display = 'inline';
-    if (l) l.style.display = 'none';
-    if (b) b.disabled = false;
-  }
-}
-
-async function resendVerificationCode() {
-  const email = (pendingVerifyEmail || '').trim();
-  const gen = document.getElementById('veGeneralError');
-  if (gen) gen.textContent = '';
-  if (!email) { if (gen) gen.textContent = 'Missing email. Please sign up again.'; return; }
-
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/auth/resend-verification`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-    const data = await res.json();
-    if (data.success) showToast('Verification code sent again. Check your email.', 'info');
-    else if (gen) gen.textContent = data.message || 'Could not resend.';
-  } catch {
-    if (gen) gen.textContent = 'Network error. Please try again.';
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// ✅ FORGOT PASSWORD
-// ─────────────────────────────────────────────────────────────────────
-async function handleForgotPassword(e) {
-  e.preventDefault();
-  const email = document.getElementById('fpEmail')?.value.trim() || '';
-  const eErr  = document.getElementById('fpEmailError');
-  const gen   = document.getElementById('fpGeneralError');
-  if (eErr) eErr.textContent = '';
-  if (gen)  gen.textContent  = '';
-
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    if (eErr) eErr.textContent = 'Enter a valid email.';
-    return;
-  }
-
-  const t = document.getElementById('fpSubmitText');
-  const l = document.getElementById('fpSubmitLoader');
-  const b = document.getElementById('fpSubmitBtn');
-  if (t) t.style.display = 'none';
-  if (l) l.style.display = 'inline-flex';
-  if (b) b.disabled = true;
-
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast('If that email exists, a reset link/code has been sent.', 'info');
-      switchAuthTab('signin');
-      const siEmail = document.getElementById('siEmail');
-      if (siEmail) siEmail.value = email;
-    } else {
-      if (gen) gen.textContent = data.message || 'Could not send reset email.';
-    }
-  } catch {
-    if (gen) gen.textContent = 'Network error. Please try again.';
-  } finally {
-    if (t) t.style.display = 'inline';
-    if (l) l.style.display = 'none';
-    if (b) b.disabled = false;
-  }
-}
+// ✅ v6: handleForgotPassword REMOVED (no forgot password feature)

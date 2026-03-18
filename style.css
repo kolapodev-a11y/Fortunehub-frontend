@@ -723,3 +723,48 @@ img { max-width:100%; display:block; }
 .auth-verify-note{background:#f8f9ff;border:1px solid rgba(0,0,0,.08);border-radius:12px;padding:12px 14px;margin-bottom:14px;}
 .auth-verify-note strong{display:block;color:var(--dark);font-size:1rem;margin-bottom:4px;}
 .auth-verify-note p{margin:0;color:var(--gray);font-size:.9rem;line-height:1.45;word-break:break-word;}
+
+/* ==============================
+   ✅ v6 NEW — CART LOGIN REQUIRED BLOCK
+   (replaces old guest name/email fields)
+   ============================== */
+.cart-login-required {
+  background: linear-gradient(135deg, #f0f4ff 0%, #fff8e1 100%);
+  border: 1.5px dashed #4361ee;
+  border-radius: 14px;
+  padding: 20px 16px;
+  text-align: center;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.cart-login-icon {
+  font-size: 2rem;
+  color: var(--brand-blue);
+  margin-bottom: 4px;
+}
+.cart-login-required p {
+  margin: 0;
+  color: var(--dark);
+  font-size: 0.95rem;
+}
+.cart-login-required .btn-inline-signin {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+
+/* ==============================
+   ✅ v6 NEW — Checkout page link styles
+   ============================== */
+.checkout-link-note {
+  text-align: center;
+  font-size: 0.82rem;
+  color: #595959;
+  margin-top: 10px;
+}

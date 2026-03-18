@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="favicon.png">
+  <meta name="description" content="FortuneHub — Checkout. Complete your order securely." />
+  <title>Checkout — Fortune's Hub</title>
+
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+  <link rel="preconnect" href="https://js.paystack.co" crossorigin />
+  <link rel="preconnect" href="https://fortunehub-backend.onrender.com" crossorigin />
+  <link rel="dns-prefetch" href="https://fortunehub-backend.onrender.com" />
+
+  <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    as="style" crossorigin onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  </noscript>
+
+  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    /* ── Checkout Page Specific Styles ── */
+    .checkout-page {
+      min-height: 100vh;
+      background: #f5f7ff;
+      padding: 32px 0 60px;
+    }
+    .checkout-breadcrumb {
+      font-size: 0.88rem;
+      color: #595959;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .checkout-breadcrumb a { color: var(--brand-blue); text-decoration: underline; font-weight: 600; }
+    .checkout-breadcrumb i { font-size: 0.75rem; color: #aaa; }
+
+    .checkout-grid {
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 32px;
+      align-items: start;
+    }
+
+    /* ── Card Panels ── */
+    .co-card {
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.07);
+      padding: 28px 26px;
+      border: 1px solid rgba(0,0,0,0.06);
+      margin-bottom: 22px;
+    }
+    .co-card:last-child { margin-bottom: 0; }
+    .co-card-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--brand-blue);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+    .co-card-title i { color: var(--brand-red); }
+
+    /* ── Auth Banner (logged-in user) ── */
+    .co-auth-banner {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: #f0f7ff;
+      border: 1.5px solid #b8d4f8;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+    .co-auth-banner img {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid var(--brand-blue);
+      flex-shrink: 0;
+    }
+    .co-auth-banner-initial {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: var(--brand-blue);
+      color: #fff;
+      font-weight: 800;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .co-auth-banner-info { flex: 1; min-width: 0; }
+    .co-auth-banner-info strong { display: block; font-size: 1rem; color: #1a1a2e; }
+    .co-auth-banner-info span { font-size: 0.85rem; color: #595959; word-break: break-all; }
+
+    /* ── Login Gate (shown when not logged in) ── */
+    .co-login-gate {
+      text-align: center;
+      padding: 48px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .co-login-gate i { font-size: 56px; color: #c7d2fe; }
+    .co-login-gate h2 { font-size: 1.45rem; color: var(--brand-blue); margin: 0; }
+    .co-login-gate p { color: #595959; max-width: 360px; margin: 0; line-height: 1.6; }
+    .co-login-gate .btn-gate {
+      background: var(--brand-blue);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 14px 36px;
+      font-size: 1.05rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.25s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .co-login-gate .btn-gate:hover { background: #161c6b; transform: translateY(-2px); }
+
+    /* ── Order Items ── */
+    .co-order-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px dashed rgba(0,0,0,0.1);
+    }
+    .co-order-item:last-child { border-bottom: none; }
+    .co-order-item img {
+      width: 68px; height: 68px;
+      object-fit: contain;
+      border-radius: 12px;
+      background: #f5f7ff;
+      border: 1px solid rgba(0,0,0,0.07);
+      flex-shrink: 0;
+      padding: 4px;
+    }
+    .co-item-img-placeholder {
+      width: 68px; height: 68px;
+      border-radius: 12px;
+      background: #e9ecef;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .co-item-img-placeholder i { color: #aaa; font-size: 1.4rem; }
+    .co-order-item-info { flex: 1; min-width: 0; }
+    .co-order-item-info h4 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin: 0 0 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .co-order-item-info .co-item-qty { font-size: 0.85rem; color: #595959; }
+    .co-order-item-price {
+      font-weight: 800;
+      font-size: 1.05rem;
+      color: var(--brand-blue);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* ── Empty Cart ── */
+    .co-empty-cart {
+      text-align: center;
+      padding: 48px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+    .co-empty-cart i { font-size: 52px; color: #c7d2fe; }
+    .co-empty-cart p { color: #595959; margin: 0; font-size: 1.05rem; }
+
+    /* ── Summary Panel ── */
+    .co-summary-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      font-size: 1rem;
+      color: #555;
+      border-bottom: 1px dashed rgba(0,0,0,0.1);
+    }
+    .co-summary-row:last-of-type { border-bottom: none; }
+    .co-summary-grand {
+      display: flex;
+      justify-content: space-between;
+      padding: 14px 0 0;
+      font-size: 1.25rem;
+      font-weight: 900;
+      color: var(--brand-blue);
+      border-top: 2px solid var(--brand-blue);
+      margin-top: 10px;
+    }
+
+    /* ── Pay Button ── */
+    .co-pay-btn {
+      width: 100%;
+      background: var(--brand-blue);
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      padding: 16px;
+      font-size: 1.1rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.25s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .co-pay-btn:hover:not(:disabled) { background: #161c6b; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(29,35,134,0.25); }
+    .co-pay-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    .co-pay-btn .btn-spinner {
+      width: 20px; height: 20px;
+      border: 3px solid rgba(255,255,255,0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spinAnim 0.8s linear infinite;
+    }
+
+    /* ── Back link ── */
+    .co-back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--brand-blue);
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      border: none;
+      background: none;
+      padding: 0;
+      margin-bottom: 24px;
+      text-decoration: none;
+    }
+    .co-back-link:hover { color: var(--brand-red); }
+
+    /* ── Security badges ── */
+    .co-security {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+      color: #595959;
+      font-size: 0.82rem;
+    }
+    .co-security i { color: #28a745; }
+
+    /* ── Step indicator ── */
+    .co-steps {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-bottom: 28px;
+      background: #fff;
+      border-radius: 14px;
+      padding: 16px 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    .co-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+    .co-step-num {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.82rem;
+      font-weight: 900;
+    }
+    .co-step.done .co-step-num { background: #28a745; color: #fff; }
+    .co-step.active .co-step-num { background: var(--brand-blue); color: #fff; }
+    .co-step.pending .co-step-num { background: #e9ecef; color: #888; }
+    .co-step.done .co-step-label { color: #28a745; }
+    .co-step.active .co-step-label { color: var(--brand-blue); }
+    .co-step.pending .co-step-label { color: #aaa; }
+    .co-step-divider { flex: 1; height: 2px; background: #e9ecef; margin: 0 10px; }
+    .co-step-divider.done { background: #28a745; }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .checkout-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .checkout-page { padding: 20px 0 50px; }
+      .co-card { padding: 20px 16px; }
+      .co-steps { padding: 12px 14px; gap: 0; }
+      .co-step-label { display: none; }
+    }
+
+    /* ── Auth Modal inside checkout ── */
+    .co-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 3000;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      padding: 16px;
+      overflow-y: auto;
+    }
+    .co-modal-overlay.open { display: flex; align-items: center; justify-content: center; }
+    .co-modal-box {
+      background: #fff;
+      border-radius: 20px;
+      padding: 32px 28px;
+      width: min(440px, 100%);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      position: relative;
+      animation: slideUpOvl 0.3s ease;
+    }
+    @keyframes slideUpOvl { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+    .co-modal-close {
+      position: absolute; top: 14px; right: 16px;
+      background: none; border: none; font-size: 28px;
+      color: #888; cursor: pointer; line-height: 1;
+    }
+    .co-modal-close:hover { color: #333; }
+
+    /* ── Toast ── */
+    .fh-toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1a1a2e; color: #fff;
+      padding: 13px 22px; border-radius: 12px;
+      font-size: 0.95rem; font-weight: 600;
+      display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      z-index: 9999; opacity: 0;
+      transition: all 0.35s cubic-bezier(0.34,1.56,0.64,1);
+      white-space: nowrap;
+    }
+    .fh-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .fh-toast-success { background: #065f46; }
+    .fh-toast-error   { background: #991b1b; }
+    .fh-toast-info    { background: #1e3a5f; }
+
+    @keyframes spinAnim { to { transform: rotate(360deg); } }
+
+    /* ── Print ── */
+    @media print {
+      .site-header, .checkout-page > .container > .co-back-link,
+      .co-steps, .co-pay-btn, .co-security { display: none !important; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="site-header">
+    <div class="container">
+      <nav class="navbar" aria-label="Primary">
+        <a href="index.html" style="text-decoration:none;">
+          <h3 class="logo">Fortune's <span>Hub</span></h3>
+        </a>
+        <div class="header-icons">
+          <!-- Auth button -->
+          <div class="auth-header-wrap">
+            <button class="icon-btn auth-signin-btn" id="headerSignInBtn" type="button"
+              title="Sign In" aria-label="Sign In" style="display:none;">
+              <i class="fas fa-user-circle" aria-hidden="true"></i>
+            </button>
+            <div class="user-avatar-wrap" id="userAvatarWrap" style="display:none;">
+              <button class="user-avatar-btn" id="userAvatarBtn" type="button" aria-label="Account menu">
+                <img id="userAvatarImg" src="" alt="User" class="user-avatar-img" />
+                <span id="userAvatarInitial" class="user-avatar-initial"></span>
+              </button>
+              <div class="user-dropdown" id="userDropdown">
+                <div class="user-dropdown-info">
+                  <strong id="dropdownUserName"></strong>
+                  <small id="dropdownUserEmail"></small>
+                </div>
+                <hr class="dropdown-divider"/>
+                <button class="dropdown-item dropdown-signout" id="signOutBtn" type="button">
+                  <i class="fas fa-sign-out-alt"></i> Sign Out
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- Cart icon -->
+          <a href="index.html#cartModal" class="icon-btn" title="Back to Cart" aria-label="Back to Cart" style="text-decoration:none;">
+            <i class="fas fa-shopping-cart" aria-hidden="true"></i>
+          </a>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== CHECKOUT MAIN ===== -->
+  <main class="checkout-page" id="checkoutPageMain">
+    <div class="container">
+
+      <!-- Back link -->
+      <a href="index.html" class="co-back-link" id="backToShopBtn">
+        <i class="fas fa-arrow-left"></i> Back to Shop
+      </a>
+
+      <!-- ── LOGIN GATE (shown when NOT logged in) ── -->
+      <div id="loginGate" style="display:none;">
+        <div class="co-card">
+          <div class="co-login-gate">
+            <i class="fas fa-lock"></i>
+            <h2>Sign In to Continue</h2>
+            <p>You must be logged in to proceed to checkout and make a purchase.</p>
+            <button class="btn-gate" id="gateSignInBtn" type="button">
+              <i class="fas fa-sign-in-alt"></i> Sign In / Create Account
+            </button>
+            <a href="index.html" style="color:#595959; font-size:0.9rem; text-decoration:underline;">
+              ← Continue Shopping
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CHECKOUT CONTENT (shown when logged in) ── -->
+      <div id="checkoutContent" style="display:none;">
+
+        <!-- Step indicator -->
+        <div class="co-steps" aria-label="Checkout progress">
+          <div class="co-step done">
+            <span class="co-step-num"><i class="fas fa-check" style="font-size:0.7rem;"></i></span>
+            <span class="co-step-label">Cart</span>
+          </div>
+          <div class="co-step-divider done"></div>
+          <div class="co-step active">
+            <span class="co-step-num">2</span>
+            <span class="co-step-label">Checkout</span>
+          </div>
+          <div class="co-step-divider"></div>
+          <div class="co-step pending">
+            <span class="co-step-num">3</span>
+            <span class="co-step-label">Confirmation</span>
+          </div>
+        </div>
+
+        <div class="checkout-grid">
+
+          <!-- LEFT: Customer & Shipping Info -->
+          <div>
+
+            <!-- Account Info -->
+            <div class="co-card">
+              <div class="co-card-title">
+                <i class="fas fa-user-check"></i> Account Information
+              </div>
+              <div class="co-auth-banner" id="coAuthBanner">
+                <div class="co-auth-banner-initial" id="coAvatarInitial"></div>
+                <img id="coAvatarImg" src="" alt="" style="display:none;"/>
+                <div class="co-auth-banner-info">
+                  <strong id="coUserName"></strong>
+                  <span id="coUserEmail"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Delivery Info -->
+            <div class="co-card">
+              <div class="co-card-title">
+                <i class="fas fa-shipping-fast"></i> Delivery Information
+              </div>
+
+              <div class="form-group">
+                <label for="coPhone"><i class="fas fa-phone-alt"></i> WhatsApp Number <span style="color:red;">*</span></label>
+                <input type="tel" id="coPhone" class="form-input"
+                  placeholder="e.g. 08031234567" autocomplete="tel" required />
+                <small id="coPhoneError" class="error-msg"></small>
+                <small class="helper-text">For delivery coordination via WhatsApp.</small>
+              </div>
+
+              <div class="form-group">
+                <label for="coState"><i class="fas fa-map-marker-alt"></i> Shipping State <span style="color:red;">*</span></label>
+                <select id="coState" class="form-select" required>
+                  <option value="">Select Your State</option>
+                  <option value="1500">Ondo State — ₦1,500</option>
+                  <option value="3000">Lagos — ₦3,000</option>
+                  <option value="3000">Osun — ₦3,000</option>
+                  <option value="2000">Ekiti — ₦2,000</option>
+                  <option value="3000">Oyo — ₦3,000</option>
+                  <option value="3000">Kogi — ₦3,000</option>
+                  <option value="3000">Kwara — ₦3,000</option>
+                </select>
+                <small class="helper-text">Delivery fee depends on your location.</small>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- RIGHT: Order Summary + Pay -->
+          <div>
+            <!-- Order Summary -->
+            <div class="co-card">
+              <div class="co-card-title">
+                <i class="fas fa-shopping-bag"></i> Order Summary
+              </div>
+              <div id="coOrderItems">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+
+            <!-- Payment Summary -->
+            <div class="co-card">
+              <div class="co-card-title">
+                <i class="fas fa-receipt"></i> Payment Summary
+              </div>
+              <div class="co-summary-row">
+                <span>Subtotal</span>
+                <span id="coSubtotal">₦0</span>
+              </div>
+              <div class="co-summary-row">
+                <span>Shipping Fee</span>
+                <span id="coShipping">₦0</span>
+              </div>
+              <div class="co-summary-grand">
+                <span>Total</span>
+                <span id="coTotal">₦0</span>
+              </div>
+
+              <button class="co-pay-btn" id="coPayBtn" type="button" disabled>
+                <span id="coPayText"><i class="fas fa-lock"></i> Pay Securely</span>
+                <span id="coPayLoader" style="display:none;">
+                  <span class="btn-spinner"></span> Processing…
+                </span>
+              </button>
+
+              <div class="co-security">
+                <span><i class="fas fa-shield-alt"></i> Secured by Paystack</span>
+                <span><i class="fas fa-lock"></i> SSL Encrypted</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div><!-- /checkoutContent -->
+
+    </div>
+  </main>
+
+  <!-- ===== AUTH MODAL (inline on checkout page) ===== -->
+  <div id="coAuthModal" class="co-modal-overlay" role="dialog" aria-label="Sign in or Sign up">
+    <div class="co-modal-box">
+      <button class="co-modal-close" id="coCloseAuthModal" type="button" aria-label="Close">&times;</button>
+
+      <!-- Tab bar -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="coTabSignIn" data-tab="signin">Sign In</button>
+        <button class="auth-tab"        id="coTabSignUp" data-tab="signup">Sign Up</button>
+      </div>
+
+      <!-- Google button -->
+      <div class="auth-google-section">
+        <div id="coGoogleSignInBtn" class="google-btn-wrap"></div>
+        <p class="auth-or"><span>or</span></p>
+      </div>
+
+      <!-- SIGN IN FORM -->
+      <form id="coSignInForm" class="auth-form" novalidate>
+        <div class="form-group">
+          <label for="coSiEmail">Email Address</label>
+          <input type="email" id="coSiEmail" class="form-input" placeholder="you@example.com" required />
+          <small id="coSiEmailError" class="error-msg"></small>
+        </div>
+        <div class="form-group">
+          <label for="coSiPassword">Password</label>
+          <div class="password-wrap">
+            <input type="password" id="coSiPassword" class="form-input" placeholder="••••••••" required />
+            <button type="button" class="toggle-pw" data-target="coSiPassword" aria-label="Show/hide password">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+          <small id="coSiPasswordError" class="error-msg"></small>
+        </div>
+        <small id="coSiGeneralError" class="error-msg" style="display:block;margin-bottom:10px;"></small>
+        <button type="submit" class="btn-auth-submit" id="coSiSubmitBtn">
+          <span id="coSiSubmitText"><i class="fas fa-sign-in-alt"></i> Sign In</span>
+          <span id="coSiSubmitLoader" style="display:none;"><div class="btn-spinner"></div> Signing in…</span>
+        </button>
+      </form>
+
+      <!-- SIGN UP FORM -->
+      <form id="coSignUpForm" class="auth-form" novalidate style="display:none;">
+        <div class="form-group">
+          <label for="coSuName">Full Name</label>
+          <input type="text" id="coSuName" class="form-input" placeholder="John Doe" required />
+          <small id="coSuNameError" class="error-msg"></small>
+        </div>
+        <div class="form-group">
+          <label for="coSuEmail">Email Address</label>
+          <input type="email" id="coSuEmail" class="form-input" placeholder="you@example.com" required />
+          <small id="coSuEmailError" class="error-msg"></small>
+        </div>
+        <div class="form-group">
+          <label for="coSuPassword">Password</label>
+          <div class="password-wrap">
+            <input type="password" id="coSuPassword" class="form-input" placeholder="Min. 6 characters" required />
+            <button type="button" class="toggle-pw" data-target="coSuPassword" aria-label="Show/hide password">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+          <small id="coSuPasswordError" class="error-msg"></small>
+        </div>
+        <div class="form-group">
+          <label for="coSuConfirmPassword">Confirm Password</label>
+          <div class="password-wrap">
+            <input type="password" id="coSuConfirmPassword" class="form-input" placeholder="Re-enter password" required />
+            <button type="button" class="toggle-pw" data-target="coSuConfirmPassword" aria-label="Show/hide password">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+          <small id="coSuConfirmPasswordError" class="error-msg"></small>
+        </div>
+        <small id="coSuGeneralError" class="error-msg" style="display:block;margin-bottom:10px;"></small>
+        <button type="submit" class="btn-auth-submit" id="coSuSubmitBtn">
+          <span id="coSuSubmitText"><i class="fas fa-user-plus"></i> Create Account</span>
+          <span id="coSuSubmitLoader" style="display:none;"><div class="btn-spinner"></div> Creating…</span>
+        </button>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-bottom" style="border-top:none; padding-top:0;">
+        <p>&copy; 2026 Fortune's Hub. All rights reserved.</p>
+        <div class="footer-bottom-links">
+          <a href="index.html">Shop</a><span class="dot"></span>
+          <a href="index.html#categories">Categories</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <script>
+    // ─────────────────────────────────────────────────────────────────
+    // CONFIG
+    // ─────────────────────────────────────────────────────────────────
+    const GOOGLE_CLIENT_ID = '694580886466-hu48nsmlesv8qojnpkm218t0i7gpjepl.apps.googleusercontent.com';
+    const API_BASE_URL = 'https://fortunehub-backend.onrender.com';
+    let PAYSTACK_PUBLIC_KEY = 'pk_test_9f6a5cb45aeab4bd8bccd72129beda47f2609921';
+
+    // ─────────────────────────────────────────────────────────────────
+    // STATE
+    // ─────────────────────────────────────────────────────────────────
+    let cart = (() => {
+      const saved = JSON.parse(localStorage.getItem('cart')) || [];
+      return saved.map(item => {
+        let m = item;
+        if (item.price && item.price > 10000) m = { ...item, price: Math.round(item.price / 100) };
+        const img = String(m.image || '');
+        if (img.startsWith('data:') || img.length > 300) m = { ...m, image: '' };
+        return m;
+      });
+    })();
+
+    let currentUser = null;
+    let _pendingPaymentRef = null;
+    let paystackScriptLoaded = false;
+    let paystackScriptLoading = false;
+    let paystackLoadCallbacks = [];
+
+    // ─────────────────────────────────────────────────────────────────
+    // HELPERS
+    // ─────────────────────────────────────────────────────────────────
+    function formatCurrency(n) {
+      return `₦${Number(n||0).toLocaleString('en-NG',{minimumFractionDigits:0,maximumFractionDigits:0})}`;
+    }
+    function getInitial(name) { return (name||'U').charAt(0).toUpperCase(); }
+
+    function showToast(message, type = 'info') {
+      const existing = document.querySelector('.fh-toast');
+      if (existing) existing.remove();
+      const toast = document.createElement('div');
+      toast.className = `fh-toast fh-toast-${type}`;
+      const icon = type==='success' ? 'fa-check-circle' : type==='error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+      toast.innerHTML = `<i class="fas ${icon}"></i> <span>${message}</span>`;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.add('show'));
+      setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); }, 4000);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // AUTH STATE
+    // ─────────────────────────────────────────────────────────────────
+    function loadAuthState() {
+      try {
+        const stored = localStorage.getItem('fh_auth');
+        if (stored) currentUser = JSON.parse(stored);
+      } catch { currentUser = null; }
+    }
+
+    function saveAuthState(user) {
+      currentUser = user;
+      if (user) localStorage.setItem('fh_auth', JSON.stringify(user));
+      else localStorage.removeItem('fh_auth');
+    }
+
+    function getAuthToken() { return currentUser?.token || null; }
+    function authHeaders() {
+      const token = getAuthToken();
+      return token ? { 'Authorization': `Bearer ${token}` } : {};
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // PAGE INIT — decide what to show
+    // ─────────────────────────────────────────────────────────────────
+    function initCheckoutPage() {
+      loadAuthState();
+
+      if (!currentUser) {
+        // Not logged in → show gate
+        document.getElementById('loginGate').style.display = 'block';
+        document.getElementById('checkoutContent').style.display = 'none';
+        updateHeaderAuth();
+        return;
+      }
+
+      if (cart.length === 0) {
+        // Cart empty → redirect to shop
+        window.location.href = 'index.html';
+        return;
+      }
+
+      // Logged in + has cart items → show checkout
+      document.getElementById('loginGate').style.display = 'none';
+      document.getElementById('checkoutContent').style.display = 'block';
+      updateHeaderAuth();
+      renderUserInfo();
+      renderOrderItems();
+      updateSummary();
+    }
+
+    function updateHeaderAuth() {
+      const signInBtn = document.getElementById('headerSignInBtn');
+      const avatarWrap = document.getElementById('userAvatarWrap');
+      if (currentUser) {
+        if (signInBtn) signInBtn.style.display = 'none';
+        if (avatarWrap) {
+          avatarWrap.style.display = 'flex';
+          const nameEl = document.getElementById('dropdownUserName');
+          const emailEl = document.getElementById('dropdownUserEmail');
+          const imgEl = document.getElementById('userAvatarImg');
+          const initialEl = document.getElementById('userAvatarInitial');
+          if (nameEl) nameEl.textContent = currentUser.name || '';
+          if (emailEl) emailEl.textContent = currentUser.email || '';
+          if (currentUser.picture) {
+            if (imgEl) { imgEl.src = currentUser.picture; imgEl.style.display = 'block'; }
+            if (initialEl) initialEl.style.display = 'none';
+          } else {
+            if (imgEl) imgEl.style.display = 'none';
+            if (initialEl) { initialEl.textContent = getInitial(currentUser.name); initialEl.style.display = 'flex'; }
+          }
+        }
+      } else {
+        if (signInBtn) signInBtn.style.display = 'flex';
+        if (avatarWrap) avatarWrap.style.display = 'none';
+      }
+    }
+
+    function renderUserInfo() {
+      if (!currentUser) return;
+      const nameEl = document.getElementById('coUserName');
+      const emailEl = document.getElementById('coUserEmail');
+      const imgEl = document.getElementById('coAvatarImg');
+      const initialEl = document.getElementById('coAvatarInitial');
+
+      if (nameEl) nameEl.textContent = currentUser.name || '';
+      if (emailEl) emailEl.textContent = currentUser.email || '';
+
+      if (currentUser.picture) {
+        if (imgEl) { imgEl.src = currentUser.picture; imgEl.style.display = 'block'; }
+        if (initialEl) initialEl.style.display = 'none';
+      } else {
+        if (imgEl) imgEl.style.display = 'none';
+        if (initialEl) { initialEl.textContent = getInitial(currentUser.name); initialEl.style.display = 'flex'; }
+      }
+
+      // Pre-fill phone if saved
+      const phoneInput = document.getElementById('coPhone');
+      if (phoneInput && currentUser.phone && !phoneInput.value) {
+        phoneInput.value = currentUser.phone;
+      }
+    }
+
+    function renderOrderItems() {
+      const container = document.getElementById('coOrderItems');
+      if (!container) return;
+
+      if (cart.length === 0) {
+        container.innerHTML = `<div class="co-empty-cart"><i class="fas fa-shopping-cart"></i><p>Your cart is empty</p></div>`;
+        return;
+      }
+
+      container.innerHTML = cart.map(item => {
+        const imgSrc = item.image || '';
+        const imgHtml = imgSrc
+          ? `<img src="${imgSrc}" alt="${item.name}" onerror="this.parentNode.innerHTML='<div class=co-item-img-placeholder><i class=fas fa-box></i></div>'">`
+          : `<div class="co-item-img-placeholder"><i class="fas fa-box"></i></div>`;
+
+        return `
+          <div class="co-order-item">
+            ${imgHtml}
+            <div class="co-order-item-info">
+              <h4>${item.name}</h4>
+              <span class="co-item-qty">Qty: ${item.quantity} × ${formatCurrency(item.price)}</span>
+            </div>
+            <span class="co-order-item-price">${formatCurrency(item.price * item.quantity)}</span>
+          </div>`;
+      }).join('');
+    }
+
+    function updateSummary() {
+      const stateSelect = document.getElementById('coState');
+      const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      const shippingFee = parseInt(stateSelect?.value || '0', 10) || 0;
+      const grandTotal = subtotal + shippingFee;
+
+      document.getElementById('coSubtotal').textContent = formatCurrency(subtotal);
+      document.getElementById('coShipping').textContent = formatCurrency(shippingFee);
+      document.getElementById('coTotal').textContent = formatCurrency(grandTotal);
+
+      // Enable/disable pay button
+      const payBtn = document.getElementById('coPayBtn');
+      const phone = (document.getElementById('coPhone')?.value || '').trim();
+      const phoneValid = /^(0[789][01])\d{8}$/.test(phone);
+      const stateValid = !!(stateSelect?.value);
+      const cartHasItems = cart.length > 0;
+
+      if (payBtn) {
+        payBtn.disabled = !(phoneValid && stateValid && cartHasItems && currentUser);
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // PAYSTACK
+    // ─────────────────────────────────────────────────────────────────
+    function loadPaystackScript() {
+      return new Promise((resolve, reject) => {
+        if (paystackScriptLoaded && typeof PaystackPop !== 'undefined') { resolve(); return; }
+        if (paystackScriptLoading) { paystackLoadCallbacks.push({ resolve, reject }); return; }
+        paystackScriptLoading = true;
+        paystackLoadCallbacks.push({ resolve, reject });
+        const script = document.createElement('script');
+        script.src = 'https://js.paystack.co/v1/inline.js';
+        script.async = true;
+        script.onload = () => { paystackScriptLoaded = true; paystackScriptLoading = false; paystackLoadCallbacks.forEach(cb => cb.resolve()); paystackLoadCallbacks = []; };
+        script.onerror = () => { paystackScriptLoading = false; const err = new Error('Failed to load Paystack SDK.'); paystackLoadCallbacks.forEach(cb => cb.reject(err)); paystackLoadCallbacks = []; };
+        document.head.appendChild(script);
+      });
+    }
+
+    function showLoadingOverlay(message = 'Processing…') {
+      hideLoadingOverlay();
+      const overlay = document.createElement('div');
+      overlay.id = 'paymentLoadingOverlay';
+      overlay.innerHTML = `
+        <div class="loading-content">
+          <div class="loading-spinner"></div>
+          <h3 class="loading-title">${message}</h3>
+          <p class="loading-subtitle">Please wait, do not close this window.</p>
+          <div class="loading-progress"><div class="loading-progress-bar"></div></div>
+          <p class="loading-info"><i class="fas fa-info-circle"></i> Do not close or go back</p>
+        </div>
+        <style>
+          #paymentLoadingOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:center;justify-content:center;animation:fadeInOvl .3s ease}
+          @keyframes fadeInOvl{from{opacity:0}to{opacity:1}}
+          .loading-content{background:#fff;border-radius:20px;padding:40px 50px;max-width:450px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4);animation:slideUpOvl .4s ease}
+          @keyframes slideUpOvl{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+          .loading-spinner{width:60px;height:60px;border:5px solid #f0f0f0;border-top:5px solid #667eea;border-radius:50%;margin:0 auto 25px;animation:spinnerOvl 1s linear infinite}
+          @keyframes spinnerOvl{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+          .loading-title{font-size:22px;font-weight:700;color:#1f2937;margin:0 0 10px}
+          .loading-subtitle{font-size:15px;color:#595959;margin:0 0 25px;line-height:1.5}
+          .loading-progress{width:100%;height:6px;background:#f0f0f0;border-radius:10px;overflow:hidden;margin-bottom:20px}
+          .loading-progress-bar{height:100%;background:linear-gradient(90deg,#667eea,#764ba2);border-radius:10px;animation:progressBarOvl 60s ease-in-out;width:0%}
+          @keyframes progressBarOvl{0%{width:0%}50%{width:75%}100%{width:95%}}
+          .loading-info{font-size:13px;color:#9ca3af;margin:0;display:flex;align-items:center;justify-content:center;gap:8px}
+          .loading-info i{color:#667eea}
+          @keyframes fadeOutOvl{from{opacity:1}to{opacity:0}}
+        </style>`;
+      document.body.appendChild(overlay);
+      document.body.style.overflow = 'hidden';
+    }
+    function hideLoadingOverlay() {
+      const overlay = document.getElementById('paymentLoadingOverlay');
+      if (overlay) { overlay.style.animation = 'fadeOutOvl .3s ease'; setTimeout(() => { overlay.remove(); document.body.style.overflow = 'auto'; }, 300); }
+    }
+
+    async function initiatePaystackPayment() {
+      if (!currentUser) { openCoAuthModal(); return; }
+      if (cart.length === 0) { showToast('Your cart is empty.', 'error'); return; }
+
+      const phone = (document.getElementById('coPhone')?.value || '').trim();
+      const stateSelect = document.getElementById('coState');
+      const stateValue = stateSelect?.value || '';
+      const stateText = stateSelect?.options?.[stateSelect.selectedIndex]?.text || '';
+
+      // Validate
+      let valid = true;
+      const phoneErr = document.getElementById('coPhoneError');
+      if (phoneErr) phoneErr.style.display = 'none';
+
+      const phoneRegex = /^(0[789][01])\d{8}$/;
+      if (!phone || !phoneRegex.test(phone)) {
+        if (phoneErr) { phoneErr.textContent = 'Enter a valid Nigerian WhatsApp number (e.g., 08031234567).'; phoneErr.style.display = 'block'; }
+        valid = false;
+      }
+      if (!stateValue) { showToast('Please select your shipping state.', 'error'); valid = false; }
+      if (!valid) return;
+
+      showLoadingOverlay('Loading payment system…');
+      try { await loadPaystackScript(); }
+      catch (err) { hideLoadingOverlay(); alert('Could not load payment system: ' + err.message + '\n\nPlease disable ad-blockers or try another network.'); return; }
+      if (typeof PaystackPop === 'undefined') { hideLoadingOverlay(); alert('Paystack could not load. Please try again.'); return; }
+
+      const shippingFeeNaira = parseInt(stateValue, 10) || 0;
+      const subtotalNaira = cart.reduce((sum, item) => sum + Number(item.price || 0) * (item.quantity || 1), 0);
+      const totalNaira = subtotalNaira + shippingFeeNaira;
+      if (!Number.isFinite(totalNaira) || totalNaira <= 0) { hideLoadingOverlay(); alert('Invalid total. Please refresh and try again.'); return; }
+
+      const totalKobo = Math.round(totalNaira * 100);
+      const email = currentUser.email;
+      const name = currentUser.name;
+
+      const metadata = {
+        customer_name: name,
+        customer_email: email,
+        customer_phone: phone,
+        cart_items: cart,
+        shipping_fee: shippingFeeNaira,
+        shipping_state: stateText,
+      };
+
+      showLoadingOverlay('Starting payment…');
+
+      fetch(`${API_BASE_URL}/api/payment/initialize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ email, amount: totalNaira, metadata }),
+      })
+        .then(r => { if (!r.ok) throw new Error(`Initialize failed (HTTP ${r.status})`); return r.json(); })
+        .then(init => {
+          if (!init?.success || !init?.access_code) throw new Error(init?.message || 'Failed to initialize transaction');
+          if (init.public_key && init.public_key.startsWith('pk_')) PAYSTACK_PUBLIC_KEY = init.public_key;
+          hideLoadingOverlay();
+
+          _pendingPaymentRef = init.reference;
+
+          const handler = PaystackPop.setup({
+            key: PAYSTACK_PUBLIC_KEY, email, amount: totalKobo, currency: 'NGN',
+            access_code: init.access_code, ref: init.reference, metadata,
+            callback: function(response) {
+              _pendingPaymentRef = null;
+              showLoadingOverlay('Verifying your payment…');
+              const timeoutId = setTimeout(() => {
+                hideLoadingOverlay();
+                alert('⏱️ Verification taking longer than expected. Check your email for confirmation.\nReference: ' + response.reference);
+              }, 90000);
+
+              fetch(`${API_BASE_URL}/api/payment/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...authHeaders() },
+                body: JSON.stringify({ reference: response.reference }),
+              })
+                .then(r => { clearTimeout(timeoutId); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+                .then(data => {
+                  hideLoadingOverlay();
+                  if (data.success) {
+                    cart = []; localStorage.setItem('cart', JSON.stringify(cart));
+                    showToast('✅ Payment successful! Check your email for your receipt.', 'success');
+                    // Redirect to success page or back to shop
+                    setTimeout(() => { window.location.href = 'index.html?order=success'; }, 2000);
+                  } else {
+                    alert('⚠️ Payment verification failed: ' + (data.message || 'Unknown error'));
+                  }
+                })
+                .catch(err => { clearTimeout(timeoutId); hideLoadingOverlay(); alert('❌ Failed to verify payment. Contact support with reference: ' + response.reference); });
+            },
+            onClose: function() {
+              const ref = _pendingPaymentRef;
+              _pendingPaymentRef = null;
+              hideLoadingOverlay();
+              if (ref) {
+                fetch(`${API_BASE_URL}/api/payment/cancel`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...authHeaders() },
+                  body: JSON.stringify({ reference: ref }),
+                }).catch(() => {});
+                showToast('Payment cancelled. Your cart is still saved.', 'info');
+              }
+            },
+          });
+          handler.openIframe();
+        })
+        .catch(err => {
+          hideLoadingOverlay();
+          alert('❌ Could not start payment: ' + (err?.message || 'Unknown error'));
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // CHECKOUT PAGE AUTH MODAL
+    // ─────────────────────────────────────────────────────────────────
+    function openCoAuthModal(startTab = 'signin') {
+      const modal = document.getElementById('coAuthModal');
+      if (!modal) return;
+      modal.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      switchCoTab(startTab);
+      setTimeout(initCoGoogleSignIn, 100);
+    }
+
+    function closeCoAuthModal() {
+      const modal = document.getElementById('coAuthModal');
+      if (!modal) return;
+      modal.classList.remove('open');
+      document.body.style.overflow = 'auto';
+      // Clear errors
+      ['coSiEmailError','coSiPasswordError','coSiGeneralError',
+       'coSuNameError','coSuEmailError','coSuPasswordError','coSuConfirmPasswordError','coSuGeneralError']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
+    }
+
+    function switchCoTab(tab) {
+      const siForm = document.getElementById('coSignInForm');
+      const suForm = document.getElementById('coSignUpForm');
+      const tabSi = document.getElementById('coTabSignIn');
+      const tabSu = document.getElementById('coTabSignUp');
+      if (tab === 'signin') {
+        tabSi?.classList.add('active'); tabSu?.classList.remove('active');
+        if (siForm) siForm.style.display = 'block';
+        if (suForm) suForm.style.display = 'none';
+      } else {
+        tabSu?.classList.add('active'); tabSi?.classList.remove('active');
+        if (suForm) suForm.style.display = 'block';
+        if (siForm) siForm.style.display = 'none';
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // GOOGLE SIGN IN (checkout page)
+    // ─────────────────────────────────────────────────────────────────
+    function initCoGoogleSignIn() {
+      if (typeof google === 'undefined' || !google.accounts) return;
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCoGoogleCredential,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+      const container = document.getElementById('coGoogleSignInBtn');
+      if (container) {
+        container.innerHTML = '';
+        google.accounts.id.renderButton(container, {
+          theme: 'outline', size: 'large', width: '100%',
+          text: 'continue_with', logo_alignment: 'left',
+        });
+      }
+    }
+
+    async function handleCoGoogleCredential(response) {
+      const credential = response?.credential;
+      if (!credential) return;
+      closeCoAuthModal();
+      showLoadingOverlay('Signing in with Google…');
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential }),
+        });
+        const data = await res.json();
+        hideLoadingOverlay();
+        if (data.success) {
+          saveAuthState({ ...data.user, token: data.token });
+          showToast(`Welcome, ${data.user.name}! 👋`, 'success');
+          initCheckoutPage();
+        } else {
+          showToast('Google sign-in failed: ' + (data.message || 'Unknown error'), 'error');
+        }
+      } catch {
+        hideLoadingOverlay();
+        showToast('Network error during Google sign-in.', 'error');
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // EMAIL SIGN IN (checkout page)
+    // ─────────────────────────────────────────────────────────────────
+    async function handleCoEmailSignIn(e) {
+      e.preventDefault();
+      const email = document.getElementById('coSiEmail')?.value.trim() || '';
+      const password = document.getElementById('coSiPassword')?.value || '';
+
+      ['coSiEmailError','coSiPasswordError','coSiGeneralError'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.textContent = '';
+      });
+
+      let valid = true;
+      if (!email) { const el = document.getElementById('coSiEmailError'); if (el) el.textContent = 'Email is required'; valid = false; }
+      if (!password) { const el = document.getElementById('coSiPasswordError'); if (el) el.textContent = 'Password is required'; valid = false; }
+      if (!valid) return;
+
+      const t = document.getElementById('coSiSubmitText');
+      const l = document.getElementById('coSiSubmitLoader');
+      const b = document.getElementById('coSiSubmitBtn');
+      if (t) t.style.display = 'none';
+      if (l) l.style.display = 'inline-flex';
+      if (b) b.disabled = true;
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/signin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeCoAuthModal();
+          saveAuthState({ ...data.user, token: data.token });
+          showToast(`Welcome back, ${data.user.name}! 👋`, 'success');
+          initCheckoutPage();
+        } else {
+          const gen = document.getElementById('coSiGeneralError');
+          if (gen) gen.textContent = data.message || 'Sign in failed';
+        }
+      } catch {
+        const gen = document.getElementById('coSiGeneralError');
+        if (gen) gen.textContent = 'Network error. Please try again.';
+      } finally {
+        if (t) t.style.display = 'inline';
+        if (l) l.style.display = 'none';
+        if (b) b.disabled = false;
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // EMAIL SIGN UP (checkout page) — NO email verification
+    // ─────────────────────────────────────────────────────────────────
+    async function handleCoEmailSignUp(e) {
+      e.preventDefault();
+      const name     = document.getElementById('coSuName')?.value.trim()  || '';
+      const email    = document.getElementById('coSuEmail')?.value.trim() || '';
+      const password = document.getElementById('coSuPassword')?.value     || '';
+      const confirm  = document.getElementById('coSuConfirmPassword')?.value || '';
+
+      ['coSuNameError','coSuEmailError','coSuPasswordError','coSuConfirmPasswordError','coSuGeneralError'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.textContent = '';
+      });
+
+      let valid = true;
+      if (!name || name.length < 2) { const el = document.getElementById('coSuNameError'); if (el) el.textContent = 'Enter your full name'; valid = false; }
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { const el = document.getElementById('coSuEmailError'); if (el) el.textContent = 'Enter a valid email'; valid = false; }
+      if (!password || password.length < 6) { const el = document.getElementById('coSuPasswordError'); if (el) el.textContent = 'Password must be at least 6 characters'; valid = false; }
+      if (!confirm || confirm !== password) { const el = document.getElementById('coSuConfirmPasswordError'); if (el) el.textContent = 'Passwords do not match'; valid = false; }
+      if (!valid) return;
+
+      const t = document.getElementById('coSuSubmitText');
+      const l = document.getElementById('coSuSubmitLoader');
+      const b = document.getElementById('coSuSubmitBtn');
+      if (t) t.style.display = 'none';
+      if (l) l.style.display = 'inline-flex';
+      if (b) b.disabled = true;
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/signup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password, confirmPassword: confirm }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          // ✅ No verification — log user in directly if token returned
+          if (data.token && data.user) {
+            closeCoAuthModal();
+            saveAuthState({ ...data.user, token: data.token });
+            showToast(`Welcome, ${data.user.name}! 👋`, 'success');
+            initCheckoutPage();
+          } else {
+            // Account created but token not returned — prompt sign-in
+            closeCoAuthModal();
+            showToast('Account created! Please sign in.', 'success');
+            openCoAuthModal('signin');
+          }
+        } else {
+          const gen = document.getElementById('coSuGeneralError');
+          if (gen) gen.textContent = data.message || 'Sign up failed';
+        }
+      } catch {
+        const gen = document.getElementById('coSuGeneralError');
+        if (gen) gen.textContent = 'Network error. Please try again.';
+      } finally {
+        if (t) t.style.display = 'inline';
+        if (l) l.style.display = 'none';
+        if (b) b.disabled = false;
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // EVENT LISTENERS
+    // ─────────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      initCheckoutPage();
+
+      // Gate button
+      document.getElementById('gateSignInBtn')?.addEventListener('click', () => openCoAuthModal('signin'));
+
+      // Auth modal close
+      document.getElementById('coCloseAuthModal')?.addEventListener('click', () => {
+        closeCoAuthModal();
+        // If still not logged in after closing, go back to shop
+        if (!currentUser) window.location.href = 'index.html';
+      });
+
+      // Tab switching
+      document.getElementById('coTabSignIn')?.addEventListener('click', () => switchCoTab('signin'));
+      document.getElementById('coTabSignUp')?.addEventListener('click', () => switchCoTab('signup'));
+
+      // Sign in form
+      document.getElementById('coSignInForm')?.addEventListener('submit', handleCoEmailSignIn);
+
+      // Sign up form
+      document.getElementById('coSignUpForm')?.addEventListener('submit', handleCoEmailSignUp);
+
+      // Shipping state + phone → recalc summary
+      document.getElementById('coState')?.addEventListener('change', updateSummary);
+      document.getElementById('coPhone')?.addEventListener('input', updateSummary);
+
+      // Pay button
+      document.getElementById('coPayBtn')?.addEventListener('click', initiatePaystackPayment);
+
+      // Password toggles
+      document.querySelectorAll('.toggle-pw').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const targetId = btn.dataset.target;
+          const input = document.getElementById(targetId);
+          if (!input) return;
+          const isPassword = input.type === 'password';
+          input.type = isPassword ? 'text' : 'password';
+          btn.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+        });
+      });
+
+      // Sign out from header dropdown
+      document.getElementById('signOutBtn')?.addEventListener('click', () => {
+        if (typeof google !== 'undefined' && google.accounts?.id) google.accounts.id.disableAutoSelect();
+        saveAuthState(null);
+        showToast('You have been signed out.', 'info');
+        setTimeout(() => window.location.href = 'index.html', 1200);
+      });
+
+      // User avatar dropdown
+      document.getElementById('userAvatarBtn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.getElementById('userDropdown')?.classList.toggle('open');
+      });
+      document.addEventListener('click', () => {
+        document.getElementById('userDropdown')?.classList.remove('open');
+      });
+
+      // Close co-modal on outside click
+      document.getElementById('coAuthModal')?.addEventListener('click', (e) => {
+        if (e.target === document.getElementById('coAuthModal')) {
+          closeCoAuthModal();
+          if (!currentUser) window.location.href = 'index.html';
+        }
+      });
+
+      // Handle order success banner if redirected back from payment
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('order') === 'success') {
+        showToast('🎉 Order placed successfully! Check your email for your receipt.', 'success');
+      }
+    });
+
+    // GIS callback
+    window.addEventListener('load', () => {
+      if (typeof google !== 'undefined' && google.accounts) initCoGoogleSignIn();
+    });
+  </script>
+</body>
+</html>
