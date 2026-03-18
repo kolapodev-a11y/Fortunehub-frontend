@@ -24,7 +24,7 @@
 // ─────────────────────────────────────────────────────────────────────
 // ✅ Replace with YOUR Google OAuth Client ID from console.cloud.google.com
 // Set this to the same GOOGLE_CLIENT_ID used in the backend .env
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '694580886466-hu48nsmlesv8qojnpkm218t0i7gpjepl.apps.googleusercontent.com';
 
 const API_BASE_URL = 'https://fortunehub-backend.onrender.com';
 
