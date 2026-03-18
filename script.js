@@ -1,12 +1,5 @@
 // =====================================================================
-// FortuneHub Frontend Script  v6 — Auth-Gated Checkout + Google OAuth Fixes
-//
-// ✅ FIXED in v6:
-//    • Purchase now REQUIRES sign-in (no guest checkout)
-//    • Google Sign-In: fixed isEmailVerified state & account conflicts
-//    • Email verification routes fixed (were dead code on backend)
-//    • Checkout button shows "Sign In to Checkout" for guests
-//    • Better error messages for Google account conflicts
+// FortuneHub Frontend Script  v5 — Google Auth + Email/Password Auth
 //
 // ✅ NEW in v5:
 //    • Google Sign-In via Google Identity Services (GIS)
@@ -119,8 +112,12 @@ const searchIconBtn            = document.getElementById('searchIcon');
 const footerOpenCart           = document.getElementById('footerOpenCart');
 
 // Cart form fields
+const customerNameInput        = document.getElementById('customerName');
+const customerEmailInput       = document.getElementById('customerEmail');
 const customerPhoneInput       = document.getElementById('customerPhone');
 const shippingStateSelect      = document.getElementById('shippingState');
+const nameError                = document.getElementById('nameError');
+const emailError               = document.getElementById('emailError');
 const phoneError               = document.getElementById('phoneError');
 
 // Auth UI elements
@@ -307,16 +304,8 @@ async function handleGoogleCredential(response) {
       saveAuthState({ ...data.user, token: data.token });
       showToast(`Welcome, ${data.user.name}! 👋`, 'success');
       updateCartUI();
-      // Close cart if it was open (user signed in via cart prompt)
-      if (cartModal && cartModal.style.display === 'block') {
-        // Re-open auth modal is not needed — just update cart
-        updateCartUI();
-      }
     } else {
-      // ✅ FIX: Show friendly Google sign-in error
-      const msg = data.message || 'Google sign-in failed. Please try again.';
-      showToast(msg, 'error');
-      openAuthModal('signin');
+      showToast('Google sign-in failed: ' + (data.message || 'Unknown error'), 'error');
     }
   } catch (err) {
     hideLoadingOverlay();
@@ -361,13 +350,9 @@ async function handleEmailSignIn(e) {
       updateCartUI();
     } else {
       if (data && data.requiresVerification) {
-        pendingVerifyEmail = data.email || email;
-        showVerifyEmailForm(data.email || email);
+        pendingVerifyEmail = email;
+        showVerifyEmailForm(email);
         showToast(data.message || 'Please verify your email.', 'info');
-      } else if (data && data.isGoogleAccount) {
-        // ✅ FIX: This email was registered via Google — guide user to Google sign-in
-        document.getElementById('siGeneralError').textContent = data.message || 'Please sign in with Google.';
-        showToast('This email uses Google Sign-In. Click "Continue with Google" below. 👆', 'info');
       } else {
         document.getElementById('siGeneralError').textContent = data.message || 'Sign in failed';
       }
@@ -419,18 +404,7 @@ async function handleEmailSignUp(e) {
       showVerifyEmailForm(email);
       showToast(data.message || 'Verification code sent. Check your email.', 'info');
     } else {
-      if (data && data.isGoogleAccount) {
-        // ✅ FIX: This email was registered via Google — guide user to Google sign-in
-        document.getElementById('suGeneralError').textContent = data.message || 'Please sign in with Google.';
-        showToast('This email uses Google Sign-In. Click "Continue with Google" below. 👆', 'info');
-      } else if (data && data.requiresVerification) {
-        // Account exists but is unverified — show verify form
-        pendingVerifyEmail = data.email || email;
-        showVerifyEmailForm(data.email || email);
-        showToast('Your account exists but is not verified yet. Please enter the code from your email.', 'info');
-      } else {
-        document.getElementById('suGeneralError').textContent = data.message || 'Sign up failed';
-      }
+      document.getElementById('suGeneralError').textContent = data.message || 'Sign up failed';
     }
   } catch {
     document.getElementById('suGeneralError').textContent = 'Network error. Please try again.';
@@ -797,21 +771,13 @@ function updateCartUI() {
   if (cartTotalElement)         cartTotalElement.textContent         = formatCurrency(grandTotal);
 
   if (checkoutButton) {
-    if (!currentUser) {
-      // ✅ FIX: Show sign-in prompt when user is not logged in
-      checkoutButton.disabled = false;
-      checkoutButton.innerHTML = '<i class="fas fa-lock"></i> Sign In to Checkout';
-      checkoutButton.classList.add('btn-signin-required');
+    const valid = validateCustomerInfo({ silent: true });
+    if (!valid) {
+      checkoutButton.disabled = true;
+      checkoutButton.innerHTML = '<i class="fas fa-info-circle"></i> Complete Info to Continue';
     } else {
-      checkoutButton.classList.remove('btn-signin-required');
-      const valid = validateCustomerInfo({ silent: true });
-      if (!valid) {
-        checkoutButton.disabled = true;
-        checkoutButton.innerHTML = '<i class="fas fa-info-circle"></i> Complete Info to Continue';
-      } else {
-        checkoutButton.disabled = false;
-        checkoutButton.innerHTML = '<i class="fas fa-credit-card"></i> Proceed to Checkout';
-      }
+      checkoutButton.disabled = false;
+      checkoutButton.innerHTML = '<i class="fas fa-credit-card"></i> Proceed to Checkout';
     }
   }
 }
@@ -851,26 +817,44 @@ function removeItem(productId) {
 // ✅ VALIDATION — aware of auth state
 // ─────────────────────────────────────────────────────────────────────
 function validateCustomerInfo({ silent = false } = {}) {
-  // Checkout is account-based: user must be signed in.
-  if (!currentUser) return false;
-
   let isValid = true;
+  if (nameError)  nameError.style.display  = 'none';
+  if (emailError) emailError.style.display = 'none';
   if (phoneError) phoneError.style.display = 'none';
 
   const phone = (customerPhoneInput?.value || '').trim();
-  const phoneRegex = /^(0[789][01])\d{8}$/;
-  if (!phone || !phoneRegex.test(phone)) {
-    if (!silent && phoneError) {
-      phoneError.textContent = 'Enter a valid Nigerian WhatsApp number (e.g., 08031234567).';
-      phoneError.style.display = 'block';
+
+  if (currentUser) {
+    // Logged in — only validate phone + state
+    const phoneRegex = /^(0[789][01])\d{8}$/;
+    if (!phone || !phoneRegex.test(phone)) {
+      if (!silent && phoneError) { phoneError.textContent = 'Enter a valid Nigerian WhatsApp number (e.g., 08031234567).'; phoneError.style.display = 'block'; }
+      isValid = false;
     }
-    isValid = false;
+  } else {
+    // Guest — validate all fields
+    const name  = (customerNameInput?.value  || '').trim();
+    const email = (customerEmailInput?.value || '').trim();
+
+    if (!name || name.length < 3 || name.includes('@') || name.includes('.')) {
+      if (!silent && nameError) { nameError.textContent = 'Please enter your full name (not email).'; nameError.style.display = 'block'; }
+      isValid = false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      if (!silent && emailError) { emailError.textContent = 'Enter a valid email (e.g., name@example.com).'; emailError.style.display = 'block'; }
+      isValid = false;
+    }
+    const phoneRegex = /^(0[789][01])\d{8}$/;
+    if (!phone || !phoneRegex.test(phone)) {
+      if (!silent && phoneError) { phoneError.textContent = 'Enter a valid Nigerian WhatsApp number (e.g., 08031234567).'; phoneError.style.display = 'block'; }
+      isValid = false;
+    }
   }
 
   if (!(shippingStateSelect?.value || '')) isValid = false;
   return isValid;
 }
-
 
 // ─────────────────────────────────────────────────────────────────────
 // PRODUCT DETAIL MODAL (unchanged)
@@ -1065,7 +1049,9 @@ function setupEventListeners() {
   });
 
   shippingStateSelect?.addEventListener('change', updateCartUI);
-customerPhoneInput?.addEventListener('input', () => {
+  customerNameInput?.addEventListener('input',  updateCartUI);
+  customerEmailInput?.addEventListener('input', updateCartUI);
+  customerPhoneInput?.addEventListener('input', () => {
     updateCartUI();
     // Save phone for logged-in users
     if (currentUser && customerPhoneInput.value) {
@@ -1154,18 +1140,9 @@ function closeCartModal() {
 // ─────────────────────────────────────────────────────────────────────
 async function initiatePaystackPayment() {
   if (cart.length === 0) { alert('Your cart is empty.'); return; }
-
-  // ✅ FIX: Require sign-in before checkout
-  if (!currentUser) {
-    closeCartModal();
-    showToast('Please sign in to complete your purchase. 🔒', 'info');
-    openAuthModal('signin');
-    return;
-  }
-
-  // Logged in — use profile data
-  const name  = currentUser.name;
-  const email = currentUser.email;
+  // ✅ Guest checkout supported: use guest fields when logged out
+  const name  = currentUser ? currentUser.name  : (customerNameInput?.value || '').trim();
+  const email = currentUser ? currentUser.email : (customerEmailInput?.value || '').trim();
   const phone = (customerPhoneInput?.value || '').trim();
 
   if (!validateCustomerInfo()) { alert('Please complete all required information correctly.'); return; }
@@ -1304,28 +1281,6 @@ function warmUpBackend() {
 // INIT
 // ─────────────────────────────────────────────────────────────────────
 async function initializeApp() {
-  // ✅ Handle verification-link redirects like:
-  //   /?email_verified=1&email=user@example.com
-  // This solves the "I verified but I still can't login" confusion.
-  try {
-    const url = new URL(window.location.href);
-    const sp  = url.searchParams;
-    if (sp.get('email_verified') === '1') {
-      const e = (sp.get('email') || '').trim();
-      showToast('✅ Email verified. Please sign in to continue.', 'success');
-      openAuthModal('signin');
-      if (e) {
-        const siEmail = document.getElementById('siEmail');
-        if (siEmail) siEmail.value = e;
-      }
-      // Clean URL (remove params) without reloading
-      sp.delete('email_verified');
-      sp.delete('email');
-      url.search = sp.toString();
-      window.history.replaceState({}, document.title, url.toString());
-    }
-  } catch (_) {}
-
   // Load persisted auth state
   loadAuthState();
   updateAuthUI();
