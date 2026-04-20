@@ -338,14 +338,13 @@ img { max-width:100%; display:block; }
 .cart-actions { display:grid; gap:10px; }
 
 /* ==============================
-   Paystack lazy-loading indicator
-   ✅ NEW: Small inline spinner shown while Paystack script loads on demand
+   Inline loading helper
    ============================== */
-.paystack-loading-msg {
+.inline-loading-msg {
   text-align:center; padding:20px; color:var(--brand-blue);
   font-weight:600; font-size:1rem;
 }
-.paystack-loading-msg .spin-sm {
+.inline-loading-msg .spin-sm {
   width:28px; height:28px; border:3px solid #e9ecef;
   border-top-color:var(--brand-blue); border-radius:50%;
   animation:spinAnim 0.9s linear infinite;

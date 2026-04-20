@@ -9,7 +9,6 @@
 
   <!-- Preconnect to critical third-party origins -->
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
-  <link rel="preconnect" href="https://js.paystack.co" crossorigin />
   <link rel="preconnect" href="https://fortunehub-backend.onrender.com" crossorigin />
   <link rel="preconnect" href="https://accounts.google.com" crossorigin />
   <link rel="dns-prefetch" href="https://fortunehub-backend.onrender.com" />
@@ -286,7 +285,7 @@
         </div>
         <div class="cart-actions">
           <button id="checkoutButton" class="btn btn-tertiary" type="button">
-            <i class="fas fa-shopping-bag" aria-hidden="true"></i> Proceed to Checkout
+            <i class="fas fa-building-columns" aria-hidden="true"></i> Proceed to Bank Transfer
           </button>
           <button id="continueShoppingButton" class="btn btn-secondary" type="button">Continue Shopping</button>
         </div>
@@ -392,15 +391,22 @@
   </div>
 
   <!-- ===== ✅ RECEIPT MODAL ===== -->
-  <div id="receiptModal" class="modal" aria-hidden="true" role="dialog" aria-label="Order Receipt">
+  <div id="receiptModal" class="modal" aria-hidden="true" role="dialog" aria-label="Order details">
     <div class="modal-content receipt-modal-content" role="document">
       <button class="close" id="closeReceiptModal" type="button" aria-label="Close">&times;</button>
       <div id="receiptContent"></div>
       <div style="text-align:center;margin-top:20px;">
         <button type="button" class="btn btn-tertiary" id="printReceiptBtn" onclick="window.print()">
-          <i class="fas fa-print"></i> Print Receipt
+          <i class="fas fa-print"></i> Print Order Details
         </button>
       </div>
+    </div>
+  </div>
+
+  <div id="paymentInstructionsModal" class="modal" aria-hidden="true" role="dialog" aria-label="Payment instructions">
+    <div class="modal-content payment-instructions-content" role="document">
+      <button class="close" id="closePaymentInstructionsModal" type="button" aria-label="Close">&times;</button>
+      <div id="paymentInstructionsContent"></div>
     </div>
   </div>
 
@@ -458,5 +464,6 @@
   </footer>
 
   <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="script.js" defer></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

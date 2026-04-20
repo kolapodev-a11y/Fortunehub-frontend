@@ -13,7 +13,7 @@
 //
 // ✅ ALL v4 LOGIC PRESERVED:
 //    • Cold-start retry logic, warm-up ping
-//    • Lazy Paystack loader
+//    • Manual Opay transfer instructions
 //    • Image zoom, product detail modal
 //    • Search, filter, category cards
 //    • Cart localStorage, quantity controls
@@ -28,7 +28,7 @@ const GOOGLE_CLIENT_ID = '694580886466-hu48nsmlesv8qojnpkm218t0i7gpjepl.apps.goo
 
 const API_BASE_URL = 'https://fortunehub-backend.onrender.com';
 
-let PAYSTACK_PUBLIC_KEY = 'pk_test_9f6a5cb45aeab4bd8bccd72129beda47f2609921';
+let paymentConfig = null;
 
 const PER_ATTEMPT_TIMEOUT_MS = 10000;
 const MAX_RETRIES             = 5;
@@ -52,8 +52,7 @@ let cart = (() => {
 let currentProduct = null;
 let zoomEnabled    = false;
 
-// ✅ FIX: Track active payment reference to cancel it if user closes popup
-let _pendingPaymentRef = null;  // set when Paystack popup opens, cleared on verify/cancel
+let currentOrderFlow = null;
 
 // ─────────────────────────────────────────────────────────────────────
 // ✅ AUTH STATE
@@ -82,13 +81,6 @@ function authHeaders() {
   const token = getAuthToken();
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
-
-// ─────────────────────────────────────────────────────────────────────
-// Paystack lazy-load state
-// ─────────────────────────────────────────────────────────────────────
-let paystackScriptLoaded  = false;
-let paystackScriptLoading = false;
-let paystackLoadCallbacks = [];
 
 // ─────────────────────────────────────────────────────────────────────
 // DOM REFS
@@ -158,6 +150,11 @@ const receiptModal             = document.getElementById('receiptModal');
 const closeReceiptModal        = document.getElementById('closeReceiptModal');
 const receiptContent           = document.getElementById('receiptContent');
 
+// Payment instructions modal
+const paymentInstructionsModal      = document.getElementById('paymentInstructionsModal');
+const closePaymentInstructionsModal = document.getElementById('closePaymentInstructionsModal');
+const paymentInstructionsContent    = document.getElementById('paymentInstructionsContent');
+
 // Product detail modal
 const productDetailModal = document.getElementById('productDetailModal');
 const closeProductModal  = document.getElementById('closeProductModal');
@@ -180,6 +177,48 @@ const zoomResult         = document.getElementById('zoomResult');
 // ─────────────────────────────────────────────────────────────────────
 function formatCurrency(n) {
   return `₦${Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+function getStatusMeta(status) {
+  const map = {
+    pending_payment: { label: 'Pending Payment', className: 'pending-payment', hint: 'Transfer still needed' },
+    awaiting_verification: { label: 'Awaiting Verification', className: 'awaiting-verification', hint: 'Proof uploaded' },
+    paid: { label: 'Paid', className: 'paid', hint: 'Verified by admin' },
+    failed: { label: 'Failed', className: 'failed', hint: 'Please contact support' },
+    cancelled: { label: 'Cancelled', className: 'cancelled', hint: 'Order closed' }
+  };
+  return map[status] || { label: status || 'Unknown', className: 'pending-payment', hint: '' };
+}
+function buildWhatsAppLink(orderRef) {
+  const raw = String(paymentConfig?.whatsappHelpNumber || paymentConfig?.opayAccountPhone || '').replace(/\D/g, '');
+  if (!raw) return '';
+  const message = encodeURIComponent(`Hello FortuneHub, I need help with order ${orderRef}.`);
+  return `https://wa.me/${raw}?text=${message}`;
+}
+function renderTimeline(order) {
+  const done = new Set((order.statusTimeline || []).map(step => step.status));
+  const steps = [
+    { key: 'pending_payment', label: 'Order created' },
+    { key: 'awaiting_verification', label: 'Proof uploaded' },
+    { key: 'paid', label: 'Payment verified' }
+  ];
+  return `<div class="timeline-list">${steps.map(step => {
+    const active = done.has(step.key) || step.key === 'pending_payment';
+    return `<div class="timeline-step ${active ? 'is-complete' : ''}">
+      <span class="timeline-dot"></span>
+      <div>
+        <strong>${step.label}</strong>
+        <small>${active ? 'Completed' : 'Waiting'}</small>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
 }
 function getProductById(id) { return products.find(p => String(p.id) === String(id)); }
 function getProductsJsonUrl() { return new URL('products.json', window.location.href).toString(); }
@@ -471,8 +510,170 @@ function showToast(message, type = 'info') {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// ✅ ORDER HISTORY
+// ✅ ORDER HISTORY + MANUAL PAYMENT FLOW
 // ─────────────────────────────────────────────────────────────────────
+async function fetchPaymentConfig() {
+  if (paymentConfig) return paymentConfig;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/config/payment`, { headers: { Accept: 'application/json' } });
+    const data = await res.json();
+    if (data.success) paymentConfig = data.data || null;
+  } catch (err) {
+    console.warn('Could not load payment config:', err.message);
+  }
+  return paymentConfig;
+}
+
+function clearCartAfterOrder() {
+  cart = [];
+  localStorage.setItem('cart', JSON.stringify(cart));
+  if (shippingStateSelect) shippingStateSelect.value = '';
+  updateCartUI();
+}
+
+function closePaymentInstructions() {
+  if (!paymentInstructionsModal) return;
+  paymentInstructionsModal.style.display = 'none';
+  document.body.style.overflow = 'auto';
+}
+
+function renderPaymentInstructions(order) {
+  if (!paymentInstructionsContent) return;
+  const statusMeta = getStatusMeta(order.status);
+  const helpLink = buildWhatsAppLink(order.orderRef);
+  const instructions = (paymentConfig?.instructions || [
+    'Transfer the exact amount to the Opay account shown below.',
+    'Use your order reference as payment narration if possible.',
+    'Upload your transfer proof after sending payment.'
+  ]);
+  const proofBlock = order.status === 'pending_payment'
+    ? `
+      <form id="paymentProofForm" class="proof-upload-form">
+        <input type="hidden" id="paymentProofOrderId" value="${escapeHtml(order.id)}" />
+        <div class="form-group">
+          <label for="paymentTransactionId">Transaction ID (optional)</label>
+          <input type="text" id="paymentTransactionId" class="form-input" placeholder="Bank transaction ID or narration" value="${escapeHtml(order.transactionId || '')}" />
+        </div>
+        <div class="form-group">
+          <label for="paymentProofFile">Upload transfer proof</label>
+          <input type="file" id="paymentProofFile" class="form-input" accept="image/*,.pdf" required />
+          <small class="helper-text">Accepted: JPG, PNG, WEBP, or PDF up to 8MB.</small>
+        </div>
+        <button type="submit" class="btn btn-tertiary" id="submitProofButton">
+          <i class="fas fa-cloud-upload-alt"></i> I have sent the payment & upload proof
+        </button>
+      </form>`
+    : order.status === 'awaiting_verification'
+      ? `<div class="proof-status-card"><i class="fas fa-hourglass-half"></i><div><strong>Proof received</strong><p>Your proof has been uploaded and is awaiting manual verification.</p></div></div>`
+      : `<div class="proof-status-card paid"><i class="fas fa-check-circle"></i><div><strong>Payment verified</strong><p>Your payment has been verified successfully.${order.receiptPdfUrl ? ` <a href="${order.receiptPdfUrl}" target="_blank" rel="noopener">Download receipt PDF</a>.` : ''}</p></div></div>`;
+
+  paymentInstructionsContent.innerHTML = `
+    <div class="receipt-header">
+      <h2>Manual Opay Transfer</h2>
+      <p class="receipt-subtitle">Order <code>${escapeHtml(order.orderRef)}</code></p>
+    </div>
+    <div class="payment-summary-grid">
+      <div class="summary-card">
+        <span>Total to transfer</span>
+        <strong>${formatCurrency(order.amount)}</strong>
+      </div>
+      <div class="summary-card">
+        <span>Status</span>
+        <strong><span class="status-badge status-${statusMeta.className}">${statusMeta.label}</span></strong>
+      </div>
+      <div class="summary-card">
+        <span>Account name</span>
+        <strong>${escapeHtml(paymentConfig?.opayAccountName || 'Set OPAY_ACCOUNT_NAME')}</strong>
+      </div>
+      <div class="summary-card">
+        <span>Opay phone/account</span>
+        <strong>${escapeHtml(paymentConfig?.opayAccountPhone || 'Set OPAY_ACCOUNT_PHONE')}</strong>
+      </div>
+    </div>
+
+    <div class="instruction-card">
+      <h3><i class="fas fa-list-check"></i> Transfer instructions</h3>
+      <ol class="instruction-list">
+        ${instructions.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+      </ol>
+      <div class="account-pill-row">
+        <span class="account-pill">Order ref: ${escapeHtml(order.orderRef)}</span>
+        <span class="account-pill">Shipping: ${escapeHtml(order.shippingState || 'N/A')}</span>
+      </div>
+    </div>
+
+    <div class="instruction-card">
+      <h3><i class="fas fa-route"></i> Order timeline</h3>
+      ${renderTimeline(order)}
+    </div>
+
+    ${proofBlock}
+
+    <div class="payment-modal-actions">
+      ${helpLink ? `<a class="whatsapp-help-btn" href="${helpLink}" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> Need help on WhatsApp</a>` : ''}
+      <button type="button" class="btn btn-secondary" id="viewOrderHistoryFromPayment">View My Orders</button>
+    </div>
+  `;
+
+  document.getElementById('viewOrderHistoryFromPayment')?.addEventListener('click', () => {
+    closePaymentInstructions();
+    openOrderHistory();
+  });
+
+  document.getElementById('paymentProofForm')?.addEventListener('submit', submitPaymentProof);
+}
+
+async function openPaymentInstructions(order) {
+  currentOrderFlow = order;
+  await fetchPaymentConfig();
+  renderPaymentInstructions(order);
+  if (!paymentInstructionsModal) return;
+  paymentInstructionsModal.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+async function submitPaymentProof(event) {
+  event.preventDefault();
+  const orderId = document.getElementById('paymentProofOrderId')?.value;
+  const proofFile = document.getElementById('paymentProofFile')?.files?.[0];
+  const transactionId = document.getElementById('paymentTransactionId')?.value?.trim() || '';
+  const submitBtn = document.getElementById('submitProofButton');
+
+  if (!orderId || !proofFile) {
+    showToast('Please select your payment proof file.', 'error');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('proof', proofFile);
+  if (transactionId) formData.append('transactionId', transactionId);
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading proof…';
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/proof`, {
+      method: 'POST',
+      headers: { ...authHeaders() },
+      body: formData
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || 'Proof upload failed');
+    currentOrderFlow = data.data;
+    renderPaymentInstructions(currentOrderFlow);
+    showToast('Payment proof uploaded successfully.', 'success');
+  } catch (err) {
+    showToast(err.message || 'Could not upload proof.', 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> I have sent the payment & upload proof';
+    }
+  }
+}
+
 async function openOrderHistory() {
   closeDropdown();
   if (!currentUser) { openAuthModal('signin'); return; }
@@ -483,139 +684,132 @@ async function openOrderHistory() {
   if (orderHistoryList) orderHistoryList.innerHTML = `<div class="products-loading"><div class="spin"></div><p>Loading orders…</p></div>`;
 
   try {
-    const res  = await fetch(`${API_BASE_URL}/api/transactions/my`, {
-      headers: { ...authHeaders(), 'Accept': 'application/json' },
-    });
+    const res = await fetch(`${API_BASE_URL}/api/orders/my`, { headers: { ...authHeaders(), Accept: 'application/json' } });
     const data = await res.json();
-
-    if (!data.success) {
-      orderHistoryList.innerHTML = `<p class="order-empty">Could not load orders. Please try again.</p>`;
-      return;
-    }
+    if (!data.success) throw new Error(data.message || 'Could not load orders');
 
     const orders = data.data || [];
-    if (orders.length === 0) {
+    if (!orders.length) {
       orderHistoryList.innerHTML = `
         <div class="order-empty-state">
           <i class="fas fa-shopping-bag"></i>
           <p>No orders yet. Start shopping!</p>
-          <button class="btn btn-tertiary" onclick="document.getElementById('orderHistoryModal').style.display='none';document.body.style.overflow='auto';">
-            Browse Products
-          </button>
+          <button class="btn btn-tertiary" onclick="document.getElementById('orderHistoryModal').style.display='none';document.body.style.overflow='auto';">Browse Products</button>
         </div>`;
       return;
     }
 
     orderHistoryList.innerHTML = orders.map(order => {
-      const items    = order.metadata?.cart_items || [];
-      const date     = new Date(order.paymentDate || order.createdAt).toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' });
-      const itemsSummary = items.map(i => `${i.name} ×${i.quantity || 1}`).join(', ');
+      const statusMeta = getStatusMeta(order.status);
+      const date = new Date(order.createdAt).toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' });
+      const itemsSummary = (order.items || []).map(i => `${i.name} ×${i.quantity || 1}`).join(', ');
       return `
         <div class="order-card">
           <div class="order-card-header">
             <div>
-              <span class="order-ref">${order.reference}</span>
+              <span class="order-ref">${escapeHtml(order.orderRef)}</span>
               <span class="order-date">${date}</span>
             </div>
-            <span class="order-status order-status-${order.status}">${order.status}</span>
+            <span class="status-badge status-${statusMeta.className}">${statusMeta.label}</span>
           </div>
           <div class="order-card-body">
-            <p class="order-items-summary">${itemsSummary || 'Order items'}</p>
-            <p class="order-shipping">📍 ${order.metadata?.shipping_state || 'N/A'}</p>
+            <p class="order-items-summary">${escapeHtml(itemsSummary || 'Order items')}</p>
+            <p class="order-shipping">📍 ${escapeHtml(order.shippingState || 'N/A')} • ${formatCurrency(order.amount)}</p>
+            ${renderTimeline(order)}
           </div>
           <div class="order-card-footer">
-            <strong class="order-total">₦${Number(order.amount || 0).toLocaleString()}</strong>
-            <button class="btn-view-receipt" data-ref="${order.reference}" type="button">
-              <i class="fas fa-receipt"></i> View Receipt
-            </button>
+            <strong class="order-total">${formatCurrency(order.amount)}</strong>
+            <div class="order-card-actions">
+              <button class="btn-view-receipt" data-order-id="${order.id}" type="button">
+                <i class="fas fa-receipt"></i> View Details
+              </button>
+              ${order.status !== 'paid' ? `<button class="btn-secondary-action" data-pay-order-id="${order.id}" type="button"><i class="fas fa-building-columns"></i> Payment</button>` : ''}
+            </div>
           </div>
         </div>`;
     }).join('');
 
-    // Wire receipt buttons
-    orderHistoryList.querySelectorAll('.btn-view-receipt').forEach(btn => {
-      btn.addEventListener('click', () => openReceipt(btn.dataset.ref, orders));
+    orderHistoryList.querySelectorAll('[data-order-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const order = orders.find(item => item.id === btn.dataset.orderId);
+        if (order) openReceipt(order);
+      });
     });
 
+    orderHistoryList.querySelectorAll('[data-pay-order-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const order = orders.find(item => item.id === btn.dataset.payOrderId);
+        if (order) {
+          orderHistoryModal.style.display = 'none';
+          openPaymentInstructions(order);
+        }
+      });
+    });
   } catch (err) {
-    if (orderHistoryList) orderHistoryList.innerHTML = `<p class="order-empty">Error: ${err.message}</p>`;
+    orderHistoryList.innerHTML = `<p class="order-empty">Error: ${escapeHtml(err.message)}</p>`;
   }
 }
 
-function openReceipt(reference, orders) {
-  const order = orders.find(o => o.reference === reference);
+function openReceipt(order) {
   if (!order || !receiptModal || !receiptContent) return;
-
-  const items    = order.metadata?.cart_items || [];
-  const date     = new Date(order.paymentDate || order.createdAt).toLocaleDateString('en-NG', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-  const shipping = order.metadata?.shipping_state || 'N/A';
-  const phone    = order.metadata?.customer_phone || order.metadata?.phone || 'N/A';
-  const name     = order.metadata?.customer_name  || currentUser?.name   || 'Customer';
-  const fee      = Number(order.metadata?.shipping_fee || 0);
-  const total    = Number(order.amount || 0);
-  const subtotal = total - fee;
-
-  const itemsHtml = items.map(i => `
+  const date = new Date(order.createdAt).toLocaleDateString('en-NG', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  const statusMeta = getStatusMeta(order.status);
+  const itemsHtml = (order.items || []).map(i => `
     <tr>
-      <td style="padding:8px;border-bottom:1px solid #eee;">${i.name}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(i.name)}</td>
       <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;">${i.quantity || 1}</td>
-      <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">₦${Number(i.price || 0).toLocaleString()}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">${formatCurrency(Number(i.price || 0) * Number(i.quantity || 1))}</td>
     </tr>`).join('');
+  const helpLink = buildWhatsAppLink(order.orderRef);
 
   receiptContent.innerHTML = `
     <div class="receipt-header">
       <h2>Fortune's <span>Hub</span></h2>
-      <p class="receipt-subtitle">Order Receipt</p>
+      <p class="receipt-subtitle">Order Details</p>
     </div>
     <div class="receipt-meta">
-      <div><strong>Reference:</strong><code>${reference}</code></div>
+      <div><strong>Reference:</strong><code>${escapeHtml(order.orderRef)}</code></div>
       <div><strong>Date:</strong> ${date}</div>
-      <div><strong>Customer:</strong> ${name}</div>
-      <div><strong>WhatsApp:</strong> ${phone}</div>
-      <div><strong>Shipping To:</strong> ${shipping}</div>
-      <div><strong>Email:</strong> ${order.email || currentUser?.email || 'N/A'}</div>
+      <div><strong>Status:</strong> <span class="status-badge status-${statusMeta.className}">${statusMeta.label}</span></div>
+      <div><strong>Customer:</strong> ${escapeHtml(order.customerName || currentUser?.name || 'Customer')}</div>
+      <div><strong>WhatsApp:</strong> ${escapeHtml(order.customerPhone || 'N/A')}</div>
+      <div><strong>Shipping To:</strong> ${escapeHtml(order.shippingState || 'N/A')}</div>
+      <div><strong>Email:</strong> ${escapeHtml(order.email || currentUser?.email || 'N/A')}</div>
+      <div><strong>Transaction ID:</strong> ${escapeHtml(order.transactionId || 'Not provided')}</div>
     </div>
     <table class="receipt-table" style="width:100%;border-collapse:collapse;margin:16px 0;">
       <thead><tr style="background:#f0f2ff;">
         <th style="padding:10px;text-align:left;">Item</th>
         <th style="padding:10px;text-align:center;">Qty</th>
-        <th style="padding:10px;text-align:right;">Price</th>
+        <th style="padding:10px;text-align:right;">Amount</th>
       </tr></thead>
       <tbody>${itemsHtml}</tbody>
     </table>
     <div class="receipt-totals">
-      <div class="receipt-row"><span>Subtotal</span><span>₦${subtotal.toLocaleString()}</span></div>
-      <div class="receipt-row"><span>Shipping</span><span>₦${fee.toLocaleString()}</span></div>
-      <div class="receipt-row receipt-grand"><span>Total Paid</span><span>₦${total.toLocaleString()}</span></div>
+      <div class="receipt-row"><span>Subtotal</span><span>${formatCurrency(order.subtotal)}</span></div>
+      <div class="receipt-row"><span>Shipping</span><span>${formatCurrency(order.shippingFee)}</span></div>
+      <div class="receipt-row receipt-grand"><span>Total</span><span>${formatCurrency(order.amount)}</span></div>
     </div>
-    <p class="receipt-thankyou">Thank you for shopping with Fortune's Hub! 🛒</p>
-    <p class="receipt-contact">Questions? WhatsApp: 09033489520 | fortunehabib9@gmail.com</p>`;
+    <div class="instruction-card" style="margin-top:16px;">
+      <h3><i class="fas fa-route"></i> Order timeline</h3>
+      ${renderTimeline(order)}
+    </div>
+    <div class="payment-modal-actions">
+      ${order.status !== 'paid' ? `<button type="button" class="btn btn-tertiary" id="continuePaymentBtn"><i class="fas fa-building-columns"></i> Continue Payment</button>` : ''}
+      ${order.receiptPdfUrl ? `<a class="btn btn-secondary" href="${order.receiptPdfUrl}" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> Download PDF</a>` : ''}
+      ${helpLink ? `<a class="whatsapp-help-btn" href="${helpLink}" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> WhatsApp Help</a>` : ''}
+    </div>
+  `;
+
+  document.getElementById('continuePaymentBtn')?.addEventListener('click', () => {
+    receiptModal.style.display = 'none';
+    openPaymentInstructions(order);
+  });
 
   receiptModal.style.display = 'block';
   document.body.style.overflow = 'hidden';
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// LAZY PAYSTACK LOADER (unchanged)
-// ─────────────────────────────────────────────────────────────────────
-function loadPaystackScript() {
-  return new Promise((resolve, reject) => {
-    if (paystackScriptLoaded && typeof PaystackPop !== 'undefined') { resolve(); return; }
-    if (paystackScriptLoading) { paystackLoadCallbacks.push({ resolve, reject }); return; }
-    paystackScriptLoading = true;
-    paystackLoadCallbacks.push({ resolve, reject });
-    const script = document.createElement('script');
-    script.src   = 'https://js.paystack.co/v1/inline.js';
-    script.async = true;
-    script.onload  = () => { paystackScriptLoaded = true; paystackScriptLoading = false; paystackLoadCallbacks.forEach(cb => cb.resolve()); paystackLoadCallbacks = []; };
-    script.onerror = () => { paystackScriptLoading = false; const err = new Error('Failed to load Paystack SDK.'); paystackLoadCallbacks.forEach(cb => cb.reject(err)); paystackLoadCallbacks = []; };
-    document.head.appendChild(script);
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// LOADING OVERLAY (unchanged)
-// ─────────────────────────────────────────────────────────────────────
 function showLoadingOverlay(message = 'Processing…') {
   hideLoadingOverlay();
   const overlay = document.createElement('div');
@@ -626,7 +820,6 @@ function showLoadingOverlay(message = 'Processing…') {
       <h3 class="loading-title">${message}</h3>
       <p class="loading-subtitle">Please wait, do not close this window.</p>
       <div class="loading-progress"><div class="loading-progress-bar"></div></div>
-      <p class="loading-info"><i class="fas fa-info-circle"></i> Do not close or go back</p>
     </div>
     <style>
       #paymentLoadingOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:center;justify-content:center;animation:fadeInOvl .3s ease}
@@ -640,8 +833,6 @@ function showLoadingOverlay(message = 'Processing…') {
       .loading-progress{width:100%;height:6px;background:#f0f0f0;border-radius:10px;overflow:hidden;margin-bottom:20px}
       .loading-progress-bar{height:100%;background:linear-gradient(90deg,#667eea,#764ba2);border-radius:10px;animation:progressBarOvl 60s ease-in-out;width:0%}
       @keyframes progressBarOvl{0%{width:0%}50%{width:75%}100%{width:95%}}
-      .loading-info{font-size:13px;color:#9ca3af;margin:0;display:flex;align-items:center;justify-content:center;gap:8px}
-      .loading-info i{color:#667eea}
       @keyframes fadeOutOvl{from{opacity:1}to{opacity:0}}
     </style>`;
   document.body.appendChild(overlay);
@@ -650,6 +841,47 @@ function showLoadingOverlay(message = 'Processing…') {
 function hideLoadingOverlay() {
   const overlay = document.getElementById('paymentLoadingOverlay');
   if (overlay) { overlay.style.animation = 'fadeOutOvl .3s ease'; setTimeout(() => { overlay.remove(); document.body.style.overflow = 'auto'; }, 300); }
+}
+
+async function initiateManualCheckout() {
+  if (cart.length === 0) { alert('Your cart is empty.'); return; }
+  if (!currentUser) {
+    closeCartModal();
+    showToast('Please sign in to complete your purchase.', 'info');
+    openAuthModal('signin');
+    return;
+  }
+  if (!validateCustomerInfo()) { alert('Please complete all required information correctly.'); return; }
+
+  const shippingFeeNaira = parseInt(shippingStateSelect?.value || '0', 10) || 0;
+  const shippingState = shippingStateSelect?.options?.[shippingStateSelect.selectedIndex]?.text || '';
+  const phone = (customerPhoneInput?.value || '').trim();
+
+  showLoadingOverlay('Creating your order…');
+  try {
+    await fetchPaymentConfig();
+    const res = await fetch(`${API_BASE_URL}/api/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...authHeaders() },
+      body: JSON.stringify({
+        items: cart,
+        shippingState,
+        shippingFee: shippingFeeNaira,
+        customerPhone: phone
+      })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || 'Could not create order');
+    currentOrderFlow = data.data;
+    clearCartAfterOrder();
+    hideLoadingOverlay();
+    closeCartModal();
+    showToast(`Order ${currentOrderFlow.orderRef} created. Complete your Opay transfer.`, 'success');
+    openPaymentInstructions(currentOrderFlow);
+  } catch (err) {
+    hideLoadingOverlay();
+    alert(`❌ Could not create order: ${err.message || 'Unknown error'}`);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -727,7 +959,7 @@ function updateCartUI() {
       checkoutButton.innerHTML = '<i class="fas fa-info-circle"></i> Complete Info to Continue';
     } else {
       checkoutButton.disabled = false;
-      checkoutButton.innerHTML = '<i class="fas fa-credit-card"></i> Proceed to Checkout';
+      checkoutButton.innerHTML = '<i class="fas fa-building-columns"></i> Proceed to Bank Transfer';
     }
   }
 }
@@ -994,6 +1226,7 @@ function setupEventListeners() {
     if (authModal          && e.target === authModal)          closeAuthModal_fn();
     if (orderHistoryModal  && e.target === orderHistoryModal)  { orderHistoryModal.style.display = 'none'; document.body.style.overflow = 'auto'; }
     if (receiptModal       && e.target === receiptModal)       { receiptModal.style.display = 'none'; document.body.style.overflow = 'auto'; }
+    if (paymentInstructionsModal && e.target === paymentInstructionsModal) closePaymentInstructions();
     // Close dropdown when clicking outside
     if (!e.target.closest('.user-avatar-wrap')) closeDropdown();
   });
@@ -1012,7 +1245,7 @@ function setupEventListeners() {
     }
   });
 
-  checkoutButton?.addEventListener('click', initiatePaystackPayment);
+  checkoutButton?.addEventListener('click', initiateManualCheckout);
 
   productsGrid?.addEventListener('click', e => {
     const target = e.target;
@@ -1050,6 +1283,7 @@ function setupEventListeners() {
   // Close order history + receipt modals
   closeOrderHistoryModal?.addEventListener('click', () => { orderHistoryModal.style.display = 'none'; document.body.style.overflow = 'auto'; });
   closeReceiptModal?.addEventListener('click',      () => { receiptModal.style.display = 'none'; document.body.style.overflow = 'auto'; });
+  closePaymentInstructionsModal?.addEventListener('click', closePaymentInstructions);
 
   // Password toggle
   document.querySelectorAll('.toggle-pw').forEach(btn => {
@@ -1080,121 +1314,10 @@ function closeCartModal() {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// ✅ PAYSTACK PAYMENT — sends userId via auth header
+// MANUAL OPAY FLOW
 // ─────────────────────────────────────────────────────────────────────
-async function initiatePaystackPayment() {
-  if (cart.length === 0) { alert('Your cart is empty.'); return; }
-
-  // ✅ FIX: Require login before purchase — open auth modal if not logged in
-  if (!currentUser) {
-    // Close cart modal temporarily and open auth modal
-    closeCartModal();
-    showToast('Please sign in to complete your purchase.', 'info');
-    openAuthModal('signin');
-    return;
-  }
-
-  // Resolve name + email from auth (user is now guaranteed to be logged in)
-  const name  = currentUser.name;
-  const email = currentUser.email;
-  const phone = (customerPhoneInput?.value || '').trim();
-
-  if (!validateCustomerInfo()) { alert('Please complete all required information correctly.'); return; }
-
-  showLoadingOverlay('Loading payment system…');
-  try { await loadPaystackScript(); }
-  catch (err) { hideLoadingOverlay(); alert('Could not load payment system: ' + err.message + '\n\nPlease disable ad-blockers or try another network.'); return; }
-  if (typeof PaystackPop === 'undefined') { hideLoadingOverlay(); alert('Paystack could not load. Please try again.'); return; }
-
-  const shippingFeeNaira = parseInt(shippingStateSelect?.value || '0', 10) || 0;
-  const subtotalNaira    = cart.reduce((sum, item) => sum + Number(item.price || 0) * (item.quantity || 1), 0);
-  const totalNaira       = subtotalNaira + shippingFeeNaira;
-  if (!Number.isFinite(totalNaira) || totalNaira <= 0) { hideLoadingOverlay(); alert('Invalid total. Please refresh and try again.'); return; }
-
-  const totalKobo = Math.round(totalNaira * 100);
-  const metadata  = {
-    customer_name:  name,
-    customer_email: email,
-    customer_phone: phone,
-    cart_items:     cart,
-    shipping_fee:   shippingFeeNaira,
-    shipping_state: shippingStateSelect?.options?.[shippingStateSelect.selectedIndex]?.text || '',
-  };
-
-  showLoadingOverlay('Starting payment…');
-
-  fetch(`${API_BASE_URL}/api/payment/initialize`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...authHeaders() },
-    body:    JSON.stringify({ email, amount: totalNaira, metadata }),
-  })
-    .then(r => { if (!r.ok) throw new Error(`Initialize failed (HTTP ${r.status})`); return r.json(); })
-    .then(init => {
-      if (!init?.success || !init?.access_code) throw new Error(init?.message || 'Failed to initialize transaction');
-      if (init.public_key && init.public_key.startsWith('pk_')) PAYSTACK_PUBLIC_KEY = init.public_key;
-      hideLoadingOverlay();
-
-      // ✅ FIX: Store reference so we can cancel it if popup is closed
-      _pendingPaymentRef = init.reference;
-
-      const handler = PaystackPop.setup({
-        key: PAYSTACK_PUBLIC_KEY, email, amount: totalKobo, currency: 'NGN',
-        access_code: init.access_code, ref: init.reference, metadata,
-        callback: function (response) {
-          // Payment completed in Paystack popup — now verify on backend
-          _pendingPaymentRef = null; // clear: payment is being verified, not cancelled
-          showLoadingOverlay('Verifying your payment…');
-          const timeoutId = setTimeout(() => {
-            hideLoadingOverlay();
-            alert('⏱️ Verification taking longer than expected. Check your email for confirmation.\nReference: ' + response.reference);
-          }, 90000);
-
-          fetch(`${API_BASE_URL}/api/payment/verify`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...authHeaders() },
-            body:   JSON.stringify({ reference: response.reference }),
-          })
-            .then(r => { clearTimeout(timeoutId); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-            .then(data => {
-              hideLoadingOverlay();
-              if (data.success) {
-                cart = []; localStorage.setItem('cart', JSON.stringify(cart));
-                if (customerPhoneInput)  customerPhoneInput.value  = '';
-                if (shippingStateSelect) shippingStateSelect.value = '';
-                updateCartUI();
-                closeCartModal();
-                showToast('✅ Payment successful! Check your email for your receipt.', 'success');
-                // Auto-open order history for logged-in users
-                if (currentUser) setTimeout(openOrderHistory, 800);
-              } else {
-                alert('⚠️ Payment verification failed: ' + (data.message || 'Unknown error'));
-              }
-            })
-            .catch(err => { clearTimeout(timeoutId); hideLoadingOverlay(); alert('❌ Failed to verify payment. Contact support with reference: ' + response.reference); });
-        },
-        onClose: function () {
-          // ✅ FIX: User closed/cancelled Paystack popup without paying
-          // Update status from 'pending' to 'cancelled' on the backend
-          const ref = _pendingPaymentRef;
-          _pendingPaymentRef = null;
-          hideLoadingOverlay();
-          if (ref) {
-            fetch(`${API_BASE_URL}/api/payment/cancel`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...authHeaders() },
-              body: JSON.stringify({ reference: ref }),
-            }).catch(() => {}); // silent — best effort
-            showToast('Payment cancelled. Your cart is still saved.', 'info');
-          }
-        },
-      });
-      handler.openIframe();
-    })
-    .catch(err => {
-      hideLoadingOverlay();
-      alert('❌ Could not start payment: ' + (err?.message || 'Unknown error') + '\n\nPossible causes:\n• Backend still waking up (wait 30s)\n• PAYSTACK_SECRET_KEY missing in server env');
-    });
-}
+// Checkout now creates an order first, then opens the bank-transfer
+// instructions modal for proof upload and manual verification.
 
 // ─────────────────────────────────────────────────────────────────────
 // FETCH PRODUCTS WITH RETRY (unchanged)
@@ -1238,6 +1361,7 @@ async function initializeApp() {
   // Load persisted auth state
   loadAuthState();
   updateAuthUI();
+  fetchPaymentConfig().catch(() => {});
 
   // Init Google Sign-In (may be called again later if GIS not ready yet)
   if (typeof google !== 'undefined') initGoogleSignIn();
