@@ -197,10 +197,37 @@ function getStatusMeta(status) {
   return map[status] || { label: status || 'Unknown', className: 'pending-payment', hint: '' };
 }
 function buildWhatsAppLink(orderRef) {
-  const raw = String(paymentConfig?.whatsappHelpNumber || paymentConfig?.opayAccountPhone || '').replace(/\D/g, '');
+  const raw = String(paymentConfig?.whatsappHelpNumber || paymentConfig?.accountNumber || paymentConfig?.opayAccountPhone || '').replace(/\D/g, '');
   if (!raw) return '';
   const message = encodeURIComponent(`Hello FortuneHub, I need help with order ${orderRef}.`);
   return `https://wa.me/${raw}?text=${message}`;
+}
+function getPaymentAccountNumber() {
+  return paymentConfig?.accountNumber || paymentConfig?.opayAccountPhone || '';
+}
+function getPaymentAccountName() {
+  return paymentConfig?.accountName || paymentConfig?.opayAccountName || 'FortuneHub';
+}
+function getPaymentBankName() {
+  return paymentConfig?.bankName || 'OPay';
+}
+async function copyText(value, label = 'text') {
+  if (!value) return;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+    } else {
+      const temp = document.createElement('textarea');
+      temp.value = value;
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand('copy');
+      temp.remove();
+    }
+    showToast(`${label} copied`, 'success');
+  } catch (_) {
+    showToast(`Could not copy ${label}`, 'error');
+  }
 }
 function renderTimeline(order) {
   const done = new Set((order.statusTimeline || []).map(step => step.status));
@@ -542,16 +569,50 @@ function renderPaymentInstructions(order) {
   const statusMeta = getStatusMeta(order.status);
   const helpLink = buildWhatsAppLink(order.orderRef);
   const instructions = (paymentConfig?.instructions || [
-    'Transfer the exact amount to the Opay account shown below.',
+    'Transfer the exact amount to the bank account shown below.',
     'Use your order reference as payment narration if possible.',
     'Upload your transfer proof after sending payment.'
   ]);
+  const accountNumber = getPaymentAccountNumber();
+  const accountName = getPaymentAccountName();
+  const bankName = getPaymentBankName();
+  const orderItems = Array.isArray(order.items) ? order.items : [];
+
+  const productPreview = orderItems.length ? `
+    <div class="instruction-card payment-product-card">
+      <div class="card-heading">
+        <div>
+          <span class="payment-eyebrow">Purchased items</span>
+          <h3><i class="fas fa-bag-shopping"></i> Order summary</h3>
+        </div>
+        <span class="account-pill">${orderItems.length} item${orderItems.length === 1 ? '' : 's'}</span>
+      </div>
+      <div class="payment-product-list">
+        ${orderItems.map((item) => `
+          <div class="payment-product-item">
+            <img src="${escapeHtml(resolveAssetUrl(item.image || 'favicon.png'))}" alt="${escapeHtml(item.name || 'Product')}" class="payment-product-thumb" />
+            <div class="payment-product-meta">
+              <strong>${escapeHtml(item.name || 'Product')}</strong>
+              <span>Qty ${Number(item.quantity || 1)} • ${formatCurrency(Number(item.price || 0) * Number(item.quantity || 1))}</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  ` : '';
+
   const proofBlock = order.status === 'pending_payment'
     ? `
       <form id="paymentProofForm" class="proof-upload-form">
+        <div class="card-heading compact">
+          <div>
+            <span class="payment-eyebrow">Final step</span>
+            <h3><i class="fas fa-cloud-upload-alt"></i> Upload transfer proof</h3>
+          </div>
+        </div>
         <input type="hidden" id="paymentProofOrderId" value="${escapeHtml(order.id)}" />
         <div class="form-group">
-          <label for="paymentTransactionId">Transaction ID (optional)</label>
+          <label for="paymentTransactionId">Transaction ID or narration</label>
           <input type="text" id="paymentTransactionId" class="form-input" placeholder="Bank transaction ID or narration" value="${escapeHtml(order.transactionId || '')}" />
         </div>
         <div class="form-group">
@@ -568,52 +629,126 @@ function renderPaymentInstructions(order) {
       : `<div class="proof-status-card paid"><i class="fas fa-check-circle"></i><div><strong>Payment verified</strong><p>Your payment has been verified successfully.${order.receiptPdfUrl ? ` <a href="${order.receiptPdfUrl}" target="_blank" rel="noopener">Download receipt PDF</a>.` : ''}</p></div></div>`;
 
   paymentInstructionsContent.innerHTML = `
-    <div class="receipt-header">
-      <h2>Manual Opay Transfer</h2>
-      <p class="receipt-subtitle">Order <code>${escapeHtml(order.orderRef)}</code></p>
-    </div>
-    <div class="payment-summary-grid">
-      <div class="summary-card">
-        <span>Total to transfer</span>
-        <strong>${formatCurrency(order.amount)}</strong>
-      </div>
-      <div class="summary-card">
-        <span>Status</span>
-        <strong><span class="status-badge status-${statusMeta.className}">${statusMeta.label}</span></strong>
-      </div>
-      <div class="summary-card">
-        <span>Account name</span>
-        <strong>${escapeHtml(paymentConfig?.opayAccountName || 'Set OPAY_ACCOUNT_NAME')}</strong>
-      </div>
-      <div class="summary-card">
-        <span>Opay phone/account</span>
-        <strong>${escapeHtml(paymentConfig?.opayAccountPhone || 'Set OPAY_ACCOUNT_PHONE')}</strong>
-      </div>
-    </div>
+    <div class="payment-brand-shell">
+      <div class="payment-hero-card">
+        <div class="payment-brand-row">
+          <div class="payment-brand-lockup">
+            <div class="payment-brand-logo-wrap">
+              <img src="${escapeHtml(resolveAssetUrl('favicon.png'))}" alt="FortuneHub logo" class="payment-brand-logo" />
+            </div>
+            <div>
+              <span class="payment-eyebrow">FortuneHub secure checkout</span>
+              <h2>Bank Transfer Payment</h2>
+              <p class="receipt-subtitle">Order <code>${escapeHtml(order.orderRef)}</code></p>
+            </div>
+          </div>
+          <div class="payment-status-panel">
+            <span class="status-badge status-${statusMeta.className}">${statusMeta.label}</span>
+            <small>${escapeHtml(statusMeta.hint || 'Awaiting your next action')}</small>
+          </div>
+        </div>
 
-    <div class="instruction-card">
-      <h3><i class="fas fa-list-check"></i> Transfer instructions</h3>
-      <ol class="instruction-list">
-        ${instructions.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
-      </ol>
-      <div class="account-pill-row">
-        <span class="account-pill">Order ref: ${escapeHtml(order.orderRef)}</span>
-        <span class="account-pill">Shipping: ${escapeHtml(order.shippingState || 'N/A')}</span>
+        <div class="payment-highlight-grid">
+          <div class="highlight-tile">
+            <span>Total to transfer</span>
+            <strong>${formatCurrency(order.amount)}</strong>
+          </div>
+          <div class="highlight-tile">
+            <span>Bank</span>
+            <strong>${escapeHtml(bankName)}</strong>
+          </div>
+          <div class="highlight-tile">
+            <span>Account name</span>
+            <strong>${escapeHtml(accountName || 'Set OPAY_ACCOUNT_NAME')}</strong>
+          </div>
+          <div class="highlight-tile">
+            <span>Account number</span>
+            <strong>${escapeHtml(accountNumber || 'Set OPAY_ACCOUNT_NUMBER')}</strong>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div class="instruction-card">
-      <h3><i class="fas fa-route"></i> Order timeline</h3>
-      ${renderTimeline(order)}
-    </div>
+      <div class="payment-details-grid">
+        <div class="instruction-card payment-account-card">
+          <div class="card-heading">
+            <div>
+              <span class="payment-eyebrow">Transfer destination</span>
+              <h3><i class="fas fa-building-columns"></i> Account details</h3>
+            </div>
+            <span class="bank-chip">${escapeHtml(bankName)}</span>
+          </div>
 
-    ${proofBlock}
+          <div class="bank-account-grid">
+            <div class="bank-account-block">
+              <span class="bank-account-label">Account name</span>
+              <div class="bank-account-value">${escapeHtml(accountName || 'Set OPAY_ACCOUNT_NAME')}</div>
+            </div>
+            <div class="bank-account-block emphasis">
+              <span class="bank-account-label">Account number</span>
+              <div class="bank-account-value monospace">${escapeHtml(accountNumber || 'Set OPAY_ACCOUNT_NUMBER')}</div>
+            </div>
+            <div class="bank-account-block compact-block">
+              <span class="bank-account-label">Copy account number</span>
+              <button type="button" class="copy-chip" data-copy-value="${escapeHtml(accountNumber)}" data-copy-label="account number">
+                <i class="fas fa-copy"></i> Copy
+              </button>
+            </div>
+            <div class="bank-account-block compact-block">
+              <span class="bank-account-label">Copy order reference</span>
+              <button type="button" class="copy-chip" data-copy-value="${escapeHtml(order.orderRef)}" data-copy-label="order reference">
+                <i class="fas fa-copy"></i> Copy
+              </button>
+            </div>
+          </div>
 
-    <div class="payment-modal-actions">
-      ${helpLink ? `<a class="whatsapp-help-btn" href="${helpLink}" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> Need help on WhatsApp</a>` : ''}
-      <button type="button" class="btn btn-secondary" id="viewOrderHistoryFromPayment">View My Orders</button>
+          <div class="account-pill-row">
+            <span class="account-pill">Order ref: ${escapeHtml(order.orderRef)}</span>
+            <span class="account-pill">Shipping: ${escapeHtml(order.shippingState || 'N/A')}</span>
+          </div>
+          <p class="helper-inline">Use the exact amount above and keep your narration close to the order reference for faster confirmation.</p>
+        </div>
+
+        <div class="instruction-card">
+          <div class="card-heading compact">
+            <div>
+              <span class="payment-eyebrow">Verification checklist</span>
+              <h3><i class="fas fa-list-check"></i> Transfer instructions</h3>
+            </div>
+          </div>
+          <ol class="instruction-list">
+            ${instructions.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+          </ol>
+          <div class="instruction-note">
+            <i class="fas fa-shield-heart"></i>
+            <span>Payments are verified manually by the FortuneHub team before your order is completed.</span>
+          </div>
+        </div>
+
+        ${productPreview}
+
+        <div class="instruction-card">
+          <div class="card-heading compact">
+            <div>
+              <span class="payment-eyebrow">Order progress</span>
+              <h3><i class="fas fa-route"></i> Timeline</h3>
+            </div>
+          </div>
+          ${renderTimeline(order)}
+        </div>
+      </div>
+
+      ${proofBlock}
+
+      <div class="payment-modal-actions">
+        ${helpLink ? `<a class="whatsapp-help-btn" href="${helpLink}" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> Need help on WhatsApp</a>` : ''}
+        <button type="button" class="btn btn-secondary" id="viewOrderHistoryFromPayment">View My Orders</button>
+      </div>
     </div>
   `;
+
+  paymentInstructionsContent.querySelectorAll('[data-copy-value]').forEach((btn) => {
+    btn.addEventListener('click', () => copyText(btn.dataset.copyValue || '', btn.dataset.copyLabel || 'text'));
+  });
 
   document.getElementById('viewOrderHistoryFromPayment')?.addEventListener('click', () => {
     closePaymentInstructions();
@@ -876,7 +1011,7 @@ async function initiateManualCheckout() {
     clearCartAfterOrder();
     hideLoadingOverlay();
     closeCartModal();
-    showToast(`Order ${currentOrderFlow.orderRef} created. Complete your Opay transfer.`, 'success');
+    showToast(`Order ${currentOrderFlow.orderRef} created. Complete your bank transfer using the account details provided.`, 'success');
     openPaymentInstructions(currentOrderFlow);
   } catch (err) {
     hideLoadingOverlay();
