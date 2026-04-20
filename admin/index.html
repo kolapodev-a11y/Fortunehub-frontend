@@ -1581,9 +1581,9 @@
       <div class="view" id="view-payments">
 
         <div class="section-header">
-          <h2>Transaction History</h2>
+          <h2>Manual Payment Verification</h2>
           <button class="btn btn-danger" id="clearAllBtn" type="button">
-            <i class="fas fa-trash-alt"></i> Clear All Transactions
+            <i class="fas fa-rotate-right"></i> Refresh Orders
           </button>
         </div>
 
@@ -1593,7 +1593,7 @@
             <div class="stat-icon purple"><i class="fas fa-receipt"></i></div>
             <div class="stat-info">
               <div class="stat-value" id="payStatTotal">0</div>
-              <div class="stat-label">Total Transactions</div>
+              <div class="stat-label">Total Orders</div>
             </div>
           </div>
 
@@ -1601,15 +1601,15 @@
             <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
             <div class="stat-info">
               <div class="stat-value" id="payStatSuccess">0</div>
-              <div class="stat-label">Successful</div>
+              <div class="stat-label">Paid Orders</div>
             </div>
           </div>
 
           <div class="stat-card">
             <div class="stat-icon orange"><i class="fas fa-clock"></i></div>
             <div class="stat-info">
-              <div class="stat-value" id="payStatPending">0</div>
-              <div class="stat-label">Pending</div>
+              <div class="stat-value" id="payStatAwaiting Verification">0</div>
+              <div class="stat-label">Awaiting Verification</div>
             </div>
           </div>
 
@@ -1624,14 +1624,14 @@
 
         <!-- Filters -->
         <div class="filters-card">
-          <div class="filters-title"><i class="fas fa-sliders-h"></i> Filter Transactions</div>
+          <div class="filters-title"><i class="fas fa-sliders-h"></i> Filter Orders</div>
           <div class="filters-grid">
             <div class="filter-group">
               <label><i class="fas fa-circle-dot"></i> Status</label>
               <select id="paymentStatusFilter">
                 <option value="all">All Status</option>
                 <option value="success">Success</option>
-                <option value="pending">Pending</option>
+                <option value="pending">Awaiting Verification</option>
                 <option value="failed">Failed</option>
                 <option value="cancelled">Cancelled</option>
               </select>
@@ -1639,7 +1639,7 @@
 
             <div class="filter-group">
               <label><i class="fas fa-search"></i> Search</label>
-              <input type="text" id="paymentSearch" placeholder="Reference or Email..." />
+              <input type="text" id="paymentSearch" placeholder="Order ref, email, phone..." />
             </div>
 
             <div class="filter-group">
@@ -1662,12 +1662,12 @@
         <!-- Payments Table -->
         <div class="payments-card">
           <div class="payments-card-header">
-            <span class="payments-card-title"><i class="fas fa-list-ul"></i> Transactions</span>
+            <span class="payments-card-title"><i class="fas fa-list-ul"></i> Orders</span>
             <span class="payments-card-count" id="txCountLabel">—</span>
           </div>
           <div id="loadingIndicator" class="loading">
             <div class="spinner"></div>
-            <p>Loading transactions...</p>
+            <p>Loading orders...</p>
           </div>
 
           <div class="table-container" id="tableContainer">
@@ -1675,7 +1675,7 @@
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Reference</th>
+                  <th>Order Ref</th>
                   <th>Customer</th>
                   <th>Email</th>
                   <th>Amount</th>
@@ -1714,7 +1714,7 @@
 <div class="modal-backdrop" id="payDetailModal">
   <div class="modal" role="dialog" aria-modal="true" style="max-width:560px;">
     <div class="modal-header">
-      <h3><i class="fas fa-receipt" style="margin-right:8px;"></i>Transaction Details</h3>
+      <h3><i class="fas fa-receipt" style="margin-right:8px;"></i>Order Details</h3>
       <button class="btn-close-modal" id="closePayDetailModal" title="Close">
         <i class="fas fa-times"></i>
       </button>
@@ -1942,7 +1942,7 @@ function fmt(n) {
 }
 
 function authHeaders() {
-  return { 'Content-Type': 'application/json', 'Authorization': `Basic ${authToken}` };
+  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` };
 }
 
 function toast(msg, type = 'success') {
@@ -1960,7 +1960,7 @@ function showView(name) {
   document.querySelectorAll('.nav-item').forEach(n => {
     n.classList.toggle('active', n.dataset.view === name);
   });
-  const titles = { dashboard: ['Dashboard', 'Overview'], products: ['Products', 'Manage Catalog'], payments: ['Payments', 'Transaction History'] };
+  const titles = { dashboard: ['Dashboard', 'Overview'], products: ['Products', 'Manage Catalog'], payments: ['Orders', 'Manual Payment Verification'] };
   const [t, b] = titles[name] || ['–', '–'];
   document.getElementById('pageTitle').textContent = t;
   document.getElementById('pageBreadcrumb').textContent = b;
@@ -2732,10 +2732,41 @@ document.getElementById('confirmYes').addEventListener('click', async () => {
 });
 
 // =========================================================
-// 11) PAYMENTS — FULL TRANSACTION HISTORY
+// 11) ORDERS — MANUAL PAYMENT VERIFICATION
 // =========================================================
 let currentPayPage = 1;
 let currentPayFilters = {};
+let allOrderRows = [];
+const PAY_PAGE_SIZE = 20;
+
+function orderStatusClass(status) {
+  if (status === 'paid') return 'status-success';
+  if (status === 'awaiting_verification' || status === 'pending_payment') return 'status-pending';
+  if (status === 'cancelled') return 'status-cancelled';
+  return 'status-failed';
+}
+
+function orderStatusLabel(status) {
+  const labels = {
+    pending_payment: 'PENDING PAYMENT',
+    awaiting_verification: 'AWAITING VERIFICATION',
+    paid: 'PAID',
+    failed: 'FAILED',
+    cancelled: 'CANCELLED'
+  };
+  return labels[status] || String(status || 'UNKNOWN').toUpperCase();
+}
+
+function filterOrdersByDate(orders) {
+  const startDate = currentPayFilters.startDate ? new Date(`${currentPayFilters.startDate}T00:00:00`) : null;
+  const endDate = currentPayFilters.endDate ? new Date(`${currentPayFilters.endDate}T23:59:59`) : null;
+  return orders.filter((order) => {
+    const createdAt = new Date(order.createdAt || order.updatedAt || Date.now());
+    if (startDate && createdAt < startDate) return false;
+    if (endDate && createdAt > endDate) return false;
+    return true;
+  });
+}
 
 async function loadPayments(page = 1) {
   currentPayPage = page;
@@ -2743,111 +2774,103 @@ async function loadPayments(page = 1) {
   const loadingIndicator = document.getElementById('loadingIndicator');
   const tbody = document.getElementById('paymentsTableBody');
   const pager = document.getElementById('pagination');
+  const cardListEl = document.getElementById('payCardList');
 
   if (loadingIndicator) loadingIndicator.style.display = 'block';
   if (pager) pager.style.display = 'flex';
-  tbody.innerHTML = '';
+  if (tbody) tbody.innerHTML = '';
+  if (cardListEl) cardListEl.innerHTML = '';
 
   try {
-    const params = new URLSearchParams({ page, limit: 20, ...currentPayFilters });
-    if (params.get('status') === 'all') params.delete('status');
+    const params = new URLSearchParams();
+    if (currentPayFilters.status && currentPayFilters.status !== 'all') params.set('status', currentPayFilters.status);
+    if (currentPayFilters.search) params.set('q', currentPayFilters.search);
 
-    const res = await fetch(`${API_BASE}/api/admin/payments?${params}`, {
+    const res = await fetch(`${API_BASE}/api/admin/orders${params.toString() ? `?${params.toString()}` : ''}`, {
       headers: authHeaders()
     });
 
     if (res.status === 401) { logout(); return; }
 
     const data = await res.json();
-    if (!data.success) throw new Error(data.message || 'Failed to load payments');
+    if (!data.success) throw new Error(data.message || 'Failed to load orders');
 
-    const payments = data.data || [];
-    const stats = data.stats || {};
-    const pagination = data.pagination || { page, totalPages: 1 };
+    allOrderRows = filterOrdersByDate(data.data || []);
+    const totalOrders = allOrderRows.length;
+    const paidOrders = allOrderRows.filter((o) => o.status === 'paid').length;
+    const awaitingOrders = allOrderRows.filter((o) => o.status === 'awaiting_verification').length;
+    const paidRevenue = allOrderRows
+      .filter((o) => o.status === 'paid')
+      .reduce((sum, order) => sum + Number(order.amount || 0), 0);
 
-    // Stats
-    const totalTx = (stats.totalCount ?? ((stats.successCount || 0) + (stats.pendingCount || 0) + (stats.failedCount || 0))) || 0;
+    const totalPages = Math.max(1, Math.ceil(totalOrders / PAY_PAGE_SIZE));
+    if (currentPayPage > totalPages) currentPayPage = totalPages;
+    const startIndex = (currentPayPage - 1) * PAY_PAGE_SIZE;
+    const visibleOrders = allOrderRows.slice(startIndex, startIndex + PAY_PAGE_SIZE);
+
     const elTotal   = document.getElementById('payStatTotal');
     const elSuccess = document.getElementById('payStatSuccess');
     const elPending = document.getElementById('payStatPending');
     const elRevenue = document.getElementById('payStatRevenue');
+    if (elTotal) elTotal.textContent = totalOrders.toLocaleString();
+    if (elSuccess) elSuccess.textContent = paidOrders.toLocaleString();
+    if (elPending) elPending.textContent = awaitingOrders.toLocaleString();
+    if (elRevenue) elRevenue.textContent = fmt(paidRevenue);
 
-    if (elTotal)   elTotal.textContent   = totalTx.toLocaleString();
-    if (elSuccess) elSuccess.textContent = (stats.successCount || 0).toLocaleString();
-    if (elPending) elPending.textContent = (stats.pendingCount || 0).toLocaleString();
-    // FIX: Only count successful payments in revenue (not pending/cancelled)
-    if (elRevenue) elRevenue.textContent = fmt(stats.successAmount || 0);
-
-    // Keep the dashboard total payments card updated if present
     const dashRevenue = document.getElementById('statRevenue');
-    if (dashRevenue) dashRevenue.textContent = fmt(stats.successAmount || 0);
+    if (dashRevenue) dashRevenue.textContent = fmt(paidRevenue);
 
-    // Update count label
     const txLabel = document.getElementById('txCountLabel');
-    if (txLabel) txLabel.textContent = `${(data.pagination?.total || payments.length)} transactions`;
+    if (txLabel) txLabel.textContent = `${totalOrders} order${totalOrders === 1 ? '' : 's'}`;
 
-    // Table
-    const cardListEl = document.getElementById('payCardList');
-
-    if (!payments.length) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="7" style="text-align: center; padding: 40px;">
-            <div class="empty-state">
-              <i class="fas fa-inbox"></i>
-              <h3>No transactions found</h3>
-              <p>Try adjusting your filters</p>
-            </div>
-          </td>
-        </tr>
-      `;
-      if (cardListEl) cardListEl.innerHTML = `
+    if (!visibleOrders.length) {
+      const emptyHtml = `
         <div class="empty-state" style="padding:40px 20px;">
           <i class="fas fa-inbox"></i>
-          <h3>No transactions found</h3>
+          <h3>No orders found</h3>
           <p>Try adjusting your filters</p>
         </div>
       `;
+      if (tbody) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align:center;padding:40px;">${emptyHtml}</td>
+          </tr>
+        `;
+      }
+      if (cardListEl) cardListEl.innerHTML = emptyHtml;
     } else {
-      const cardList = document.getElementById('payCardList');
-      if (cardList) cardList.innerHTML = '';
+      visibleOrders.forEach((order) => {
+        const statusClass = orderStatusClass(order.status);
+        const date = fmtDate(order.createdAt || order.updatedAt || order.paymentDate);
+        const customerName = order.customerName || order.metadata?.customer_name || 'N/A';
+        const orderId = order._id || order.id || '';
+        const canVerify = order.status === 'awaiting_verification';
 
-      payments.forEach(p => {
-        const statusClass = p.status === 'success'   ? 'status-success'   :
-                           p.status === 'pending'   ? 'status-pending'   :
-                           p.status === 'cancelled' ? 'status-cancelled' : 'status-failed';
-        const customerName = p.metadata?.customer_name || 'N/A';
-        const date = fmtDate(p.createdAt || p.paymentDate);
-        const pid = p._id || '';
-
-        // Desktop table row
         const row = document.createElement('tr');
         row.innerHTML = `
           <td>${date}</td>
-          <td><code style="font-size:11px;">${escHtml(p.reference || '—')}</code></td>
+          <td><code style="font-size:11px;">${escHtml(order.orderRef || order.reference || '—')}</code></td>
           <td>${escHtml(customerName)}</td>
-          <td style="font-size:12px;">${escHtml(p.email || '—')}</td>
-          <td><strong>${fmt(p.amount)}</strong></td>
-          <td><span class="status-badge ${statusClass}">${escHtml((p.status || '').toUpperCase())}</span></td>
+          <td style="font-size:12px;">${escHtml(order.email || '—')}</td>
+          <td><strong>${fmt(order.amount)}</strong></td>
+          <td><span class="status-badge ${statusClass}">${escHtml(orderStatusLabel(order.status))}</span></td>
           <td style="white-space:nowrap;">
-            <button class="btn-view" onclick="viewPayment('${pid}')">
+            <button class="btn-view" onclick="viewPayment('${orderId}')">
               <i class="fas fa-eye"></i> View
             </button>
-            <button class="btn-del-tx" onclick="deleteTransaction('${pid}')" title="Delete this transaction" style="margin-left:6px;">
-              <i class="fas fa-trash-alt"></i>
-            </button>
+            ${canVerify ? `<button class="btn-view" style="margin-left:6px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-color:transparent;" onclick="verifyOrder('${orderId}')"><i class="fas fa-check"></i> Verify</button>` : ''}
           </td>
         `;
         tbody.appendChild(row);
 
-        // Mobile card
-        if (cardList) {
+        if (cardListEl) {
           const card = document.createElement('div');
           card.className = 'pay-card';
           card.innerHTML = `
             <div class="pay-card-top">
-              <span class="pay-card-ref">${escHtml(p.reference || '—')}</span>
-              <span class="pay-card-amount">${fmt(p.amount)}</span>
+              <span class="pay-card-ref">${escHtml(order.orderRef || order.reference || '—')}</span>
+              <span class="pay-card-amount">${fmt(order.amount)}</span>
             </div>
             <div class="pay-card-row">
               <span>👤 Customer</span>
@@ -2855,36 +2878,31 @@ async function loadPayments(page = 1) {
             </div>
             <div class="pay-card-row">
               <span>📧 Email</span>
-              <strong style="font-size:12px;">${escHtml(p.email || '—')}</strong>
+              <strong style="font-size:12px;">${escHtml(order.email || '—')}</strong>
             </div>
             <div class="pay-card-row">
               <span>📅 Date</span>
               <strong>${date}</strong>
             </div>
             <div class="pay-card-footer">
-              <span class="status-badge ${statusClass}">${escHtml((p.status || '').toUpperCase())}</span>
-              <div style="display:flex;gap:6px;">
-                <button class="btn-view" onclick="viewPayment('${pid}')">
+              <span class="status-badge ${statusClass}">${escHtml(orderStatusLabel(order.status))}</span>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+                <button class="btn-view" onclick="viewPayment('${orderId}')">
                   <i class="fas fa-eye"></i> Details
                 </button>
-                <button class="btn-del-tx" onclick="deleteTransaction('${pid}')" title="Delete">
-                  <i class="fas fa-trash-alt"></i>
-                </button>
+                ${canVerify ? `<button class="btn-view" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-color:transparent;" onclick="verifyOrder('${orderId}')"><i class="fas fa-check"></i> Verify</button>` : ''}
               </div>
             </div>
           `;
-          cardList.appendChild(card);
+          cardListEl.appendChild(card);
         }
       });
     }
 
-    // Pagination
-    updatePagination(pagination);
-
+    updatePagination({ page: currentPayPage, totalPages, total: totalOrders });
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--danger);"><i class="fas fa-exclamation-circle"></i> Error: ${escHtml(err.message)}</td></tr>`;
-    toast('Payment load error: ' + err.message, 'error');
-    const pager = document.getElementById('pagination');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--danger);"><i class="fas fa-exclamation-circle"></i> Error: ${escHtml(err.message)}</td></tr>`;
+    toast('Order load error: ' + err.message, 'error');
     if (pager) pager.style.display = 'none';
   } finally {
     if (loadingIndicator) loadingIndicator.style.display = 'none';
@@ -2909,177 +2927,161 @@ function updatePagination(pagination) {
 
   pager.style.display = 'flex';
   pageInfo.textContent = `Page ${page} of ${totalPages}`;
-
   prevBtn.disabled = page <= 1;
   nextBtn.disabled = page >= totalPages;
-
   prevBtn.onclick = () => { if (page > 1) loadPayments(page - 1); };
   nextBtn.onclick = () => { if (page < totalPages) loadPayments(page + 1); };
 }
 
-// View single payment details
 async function viewPayment(id) {
   try {
-    const res = await fetch(`${API_BASE}/api/admin/payments/${id}`, { headers: authHeaders() });
+    const res = await fetch(`${API_BASE}/api/admin/orders/${id}`, { headers: authHeaders() });
+    if (res.status === 401) { logout(); return; }
     const result = await res.json();
-    if (result.success) {
-      displayPaymentDetails(result.data);
-      document.getElementById('payDetailModal').classList.add('show');
-    } else {
-      toast('Failed to load payment details', 'error');
-    }
+    if (!result.success) throw new Error(result.message || 'Failed to load order details');
+    displayPaymentDetails(result.data);
+    document.getElementById('payDetailModal').classList.add('show');
   } catch (err) {
     toast('Error: ' + err.message, 'error');
   }
 }
 
-function displayPaymentDetails(payment) {
-  const metadata = payment.metadata || {};
-  const cartItems = metadata.cart_items || [];
-
-  let cartHTML = '';
-  if (cartItems.length > 0) {
-    cartHTML = '<div style="display:flex;flex-direction:column;gap:0;">';
-    cartItems.forEach((item, idx) => {
-      const rawPrice = Number(item.price || 0);
-      const unitPrice = rawPrice > 2000000 ? (rawPrice / 100) : rawPrice;
-      const itemTotal = unitPrice * (item.quantity || 1);
-      // ✅ FIX: item.image is stripped before saving to Paystack (to keep metadata <5KB).
-      // Fall back to looking up the product image from the already-loaded allProducts array
-      // so the Order Items section shows real product thumbnails instead of just 📦.
-      const imgSrc = item.image || (() => {
-        const pid = String(item.id || '').replace(/^db_/, '');
-        const match = allProducts.find(p =>
-          (pid && (String(p._id) === pid || String(p.id) === pid || String(p.id) === 'db_' + pid)) ||
-          (item.name && p.name === item.name)
-        );
-        return match
-          ? (match.image || (Array.isArray(match.images) && match.images.find(Boolean)) || '')
-          : '';
-      })();
-      const imgHtml = imgSrc
-        ? `<img src="${imgSrc}" alt="${escHtml(item.name || 'Item')}" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--border);flex-shrink:0;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><div style="display:none;width:52px;height:52px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📦</div>`
-        : `<div style="width:52px;height:52px;background:linear-gradient(135deg,rgba(102,126,234,.1),rgba(118,75,162,.1));border-radius:8px;border:1px solid rgba(102,126,234,.15);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📦</div>`;
-      const isLast = idx === cartItems.length - 1;
-      cartHTML += `
-        <div style="display:flex;align-items:center;gap:12px;padding:12px 0;${isLast?'':'border-bottom:1px solid var(--border);'}">
-          ${imgHtml}
-          <div style="flex:1;min-width:0;">
-            <strong style="font-size:14px;color:var(--text);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(item.name || 'Item')}</strong>
-            <small style="color:var(--text-muted);font-size:12px;">Qty: ${item.quantity || 1} × ${fmt(unitPrice)}</small>
-          </div>
-          <strong style="color:var(--primary);font-size:15px;white-space:nowrap;">${fmt(itemTotal)}</strong>
-        </div>`;
+async function verifyOrder(id) {
+  if (!confirm('Mark this order as paid and send the buyer receipt?')) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/orders/${id}/verify`, {
+      method: 'PUT',
+      headers: authHeaders()
     });
-    cartHTML += '</div>';
-  } else {
-    cartHTML = '<p style="color:var(--text-muted);font-size:13px;">No items data available</p>';
+    if (res.status === 401) { logout(); return; }
+    const result = await res.json();
+    if (!result.success) throw new Error(result.message || 'Could not verify order');
+    toast('✅ Order verified and receipt sent', 'success');
+    await loadPayments(currentPayPage);
+    displayPaymentDetails(result.data);
+    document.getElementById('payDetailModal').classList.add('show');
+  } catch (err) {
+    toast('Verification failed: ' + err.message, 'error');
   }
+}
 
-  const _sc = payment.status==='success'?'status-success':payment.status==='pending'?'status-pending':'status-failed';
-  const _sl = (payment.status||'unknown').toUpperCase();
+function displayPaymentDetails(order) {
+  const items = order.items || order.metadata?.cart_items || [];
+  const statusClass = orderStatusClass(order.status);
+  const canVerify = order.status === 'awaiting_verification';
+  const proofUrl = order.proofUrl || order.metadata?.proof_url || '';
+  const receiptUrl = order.receiptPdfUrl || order.metadata?.receipt_pdf_url || '';
+  const itemsHtml = items.length
+    ? `<div style="display:flex;flex-direction:column;gap:0;">${items.map((item, idx) => `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;${idx === items.length - 1 ? '' : 'border-bottom:1px solid var(--border);'}">
+        <div style="width:52px;height:52px;background:linear-gradient(135deg,rgba(102,126,234,.1),rgba(118,75,162,.1));border-radius:8px;border:1px solid rgba(102,126,234,.15);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📦</div>
+        <div style="flex:1;min-width:0;">
+          <strong style="font-size:14px;color:var(--text);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(item.name || 'Item')}</strong>
+          <small style="color:var(--text-muted);font-size:12px;">Qty: ${item.quantity || 1} × ${fmt(item.price || 0)}</small>
+        </div>
+        <strong style="color:var(--primary);font-size:15px;white-space:nowrap;">${fmt((Number(item.price || 0) * Number(item.quantity || 1)))}</strong>
+      </div>`).join('')}</div>`
+    : '<p style="color:var(--text-muted);font-size:13px;">No items data available</p>';
+
+  const timeline = (order.statusTimeline || []).map((step) => `
+    <div style="display:flex;gap:10px;align-items:flex-start;${step === order.statusTimeline[order.statusTimeline.length - 1] ? '' : 'margin-bottom:10px;'}">
+      <span style="width:10px;height:10px;border-radius:50%;background:${step.status === 'paid' ? '#10b981' : step.status === 'awaiting_verification' ? '#f59e0b' : '#667eea'};margin-top:6px;"></span>
+      <div>
+        <strong style="display:block;font-size:13px;color:var(--text);">${escHtml(step.label || step.status)}</strong>
+        <small style="display:block;color:var(--text-muted);">${fmtDate(step.at)}${step.note ? ` • ${escHtml(step.note)}` : ''}</small>
+      </div>
+    </div>
+  `).join('') || '<p style="color:var(--text-muted);font-size:13px;">No timeline yet.</p>';
+
   document.getElementById('payDetailBody').innerHTML = `
     <div style="display:grid;gap:14px;">
-
-      <!-- Hero Amount Card -->
       <div style="background:var(--gradient);border-radius:14px;padding:20px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <div>
-          <div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.7);margin-bottom:5px;">💰 Total Amount Paid</div>
-          <div style="font-size:32px;font-weight:900;color:#fff;letter-spacing:-1px;line-height:1;">${fmt(payment.amount)}</div>
-          <div style="font-size:12px;color:rgba(255,255,255,.78);margin-top:5px;">${escHtml(payment.currency || 'NGN')} · ${fmtDate(payment.createdAt)}</div>
+          <div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.7);margin-bottom:5px;">Order amount</div>
+          <div style="font-size:32px;font-weight:900;color:#fff;letter-spacing:-1px;line-height:1;">${fmt(order.amount)}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.78);margin-top:5px;">${escHtml(order.orderRef || order.reference || '—')} · ${fmtDate(order.createdAt)}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
-          <span class="status-badge ${_sc}" style="background:rgba(255,255,255,.2);color:#fff;border-color:rgba(255,255,255,.3);font-size:12px;padding:6px 14px;">${_sl}</span>
-          <span style="font-size:11px;color:rgba(255,255,255,.7);">Ref: ${escHtml((payment.reference||'').slice(-12))}</span>
+          <span class="status-badge ${statusClass}" style="background:rgba(255,255,255,.2);color:#fff;border-color:rgba(255,255,255,.3);font-size:12px;padding:6px 14px;">${escHtml(orderStatusLabel(order.status))}</span>
+          ${canVerify ? `<button class="btn-view" style="background:#fff;color:#059669;border-color:transparent;" onclick="verifyOrder('${escHtml(order.id || order._id || '')}')"><i class="fas fa-check"></i> Verify Now</button>` : ''}
         </div>
       </div>
 
-      <!-- Transaction + Customer side-by-side -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-
-        <!-- Transaction Info -->
-        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:16px;">
-          <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
-            <i class="fas fa-receipt" style="color:var(--primary);"></i> Transaction
-          </h4>
-          <div style="display:flex;flex-direction:column;gap:9px;">
-            <div>
-              <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Reference</div>
-              <code style="font-size:10.5px;word-break:break-all;background:rgba(102,126,234,.08);padding:3px 7px;border-radius:4px;color:var(--primary-dark);display:inline-block;">${escHtml(payment.reference || '—')}</code>
-            </div>
-            <div>
-              <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Currency</div>
-              <span style="font-size:13px;font-weight:600;">${escHtml(payment.currency || 'NGN')}</span>
-            </div>
-            <div>
-              <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Email Sent</div>
-              <span style="font-size:13px;">${payment.emailSent ? '<span style="color:#059669;font-weight:700;">✅ Sent</span>' : '<span style="color:#dc2626;font-weight:700;">❌ Not Sent</span>'}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Customer Info -->
         <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:16px;">
           <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
             <i class="fas fa-user" style="color:var(--success);"></i> Customer
           </h4>
           <div style="display:flex;flex-direction:column;gap:9px;">
-            <div>
-              <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Name</div>
-              <span style="font-size:13px;font-weight:700;">${escHtml(metadata.customer_name || 'N/A')}</span>
-            </div>
-            <div>
-              <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Email</div>
-              <span style="font-size:12px;">${escHtml(payment.email || 'N/A')}</span>
-            </div>
-            <div>
-              <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Phone</div>
-              <span style="font-size:13px;">${escHtml(metadata.customer_phone || 'N/A')}</span>
-            </div>
-            <div>
-              <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Delivery State</div>
-              <span style="font-size:12px;font-weight:600;">${escHtml(metadata.shipping_state || 'N/A')}</span>
-            </div>
+            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Name</div><span style="font-size:13px;font-weight:700;">${escHtml(order.customerName || order.metadata?.customer_name || 'N/A')}</span></div>
+            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Email</div><span style="font-size:12px;">${escHtml(order.email || 'N/A')}</span></div>
+            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Phone</div><span style="font-size:13px;">${escHtml(order.customerPhone || order.metadata?.customer_phone || 'N/A')}</span></div>
+            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Shipping</div><span style="font-size:12px;font-weight:600;">${escHtml(order.shippingState || order.metadata?.shipping_state || 'N/A')}</span></div>
+          </div>
+        </div>
+
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:16px;">
+          <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
+            <i class="fas fa-building-columns" style="color:var(--warning);"></i> Payment
+          </h4>
+          <div style="display:flex;flex-direction:column;gap:9px;">
+            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Method</div><span style="font-size:13px;font-weight:700;">Opay manual transfer</span></div>
+            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Transaction ID</div><span style="font-size:12px;">${escHtml(order.transactionId || 'Not provided')}</span></div>
+            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Verified By</div><span style="font-size:12px;">${escHtml(order.verifiedBy || '—')}</span></div>
+            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Verified At</div><span style="font-size:12px;">${fmtDate(order.verifiedAt)}</span></div>
           </div>
         </div>
       </div>
 
-      <!-- Order Items -->
       <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:16px;">
         <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
-          <i class="fas fa-shopping-bag" style="color:var(--warning);"></i> Order Items
+          <i class="fas fa-shopping-bag" style="color:var(--primary);"></i> Order Items
         </h4>
-        ${cartHTML}
+        ${itemsHtml}
       </div>
 
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:16px;">
+          <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
+            <i class="fas fa-paperclip" style="color:var(--danger);"></i> Uploaded Proof
+          </h4>
+          ${proofUrl ? `<a href="${proofUrl}" target="_blank" rel="noopener" class="btn-view"><i class="fas fa-up-right-from-square"></i> Open Proof</a>` : '<p style="color:var(--text-muted);font-size:13px;">No proof uploaded yet.</p>'}
+          ${receiptUrl ? `<div style="margin-top:10px;"><a href="${receiptUrl}" target="_blank" rel="noopener" class="btn-view"><i class="fas fa-file-pdf"></i> Receipt PDF</a></div>` : ''}
+        </div>
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:16px;">
+          <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
+            <i class="fas fa-timeline" style="color:var(--info);"></i> Timeline
+          </h4>
+          ${timeline}
+        </div>
+      </div>
     </div>
   `;
 }
 
-// Payment detail modal close
 document.getElementById('closePayDetailModal').addEventListener('click', () => {
   document.getElementById('payDetailModal').classList.remove('show');
 });
 document.getElementById('payDetailModal').addEventListener('click', (e) => {
-  if (e.target === document.getElementById('payDetailModal'))
+  if (e.target === document.getElementById('payDetailModal')) {
     document.getElementById('payDetailModal').classList.remove('show');
+  }
 });
 
-// Filters
 document.getElementById('applyPayFilters').addEventListener('click', () => {
   currentPayFilters = {
-    status:    document.getElementById('paymentStatusFilter').value,
-    search:    document.getElementById('paymentSearch').value.trim(),
+    status: document.getElementById('paymentStatusFilter').value,
+    search: document.getElementById('paymentSearch').value.trim(),
     startDate: document.getElementById('payStartDate').value,
-    endDate:   document.getElementById('payEndDate').value
+    endDate: document.getElementById('payEndDate').value
   };
-  Object.keys(currentPayFilters).forEach(k => {
-    if (!currentPayFilters[k] || currentPayFilters[k] === 'all') delete currentPayFilters[k];
+  Object.keys(currentPayFilters).forEach((key) => {
+    if (!currentPayFilters[key] || currentPayFilters[key] === 'all') delete currentPayFilters[key];
   });
   loadPayments(1);
 });
 
-document.getElementById('clearAllBtn').addEventListener('click', clearAllTransactions);
+document.getElementById('clearAllBtn').addEventListener('click', () => loadPayments(1));
 
 document.getElementById('resetPayFilters').addEventListener('click', () => {
   document.getElementById('paymentStatusFilter').value = 'all';
@@ -3100,59 +3102,8 @@ document.getElementById('paymentSearch').addEventListener('input', () => {
   }, 400);
 });
 
-// Clear all transactions
-async function clearAllTransactions() {
-  if (!confirm('⚠️ WARNING: This will permanently delete ALL transactions.\n\nThis action CANNOT be undone!\n\nAre you sure?')) return;
-  if (!confirm('⚠️ FINAL CONFIRMATION\n\nClick OK to delete ALL transactions or Cancel to abort.')) return;
-
-  const btn = document.getElementById('clearAllBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Clearing...';
-
-  try {
-    const res = await fetch(`${API_BASE}/api/admin/payments/clear-all`, {
-      method: 'DELETE', headers: authHeaders()
-    });
-    if (res.status === 401) { logout(); return; }
-    const result = await res.json();
-    if (result.success) {
-      toast(`✅ Cleared ${result.deletedCount} transaction(s)`, 'success');
-      loadPayments(1);
-    } else {
-      toast('Error: ' + result.message, 'error');
-    }
-  } catch (err) {
-    toast('Connection Error: ' + err.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-trash-alt"></i> Clear All Transactions';
-  }
-}
-
-// Delete a single transaction
-async function deleteTransaction(id) {
-  if (!confirm('Delete this transaction?\n\nThis action cannot be undone.')) return;
-
-  try {
-    const res = await fetch(`${API_BASE}/api/admin/payments/${id}`, {
-      method: 'DELETE', headers: authHeaders()
-    });
-    if (res.status === 401) { logout(); return; }
-    const result = await res.json();
-    if (result.success) {
-      toast('✅ Transaction deleted', 'success');
-      loadPayments(currentPayPage);
-    } else {
-      toast('Error: ' + result.message, 'error');
-    }
-  } catch (err) {
-    toast('Connection error: ' + err.message, 'error');
-  }
-}
-
-window.clearAllTransactions = clearAllTransactions;
 window.viewPayment = viewPayment;
-window.deleteTransaction = deleteTransaction;
+window.verifyOrder = verifyOrder;
 
 function fmtDate(dateString) {
   if (!dateString) return '—';
@@ -3166,8 +3117,7 @@ function fmtDate(dateString) {
 // 12) DASHBOARD
 // =========================================================
 async function loadDashboard() {
-  await loadProducts();
-  await loadPayments();
+  await Promise.all([loadProducts(), loadPayments()]);
 }
 
 // =========================================================
@@ -3179,4 +3129,4 @@ if (authToken) {
 </script>
 </body>
 </html>
-   
+
