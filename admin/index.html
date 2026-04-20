@@ -1581,7 +1581,7 @@
       <div class="view" id="view-payments">
 
         <div class="section-header">
-          <h2>Manual Payment Verification</h2>
+          <h2>Bank Transfer Verification</h2>
           <button class="btn btn-danger" id="clearAllBtn" type="button">
             <i class="fas fa-rotate-right"></i> Refresh Orders
           </button>
@@ -1608,7 +1608,7 @@
           <div class="stat-card">
             <div class="stat-icon orange"><i class="fas fa-clock"></i></div>
             <div class="stat-info">
-              <div class="stat-value" id="payStatAwaiting Verification">0</div>
+              <div class="stat-value" id="payStatPending">0</div>
               <div class="stat-label">Awaiting Verification</div>
             </div>
           </div>
@@ -1630,8 +1630,9 @@
               <label><i class="fas fa-circle-dot"></i> Status</label>
               <select id="paymentStatusFilter">
                 <option value="all">All Status</option>
-                <option value="success">Success</option>
-                <option value="pending">Awaiting Verification</option>
+                <option value="pending_payment">Pending Transfer</option>
+                <option value="awaiting_verification">Awaiting Verification</option>
+                <option value="paid">Paid</option>
                 <option value="failed">Failed</option>
                 <option value="cancelled">Cancelled</option>
               </select>
@@ -1712,7 +1713,7 @@
      PAYMENT DETAIL MODAL
 ===================================================== -->
 <div class="modal-backdrop" id="payDetailModal">
-  <div class="modal" role="dialog" aria-modal="true" style="max-width:560px;">
+  <div class="modal" role="dialog" aria-modal="true" style="max-width:920px;">
     <div class="modal-header">
       <h3><i class="fas fa-receipt" style="margin-right:8px;"></i>Order Details</h3>
       <button class="btn-close-modal" id="closePayDetailModal" title="Close">
@@ -1960,7 +1961,7 @@ function showView(name) {
   document.querySelectorAll('.nav-item').forEach(n => {
     n.classList.toggle('active', n.dataset.view === name);
   });
-  const titles = { dashboard: ['Dashboard', 'Overview'], products: ['Products', 'Manage Catalog'], payments: ['Orders', 'Manual Payment Verification'] };
+  const titles = { dashboard: ['Dashboard', 'Overview'], products: ['Products', 'Manage Catalog'], payments: ['Orders', 'Bank Transfer Verification'] };
   const [t, b] = titles[name] || ['–', '–'];
   document.getElementById('pageTitle').textContent = t;
   document.getElementById('pageBreadcrumb').textContent = b;
@@ -2757,6 +2758,14 @@ function orderStatusLabel(status) {
   return labels[status] || String(status || 'UNKNOWN').toUpperCase();
 }
 
+function resolveOrderAssetUrl(url) {
+  if (!url) return '';
+  if (/^(https?:|data:)/i.test(url)) return url;
+  if (url.startsWith('/uploads/')) return `${API_BASE}${url}`;
+  if (url.startsWith('/')) return new URL(url, window.location.origin).toString();
+  return new URL(url, `${window.location.origin}/`).toString();
+}
+
 function filterOrdersByDate(orders) {
   const startDate = currentPayFilters.startDate ? new Date(`${currentPayFilters.startDate}T00:00:00`) : null;
   const endDate = currentPayFilters.endDate ? new Date(`${currentPayFilters.endDate}T23:59:59`) : null;
@@ -2947,7 +2956,7 @@ async function viewPayment(id) {
 }
 
 async function verifyOrder(id) {
-  if (!confirm('Mark this order as paid and send the buyer receipt?')) return;
+  if (!confirm('Mark this transfer as paid and send the buyer receipt?')) return;
   try {
     const res = await fetch(`${API_BASE}/api/admin/orders/${id}/verify`, {
       method: 'PUT',
@@ -2971,88 +2980,121 @@ function displayPaymentDetails(order) {
   const canVerify = order.status === 'awaiting_verification';
   const proofUrl = order.proofUrl || order.metadata?.proof_url || '';
   const receiptUrl = order.receiptPdfUrl || order.metadata?.receipt_pdf_url || '';
+  const proofIsImage = /\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(proofUrl || '');
+
   const itemsHtml = items.length
-    ? `<div style="display:flex;flex-direction:column;gap:0;">${items.map((item, idx) => `
-      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;${idx === items.length - 1 ? '' : 'border-bottom:1px solid var(--border);'}">
-        <div style="width:52px;height:52px;background:linear-gradient(135deg,rgba(102,126,234,.1),rgba(118,75,162,.1));border-radius:8px;border:1px solid rgba(102,126,234,.15);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📦</div>
-        <div style="flex:1;min-width:0;">
-          <strong style="font-size:14px;color:var(--text);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(item.name || 'Item')}</strong>
-          <small style="color:var(--text-muted);font-size:12px;">Qty: ${item.quantity || 1} × ${fmt(item.price || 0)}</small>
-        </div>
-        <strong style="color:var(--primary);font-size:15px;white-space:nowrap;">${fmt((Number(item.price || 0) * Number(item.quantity || 1)))}</strong>
-      </div>`).join('')}</div>`
+    ? `<div style="display:grid;gap:12px;">${items.map((item) => {
+        const imageUrl = resolveOrderAssetUrl(item.image || '');
+        return `
+          <div style="display:flex;align-items:center;gap:14px;padding:14px;border:1px solid rgba(102,126,234,.12);border-radius:16px;background:linear-gradient(180deg,#fff,#f8faff);">
+            ${imageUrl ? `<img src="${escHtml(imageUrl)}" alt="${escHtml(item.name || 'Item')}" style="width:68px;height:68px;border-radius:14px;object-fit:cover;border:1px solid rgba(102,126,234,.15);background:#fff;flex-shrink:0;"/>` : `<div style="width:68px;height:68px;border-radius:14px;background:linear-gradient(135deg,rgba(102,126,234,.12),rgba(118,75,162,.12));display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;">📦</div>`}
+            <div style="flex:1;min-width:0;display:grid;gap:4px;">
+              <strong style="font-size:14px;color:var(--text);overflow-wrap:anywhere;">${escHtml(item.name || 'Item')}</strong>
+              <span style="font-size:12px;color:var(--text-muted);">Qty ${item.quantity || 1} • ${fmt(item.price || 0)} each</span>
+            </div>
+            <strong style="color:var(--primary);font-size:15px;white-space:nowrap;">${fmt(Number(item.price || 0) * Number(item.quantity || 1))}</strong>
+          </div>`;
+      }).join('')}</div>`
     : '<p style="color:var(--text-muted);font-size:13px;">No items data available</p>';
 
   const timeline = (order.statusTimeline || []).map((step) => `
-    <div style="display:flex;gap:10px;align-items:flex-start;${step === order.statusTimeline[order.statusTimeline.length - 1] ? '' : 'margin-bottom:10px;'}">
-      <span style="width:10px;height:10px;border-radius:50%;background:${step.status === 'paid' ? '#10b981' : step.status === 'awaiting_verification' ? '#f59e0b' : '#667eea'};margin-top:6px;"></span>
+    <div style="display:flex;gap:10px;align-items:flex-start;${step === order.statusTimeline[order.statusTimeline.length - 1] ? '' : 'margin-bottom:12px;'}">
+      <span style="width:12px;height:12px;border-radius:50%;background:${step.status === 'paid' ? '#10b981' : step.status === 'awaiting_verification' ? '#f59e0b' : '#667eea'};margin-top:5px;box-shadow:0 0 0 5px ${step.status === 'paid' ? 'rgba(16,185,129,.14)' : step.status === 'awaiting_verification' ? 'rgba(245,158,11,.16)' : 'rgba(102,126,234,.12)'};"></span>
       <div>
         <strong style="display:block;font-size:13px;color:var(--text);">${escHtml(step.label || step.status)}</strong>
-        <small style="display:block;color:var(--text-muted);">${fmtDate(step.at)}${step.note ? ` • ${escHtml(step.note)}` : ''}</small>
+        <small style="display:block;color:var(--text-muted);line-height:1.55;">${fmtDate(step.at)}${step.note ? ` • ${escHtml(step.note)}` : ''}</small>
       </div>
     </div>
   `).join('') || '<p style="color:var(--text-muted);font-size:13px;">No timeline yet.</p>';
 
+  const proofPreviewHtml = proofUrl
+    ? proofIsImage
+      ? `<a href="${proofUrl}" target="_blank" rel="noopener" style="display:block;margin:12px 0 14px;"><img src="${proofUrl}" alt="Uploaded payment proof" style="width:100%;max-height:280px;object-fit:contain;border-radius:16px;border:1px solid var(--border);background:#fff;" /></a>`
+      : `<div style="margin:12px 0 14px;padding:18px;border-radius:16px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:13px;line-height:1.6;"><strong>Payment proof document uploaded.</strong><br/>Open the file to review the full document.</div>`
+    : '<p style="color:var(--text-muted);font-size:13px;margin:0 0 14px;">No proof uploaded yet.</p>';
+
   document.getElementById('payDetailBody').innerHTML = `
-    <div style="display:grid;gap:14px;">
-      <div style="background:var(--gradient);border-radius:14px;padding:20px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+    <div style="display:grid;gap:16px;">
+      <div style="background:var(--gradient);border-radius:20px;padding:22px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;box-shadow:0 16px 34px rgba(102,126,234,.24);">
         <div>
-          <div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.7);margin-bottom:5px;">Order amount</div>
-          <div style="font-size:32px;font-weight:900;color:#fff;letter-spacing:-1px;line-height:1;">${fmt(order.amount)}</div>
-          <div style="font-size:12px;color:rgba(255,255,255,.78);margin-top:5px;">${escHtml(order.orderRef || order.reference || '—')} · ${fmtDate(order.createdAt)}</div>
+          <div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.72);margin-bottom:6px;">Transfer amount</div>
+          <div style="font-size:34px;font-weight:900;color:#fff;letter-spacing:-1px;line-height:1;">${fmt(order.amount)}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.82);margin-top:8px;line-height:1.6;">${escHtml(order.orderRef || order.reference || '—')}<br/>Created ${fmtDate(order.createdAt)}</div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
-          <span class="status-badge ${statusClass}" style="background:rgba(255,255,255,.2);color:#fff;border-color:rgba(255,255,255,.3);font-size:12px;padding:6px 14px;">${escHtml(orderStatusLabel(order.status))}</span>
-          ${canVerify ? `<button class="btn-view" style="background:#fff;color:#059669;border-color:transparent;" onclick="verifyOrder('${escHtml(order.id || order._id || '')}')"><i class="fas fa-check"></i> Verify Now</button>` : ''}
+        <div style="display:grid;gap:10px;justify-items:end;">
+          <span class="status-badge ${statusClass}" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.28);font-size:12px;padding:7px 14px;">${escHtml(orderStatusLabel(order.status))}</span>
+          ${canVerify ? `<button class="btn-view" style="background:#fff;color:#059669;border-color:transparent;" onclick="verifyOrder('${escHtml(order.id || order._id || '')}')"><i class="fas fa-check"></i> Verify transfer</button>` : ''}
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:16px;">
-          <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
-            <i class="fas fa-user" style="color:var(--success);"></i> Customer
-          </h4>
-          <div style="display:flex;flex-direction:column;gap:9px;">
-            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Name</div><span style="font-size:13px;font-weight:700;">${escHtml(order.customerName || order.metadata?.customer_name || 'N/A')}</span></div>
-            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Email</div><span style="font-size:12px;">${escHtml(order.email || 'N/A')}</span></div>
-            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Phone</div><span style="font-size:13px;">${escHtml(order.customerPhone || order.metadata?.customer_phone || 'N/A')}</span></div>
-            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Shipping</div><span style="font-size:12px;font-weight:600;">${escHtml(order.shippingState || order.metadata?.shipping_state || 'N/A')}</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;">
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;">
+          <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Subtotal</div>
+          <div style="font-size:24px;font-weight:900;color:var(--text);">${fmt(order.subtotal || 0)}</div>
+        </div>
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;">
+          <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Shipping</div>
+          <div style="font-size:24px;font-weight:900;color:var(--text);">${fmt(order.shippingFee || 0)}</div>
+        </div>
+        <div style="background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(255,255,255,.92));border:1px solid rgba(16,185,129,.2);border-radius:16px;padding:16px;">
+          <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Total received</div>
+          <div style="font-size:24px;font-weight:900;color:#059669;">${fmt(order.amount || 0)}</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1.15fr .85fr;gap:12px;align-items:start;">
+        <div style="display:grid;gap:12px;">
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;">
+            <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
+              <i class="fas fa-user" style="color:var(--success);"></i> Customer profile
+            </h4>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Name</div><span style="font-size:13px;font-weight:700;">${escHtml(order.customerName || order.metadata?.customer_name || 'N/A')}</span></div>
+              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Phone</div><span style="font-size:13px;">${escHtml(order.customerPhone || order.metadata?.customer_phone || 'N/A')}</span></div>
+              <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Email</div><span style="font-size:12px;overflow-wrap:anywhere;">${escHtml(order.email || 'N/A')}</span></div>
+              <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Shipping state</div><span style="font-size:12px;font-weight:700;">${escHtml(order.shippingState || order.metadata?.shipping_state || 'N/A')}</span></div>
+            </div>
+          </div>
+
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;">
+            <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
+              <i class="fas fa-shopping-bag" style="color:var(--primary);"></i> Purchased items
+            </h4>
+            ${itemsHtml}
           </div>
         </div>
 
-        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:16px;">
-          <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
-            <i class="fas fa-building-columns" style="color:var(--warning);"></i> Payment
-          </h4>
-          <div style="display:flex;flex-direction:column;gap:9px;">
-            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Method</div><span style="font-size:13px;font-weight:700;">Opay manual transfer</span></div>
-            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Transaction ID</div><span style="font-size:12px;">${escHtml(order.transactionId || 'Not provided')}</span></div>
-            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Verified By</div><span style="font-size:12px;">${escHtml(order.verifiedBy || '—')}</span></div>
-            <div><div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px;">Verified At</div><span style="font-size:12px;">${fmtDate(order.verifiedAt)}</span></div>
+        <div style="display:grid;gap:12px;">
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;">
+            <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
+              <i class="fas fa-building-columns" style="color:var(--warning);"></i> Payment handling
+            </h4>
+            <div style="display:grid;gap:10px;">
+              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Method</div><span style="font-size:13px;font-weight:700;">Bank transfer (OPay)</span></div>
+              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Verification mode</div><span style="font-size:12px;">Manual admin confirmation</span></div>
+              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Transaction ID</div><span style="font-size:12px;overflow-wrap:anywhere;">${escHtml(order.transactionId || 'Not provided')}</span></div>
+              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Verified by</div><span style="font-size:12px;">${escHtml(order.verifiedBy || '—')}</span></div>
+              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Verified at</div><span style="font-size:12px;">${fmtDate(order.verifiedAt)}</span></div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:16px;">
-        <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
-          <i class="fas fa-shopping-bag" style="color:var(--primary);"></i> Order Items
-        </h4>
-        ${itemsHtml}
-      </div>
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;">
+            <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
+              <i class="fas fa-paperclip" style="color:var(--danger);"></i> Uploaded proof
+            </h4>
+            ${proofPreviewHtml}
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              ${proofUrl ? `<a href="${proofUrl}" target="_blank" rel="noopener" class="btn-view"><i class="fas fa-up-right-from-square"></i> Open proof</a>` : ''}
+              ${receiptUrl ? `<a href="${receiptUrl}" target="_blank" rel="noopener" class="btn-view"><i class="fas fa-file-pdf"></i> Receipt PDF</a>` : ''}
+            </div>
+          </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:16px;">
-          <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
-            <i class="fas fa-paperclip" style="color:var(--danger);"></i> Uploaded Proof
-          </h4>
-          ${proofUrl ? `<a href="${proofUrl}" target="_blank" rel="noopener" class="btn-view"><i class="fas fa-up-right-from-square"></i> Open Proof</a>` : '<p style="color:var(--text-muted);font-size:13px;">No proof uploaded yet.</p>'}
-          ${receiptUrl ? `<div style="margin-top:10px;"><a href="${receiptUrl}" target="_blank" rel="noopener" class="btn-view"><i class="fas fa-file-pdf"></i> Receipt PDF</a></div>` : ''}
-        </div>
-        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:16px;">
-          <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
-            <i class="fas fa-timeline" style="color:var(--info);"></i> Timeline
-          </h4>
-          ${timeline}
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;">
+            <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
+              <i class="fas fa-timeline" style="color:var(--info);"></i> Timeline
+            </h4>
+            ${timeline}
+          </div>
         </div>
       </div>
     </div>
