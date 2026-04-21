@@ -1364,7 +1364,7 @@ img { max-width:100%; display:block; }
 
 .receipt-summary-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
   margin: 18px 0 16px;
 }
@@ -1390,6 +1390,64 @@ img { max-width:100%; display:block; }
   color: var(--dark);
   font-size: .96rem;
   overflow-wrap: anywhere;
+}
+
+.optional-field-note {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(67,97,238,.12);
+  color: var(--brand-blue);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.receipt-financial-grid {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0 0;
+}
+
+.receipt-financial-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(67, 97, 238, 0.12);
+  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,255,.98));
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.receipt-financial-card.total {
+  background: linear-gradient(135deg, rgba(16,185,129,.96), rgba(5,150,105,.96));
+  border-color: transparent;
+}
+
+.receipt-financial-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: .76rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--gray);
+  font-weight: 800;
+}
+
+.receipt-financial-card strong {
+  display: block;
+  font-size: 1.08rem;
+  color: var(--dark);
+}
+
+.receipt-financial-card.total .receipt-financial-label,
+.receipt-financial-card.total strong {
+  color: #fff;
 }
 
 .receipt-item-cell {
@@ -1437,6 +1495,7 @@ img { max-width:100%; display:block; }
   .receipt-summary-grid { grid-template-columns: 1fr; }
   .receipt-sheet { padding: 18px 16px; }
   .receipt-item-cell { align-items: flex-start; }
+  .receipt-financial-card { padding: 14px 15px; }
   .receipt-actions { justify-content: stretch; }
   .receipt-actions > * { width: 100%; justify-content: center; }
 }

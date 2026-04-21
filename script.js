@@ -634,8 +634,9 @@ function renderPaymentInstructions(order) {
         </div>
         <input type="hidden" id="paymentProofOrderId" value="${escapeHtml(order.id)}" />
         <div class="form-group">
-          <label for="paymentTransactionId">Transaction ID or narration</label>
-          <input type="text" id="paymentTransactionId" class="form-input" placeholder="Bank transaction ID or narration" value="${escapeHtml(order.transactionId || '')}" />
+          <label for="paymentTransactionId">Transaction ID or narration <span class="optional-field-note">Optional</span></label>
+          <input type="text" id="paymentTransactionId" class="form-input" placeholder="Leave blank if your bank did not provide one" value="${escapeHtml(order.transactionId || '')}" />
+          <small class="helper-text">Optional. You can still upload your proof without this field.</small>
         </div>
         <div class="form-group">
           <label for="paymentProofFile">Upload transfer proof</label>
@@ -932,6 +933,9 @@ function openReceipt(order) {
       </tr>`;
   }).join('');
   const helpLink = buildWhatsAppLink(order.orderRef);
+  const transactionMetaCard = order.transactionId
+    ? `<div class="receipt-meta-card"><span>Transaction ID / Narration</span><strong>${escapeHtml(order.transactionId)}</strong></div>`
+    : '';
 
   const receiptActions = order.status === 'paid'
     ? `
@@ -948,7 +952,7 @@ function openReceipt(order) {
           <div>
             <span class="payment-eyebrow" style="color:var(--brand-blue);opacity:1;">Order receipt</span>
             <h2>Fortune's <span>Hub</span></h2>
-            <p class="receipt-sheet-subtitle">A clean single-page summary for your verified bank transfer order.</p>
+            <p class="receipt-sheet-subtitle">A colorful, polished summary for your FortuneHub bank transfer order.</p>
           </div>
           <span class="status-badge status-${statusMeta.className} receipt-inline-status">${statusMeta.label}</span>
         </div>
@@ -958,7 +962,7 @@ function openReceipt(order) {
         <div class="receipt-meta-card"><span>Reference</span><strong><code>${escapeHtml(order.orderRef)}</code></strong></div>
         <div class="receipt-meta-card"><span>Date</span><strong>${date}</strong></div>
         <div class="receipt-meta-card"><span>Customer</span><strong>${escapeHtml(order.customerName || currentUser?.name || 'Customer')}</strong></div>
-        <div class="receipt-meta-card"><span>Transaction ID</span><strong>${escapeHtml(order.transactionId || 'Not provided')}</strong></div>
+        ${transactionMetaCard}
       </div>
 
       <div class="receipt-meta">
@@ -977,10 +981,25 @@ function openReceipt(order) {
         <tbody>${itemsHtml}</tbody>
       </table>
 
-      <div class="receipt-totals">
-        <div class="receipt-row"><span>Subtotal</span><span>${formatCurrency(order.subtotal)}</span></div>
-        <div class="receipt-row"><span>Shipping</span><span>${formatCurrency(order.shippingFee)}</span></div>
-        <div class="receipt-row receipt-grand"><span>Total Paid</span><span>${formatCurrency(order.amount)}</span></div>
+      <div class="receipt-financial-grid">
+        <div class="receipt-financial-card">
+          <div>
+            <span class="receipt-financial-label">Subtotal</span>
+            <strong>${formatCurrency(order.subtotal)}</strong>
+          </div>
+        </div>
+        <div class="receipt-financial-card">
+          <div>
+            <span class="receipt-financial-label">Shipping fee</span>
+            <strong>${formatCurrency(order.shippingFee)}</strong>
+          </div>
+        </div>
+        <div class="receipt-financial-card total">
+          <div>
+            <span class="receipt-financial-label">Total paid</span>
+            <strong>${formatCurrency(order.amount)}</strong>
+          </div>
+        </div>
       </div>
 
       <div class="instruction-card receipt-timeline-card">
