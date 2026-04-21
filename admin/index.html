@@ -453,6 +453,16 @@
       gap: 20px;
     }
 
+    #view-products .products-grid {
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 24px;
+      align-items: stretch;
+    }
+
+    #view-dashboard .products-grid {
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    }
+
     .product-admin-card {
       background: var(--surface);
       border-radius: var(--radius);
@@ -461,6 +471,9 @@
       box-shadow: var(--shadow);
       transition: transform .25s, box-shadow .25s, border-color .2s;
       position: relative;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
     }
     .product-admin-card::after {
       content: '';
@@ -508,7 +521,7 @@
     .pcard-status.inactive  { background: #f59e0b; }
     .pcard-status.sold-dot  { background: #374151; }
 
-    .pcard-body { padding: 16px; }
+    .pcard-body { padding: 16px; display:flex; flex-direction:column; flex:1; }
     .pcard-category {
       font-size: 10px; font-weight: 700; letter-spacing: .08em;
       text-transform: uppercase; color: var(--primary); margin-bottom: 6px;
@@ -538,7 +551,7 @@
     .meta-tag.new-t  { background: rgba(102,126,234,.1); color: var(--primary); }
     .meta-tag.sale-t { background: rgba(239,68,68,.1);   color: #dc2626; }
 
-    .pcard-actions { display: flex; gap: 8px; }
+    .pcard-actions { display: flex; gap: 8px; margin-top: auto; }
     .pcard-actions .btn { flex: 1; justify-content: center; }
 
     /* =========================================================
@@ -2877,9 +2890,6 @@ async function loadPayments(page = 1) {
               <i class="fas fa-eye"></i> View
             </button>
             ${canVerify ? `<button class="btn-view" style="margin-left:6px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-color:transparent;" onclick="verifyOrder('${orderId}')"><i class="fas fa-check"></i> Verify</button>` : ''}
-            <button class="btn-del-tx" style="margin-left:6px;" onclick="deleteOrder('${orderId}')">
-              <i class="fas fa-trash"></i> Delete
-            </button>
           </td>
         `;
         tbody.appendChild(row);
@@ -2911,9 +2921,6 @@ async function loadPayments(page = 1) {
                   <i class="fas fa-eye"></i> Details
                 </button>
                 ${canVerify ? `<button class="btn-view" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-color:transparent;" onclick="verifyOrder('${orderId}')"><i class="fas fa-check"></i> Verify</button>` : ''}
-                <button class="btn-del-tx" onclick="deleteOrder('${orderId}')">
-                  <i class="fas fa-trash"></i> Delete
-                </button>
               </div>
             </div>
           `;
@@ -3039,7 +3046,6 @@ function displayPaymentDetails(order) {
           <span class="status-badge ${statusClass}" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.28);font-size:12px;padding:7px 14px;">${escHtml(orderStatusLabel(order.status))}</span>
           <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
             ${canVerify ? `<button class="btn-view" style="background:#fff;color:#059669;border-color:transparent;" onclick="verifyOrder('${escHtml(order.id || order._id || '')}')"><i class="fas fa-check"></i> Verify transfer</button>` : ''}
-            <button class="btn-del-tx" onclick="deleteOrder('${escHtml(order.id || order._id || '')}')"><i class="fas fa-trash"></i> Delete</button>
           </div>
         </div>
       </div>
@@ -3089,7 +3095,7 @@ function displayPaymentDetails(order) {
             <div style="display:grid;gap:10px;">
               <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Method</div><span style="font-size:13px;font-weight:700;">Bank transfer (OPay)</span></div>
               <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Verification mode</div><span style="font-size:12px;">Manual admin confirmation</span></div>
-              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Transaction ID</div><span style="font-size:12px;overflow-wrap:anywhere;">${escHtml(order.transactionId || 'Not provided')}</span></div>
+              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Transaction ID / Narration</div><span style="font-size:12px;overflow-wrap:anywhere;">${escHtml(order.transactionId || 'Optional field not supplied')}</span></div>
               <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Verified by</div><span style="font-size:12px;">${escHtml(order.verifiedBy || '—')}</span></div>
               <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Verified at</div><span style="font-size:12px;">${fmtDate(order.verifiedAt)}</span></div>
             </div>
@@ -3111,6 +3117,18 @@ function displayPaymentDetails(order) {
               <i class="fas fa-timeline" style="color:var(--info);"></i> Timeline
             </h4>
             ${timeline}
+          </div>
+
+          <div style="background:linear-gradient(180deg,#fff5f5,#ffffff);border:1px solid rgba(239,68,68,.18);border-radius:18px;padding:18px;">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+              <div style="max-width:520px;">
+                <h4 style="margin:0 0 8px;font-size:11px;font-weight:900;text-transform:uppercase;color:#b91c1c;letter-spacing:.08em;display:flex;align-items:center;gap:8px;">
+                  <i class="fas fa-triangle-exclamation"></i> Danger zone
+                </h4>
+                <p style="margin:0;color:#7f1d1d;font-size:12.5px;line-height:1.65;">Delete is isolated here to avoid accidental clicks. This permanently removes <strong>${escHtml(order.orderRef || order.reference || 'this order')}</strong> from the admin panel.</p>
+              </div>
+              <button class="btn-del-tx" onclick="deleteOrder('${escHtml(order.id || order._id || '')}', '${escHtml(order.orderRef || order.reference || 'this order')}')"><i class="fas fa-trash"></i> Delete transaction</button>
+            </div>
           </div>
         </div>
       </div>
@@ -3140,9 +3158,15 @@ document.getElementById('applyPayFilters').addEventListener('click', () => {
   loadPayments(1);
 });
 
-async function deleteOrder(id) {
+async function deleteOrder(id, orderRef = 'this transaction') {
   if (!id) return;
-  if (!confirm('Delete this transaction permanently from the admin panel?')) return;
+  const proceed = confirm(`Warning: deleting ${orderRef} permanently removes it from the admin panel. This action cannot be undone. Continue?`);
+  if (!proceed) return;
+  const typed = prompt(`Type DELETE to confirm permanent removal of ${orderRef}.`, '');
+  if (typed !== 'DELETE') {
+    toast('Deletion cancelled. Type DELETE exactly to proceed.', 'info');
+    return;
+  }
   try {
     const res = await fetch(`${API_BASE}/api/admin/orders/${id}`, {
       method: 'DELETE',
@@ -3230,6 +3254,7 @@ if (authToken) {
   loadDashboard();
 }
 </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
 
