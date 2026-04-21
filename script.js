@@ -173,8 +173,9 @@ const zoomResult         = document.getElementById('zoomResult');
 // ─────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────
+const NAIRA_SYMBOL = '\u20A6';
 function formatCurrency(n) {
-  return `₦${Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  return `${NAIRA_SYMBOL}${Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 function escapeHtml(value) {
   return String(value || '')
@@ -726,7 +727,7 @@ function renderPaymentInstructions(order) {
 
           <div class="account-pill-row">
             <span class="account-pill">Order ref: ${escapeHtml(order.orderRef)}</span>
-            <span class="account-pill">Shipping: ${escapeHtml(order.shippingState || 'N/A')}</span>
+            <span class="account-pill">Shipping fee: ${escapeHtml(order.shippingState || 'N/A')}</span>
           </div>
           <p class="helper-inline">Use the exact amount above and keep your narration close to the order reference for faster confirmation.</p>
         </div>
@@ -872,7 +873,7 @@ async function openOrderHistory() {
           </div>
           <div class="order-card-body">
             <p class="order-items-summary">${escapeHtml(itemsSummary || 'Order items')}</p>
-            <p class="order-shipping">📍 ${escapeHtml(order.shippingState || 'N/A')} • ${formatCurrency(order.amount)}</p>
+            <p class="order-shipping">📍 Shipping fee: ${escapeHtml(order.shippingState || 'N/A')} • Total ${formatCurrency(order.amount)}</p>
             ${renderTimeline(order)}
           </div>
           <div class="order-card-footer">
@@ -952,7 +953,7 @@ function openReceipt(order) {
           <div>
             <span class="payment-eyebrow" style="color:var(--brand-blue);opacity:1;">Order receipt</span>
             <h2>Fortune's <span>Hub</span></h2>
-            <p class="receipt-sheet-subtitle">A colorful, polished summary for your FortuneHub bank transfer order.</p>
+            <p class="receipt-sheet-subtitle">A polished summary for your FortuneHub bank transfer order.</p>
           </div>
           <span class="status-badge status-${statusMeta.className} receipt-inline-status">${statusMeta.label}</span>
         </div>
@@ -968,7 +969,7 @@ function openReceipt(order) {
       <div class="receipt-meta">
         <div><strong>Email:</strong> ${escapeHtml(order.email || currentUser?.email || 'N/A')}</div>
         <div><strong>WhatsApp:</strong> ${escapeHtml(order.customerPhone || 'N/A')}</div>
-        <div><strong>Shipping To:</strong> ${escapeHtml(order.shippingState || 'N/A')}</div>
+        <div><strong>Shipping Fee:</strong> ${escapeHtml(order.shippingState || 'N/A')}</div>
         <div><strong>Payment Method:</strong> Bank transfer</div>
       </div>
 
