@@ -1036,6 +1036,253 @@
       box-shadow: 0 4px 14px rgba(239,68,68,.35);
     }
 
+    .order-detail-shell { display:grid; gap:16px; }
+    .order-detail-hero {
+      background: var(--gradient);
+      border-radius: 22px;
+      padding: 22px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+      color: #fff;
+      box-shadow: 0 18px 38px rgba(102,126,234,.24);
+    }
+    .order-detail-hero-eyebrow {
+      font-size: 10.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: rgba(255,255,255,.72);
+      margin-bottom: 6px;
+    }
+    .order-detail-hero-amount {
+      font-size: clamp(30px, 4vw, 38px);
+      font-weight: 900;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+    .order-detail-hero-meta {
+      font-size: 12px;
+      color: rgba(255,255,255,.84);
+      margin-top: 8px;
+      line-height: 1.7;
+      overflow-wrap: anywhere;
+    }
+    .order-detail-actions {
+      display: grid;
+      gap: 10px;
+      justify-items: end;
+      align-content: start;
+    }
+    .order-detail-primary-actions,
+    .order-detail-danger-row,
+    .order-detail-proof-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .order-detail-danger-row { padding-top: 6px; }
+    .order-detail-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .order-detail-summary-card,
+    .order-detail-panel {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px;
+      min-width: 0;
+    }
+    .order-detail-summary-card.total {
+      background: linear-gradient(135deg, rgba(16,185,129,.12), rgba(255,255,255,.94));
+      border-color: rgba(16,185,129,.2);
+    }
+    .order-detail-summary-card-label,
+    .order-detail-info-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 6px;
+      display: block;
+    }
+    .order-detail-summary-card-value {
+      font-size: 24px;
+      font-weight: 900;
+      color: var(--text);
+      line-height: 1.15;
+    }
+    .order-detail-summary-card.total .order-detail-summary-card-value { color: #059669; }
+    .order-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      align-items: stretch;
+    }
+    .order-detail-panel {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 12px 28px rgba(17,24,39,.05);
+    }
+    .order-detail-panel-heading {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: .08em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .order-detail-info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .order-detail-info-block.full { grid-column: 1 / -1; }
+    .order-detail-info-value {
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 600;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+    }
+    .order-detail-info-value.subtle { font-weight: 500; }
+    .order-detail-contact-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 14px;
+      background: #25d366;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+      text-decoration: none;
+      box-shadow: 0 10px 22px rgba(37,211,102,.22);
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+    .order-detail-contact-btn:hover {
+      background: #1fb658;
+      transform: translateY(-1px);
+      box-shadow: 0 12px 26px rgba(37,211,102,.28);
+    }
+    .order-detail-contact-btn.disabled {
+      background: #e5e7eb;
+      color: #4b5563;
+      box-shadow: none;
+      pointer-events: none;
+    }
+    .order-detail-proof-preview img {
+      width: 100%;
+      max-height: 220px;
+      object-fit: contain;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: #fff;
+      display: block;
+    }
+    .order-detail-proof-note {
+      padding: 16px;
+      border-radius: 16px;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #9a3412;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .order-detail-item-list { display:grid; gap:10px; }
+    .order-detail-item {
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding: 14px;
+      border: 1px solid rgba(102,126,234,.12);
+      border-radius: 16px;
+      background: linear-gradient(180deg,#fff,#f8faff);
+      min-width: 0;
+    }
+    .order-detail-item-thumb,
+    .order-detail-item-thumb-fallback {
+      width: 64px;
+      height: 64px;
+      border-radius: 14px;
+      flex-shrink: 0;
+      background: #fff;
+      border: 1px solid rgba(102,126,234,.15);
+      object-fit: cover;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size: 24px;
+      color: var(--primary);
+    }
+    .order-detail-item-meta {
+      flex: 1;
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+    .order-detail-item-meta strong {
+      font-size: 14px;
+      color: var(--text);
+      overflow-wrap: anywhere;
+    }
+    .order-detail-item-meta span {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .order-detail-item-price {
+      color: var(--primary);
+      font-size: 15px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .order-detail-timeline { display:grid; gap:12px; }
+    .order-detail-timeline-step {
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+    }
+    .order-detail-timeline-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+    .order-detail-muted {
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    @media (max-width: 760px) {
+      .order-detail-actions,
+      .order-detail-primary-actions,
+      .order-detail-danger-row,
+      .order-detail-proof-actions {
+        justify-items: stretch;
+        justify-content: stretch;
+      }
+      .order-detail-primary-actions > *,
+      .order-detail-danger-row > *,
+      .order-detail-proof-actions > * {
+        width: 100%;
+        justify-content: center;
+      }
+      .order-detail-info-grid { grid-template-columns: 1fr; }
+      .order-detail-item { align-items: flex-start; }
+      .order-detail-item-price { white-space: normal; }
+    }
+
     /* ── Pagination ── */
     #view-payments .pagination {
       display: flex; justify-content: space-between;
@@ -2774,6 +3021,23 @@ function resolveOrderAssetUrl(url) {
   return new URL(url, `${window.location.origin}/`).toString();
 }
 
+function normalizeWhatsAppNumber(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('234')) return digits;
+  if (digits.startsWith('0')) return `234${digits.slice(1)}`;
+  return digits;
+}
+
+function buildBuyerWhatsAppLink(order) {
+  const phone = normalizeWhatsAppNumber(order?.customerPhone || order?.metadata?.customer_phone || '');
+  if (!phone) return '';
+  const buyerName = order?.customerName || order?.metadata?.customer_name || 'there';
+  const orderRef = order?.orderRef || order?.reference || 'your order';
+  const message = `Hello ${buyerName}, this is FortuneHub regarding order ${orderRef}. We are reaching out about your delivery/payment update.`;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
+
 function filterOrdersByDate(orders) {
   const startDate = currentPayFilters.startDate ? new Date(`${currentPayFilters.startDate}T00:00:00`) : null;
   const endDate = currentPayFilters.endDate ? new Date(`${currentPayFilters.endDate}T23:59:59`) : null;
@@ -2877,9 +3141,6 @@ async function loadPayments(page = 1) {
               <i class="fas fa-eye"></i> View
             </button>
             ${canVerify ? `<button class="btn-view" style="margin-left:6px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-color:transparent;" onclick="verifyOrder('${orderId}')"><i class="fas fa-check"></i> Verify</button>` : ''}
-            <button class="btn-del-tx" style="margin-left:6px;" onclick="deleteOrder('${orderId}')">
-              <i class="fas fa-trash"></i> Delete
-            </button>
           </td>
         `;
         tbody.appendChild(row);
@@ -2911,9 +3172,6 @@ async function loadPayments(page = 1) {
                   <i class="fas fa-eye"></i> Details
                 </button>
                 ${canVerify ? `<button class="btn-view" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-color:transparent;" onclick="verifyOrder('${orderId}')"><i class="fas fa-check"></i> Verify</button>` : ''}
-                <button class="btn-del-tx" onclick="deleteOrder('${orderId}')">
-                  <i class="fas fa-trash"></i> Delete
-                </button>
               </div>
             </div>
           `;
@@ -2995,123 +3253,135 @@ function displayPaymentDetails(order) {
   const proofUrl = order.proofUrl || order.metadata?.proof_url || '';
   const receiptUrl = order.receiptPdfUrl || order.metadata?.receipt_pdf_url || '';
   const proofIsImage = /\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(proofUrl || '');
+  const buyerWhatsAppLink = buildBuyerWhatsAppLink(order);
+  const orderId = escHtml(order.id || order._id || '');
 
   const itemsHtml = items.length
-    ? `<div style="display:grid;gap:12px;">${items.map((item) => {
+    ? `<div class="order-detail-item-list">${items.map((item) => {
         const imageUrl = resolveOrderAssetUrl(item.image || '');
         return `
-          <div style="display:flex;align-items:center;gap:14px;padding:14px;border:1px solid rgba(102,126,234,.12);border-radius:16px;background:linear-gradient(180deg,#fff,#f8faff);">
-            ${imageUrl ? `<img src="${escHtml(imageUrl)}" alt="${escHtml(item.name || 'Item')}" style="width:68px;height:68px;border-radius:14px;object-fit:cover;border:1px solid rgba(102,126,234,.15);background:#fff;flex-shrink:0;"/>` : `<div style="width:68px;height:68px;border-radius:14px;background:linear-gradient(135deg,rgba(102,126,234,.12),rgba(118,75,162,.12));display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;">📦</div>`}
-            <div style="flex:1;min-width:0;display:grid;gap:4px;">
-              <strong style="font-size:14px;color:var(--text);overflow-wrap:anywhere;">${escHtml(item.name || 'Item')}</strong>
-              <span style="font-size:12px;color:var(--text-muted);">Qty ${item.quantity || 1} • ${fmt(item.price || 0)} each</span>
+          <div class="order-detail-item">
+            ${imageUrl
+              ? `<img src="${escHtml(imageUrl)}" alt="${escHtml(item.name || 'Item')}" class="order-detail-item-thumb" />`
+              : `<div class="order-detail-item-thumb-fallback">📦</div>`}
+            <div class="order-detail-item-meta">
+              <strong>${escHtml(item.name || 'Item')}</strong>
+              <span>Qty ${item.quantity || 1} • ${fmt(item.price || 0)} each</span>
             </div>
-            <strong style="color:var(--primary);font-size:15px;white-space:nowrap;">${fmt(Number(item.price || 0) * Number(item.quantity || 1))}</strong>
+            <strong class="order-detail-item-price">${fmt(Number(item.price || 0) * Number(item.quantity || 1))}</strong>
           </div>`;
       }).join('')}</div>`
-    : '<p style="color:var(--text-muted);font-size:13px;">No items data available</p>';
+    : '<p class="order-detail-muted">No items data available.</p>';
 
-  const timeline = (order.statusTimeline || []).map((step) => `
-    <div style="display:flex;gap:10px;align-items:flex-start;${step === order.statusTimeline[order.statusTimeline.length - 1] ? '' : 'margin-bottom:12px;'}">
-      <span style="width:12px;height:12px;border-radius:50%;background:${step.status === 'paid' ? '#10b981' : step.status === 'awaiting_verification' ? '#f59e0b' : '#667eea'};margin-top:5px;box-shadow:0 0 0 5px ${step.status === 'paid' ? 'rgba(16,185,129,.14)' : step.status === 'awaiting_verification' ? 'rgba(245,158,11,.16)' : 'rgba(102,126,234,.12)'};"></span>
-      <div>
-        <strong style="display:block;font-size:13px;color:var(--text);">${escHtml(step.label || step.status)}</strong>
-        <small style="display:block;color:var(--text-muted);line-height:1.55;">${fmtDate(step.at)}${step.note ? ` • ${escHtml(step.note)}` : ''}</small>
-      </div>
-    </div>
-  `).join('') || '<p style="color:var(--text-muted);font-size:13px;">No timeline yet.</p>';
+  const timeline = (order.statusTimeline || []).map((step) => {
+    const palette = step.status === 'paid'
+      ? { fill: '#10b981', halo: 'rgba(16,185,129,.14)' }
+      : step.status === 'awaiting_verification'
+        ? { fill: '#f59e0b', halo: 'rgba(245,158,11,.16)' }
+        : step.status === 'cancelled'
+          ? { fill: '#ef4444', halo: 'rgba(239,68,68,.14)' }
+          : { fill: '#667eea', halo: 'rgba(102,126,234,.12)' };
+
+    return `
+      <div class="order-detail-timeline-step">
+        <span class="order-detail-timeline-dot" style="background:${palette.fill};box-shadow:0 0 0 5px ${palette.halo};"></span>
+        <div>
+          <strong style="display:block;font-size:13px;color:var(--text);">${escHtml(step.label || step.status)}</strong>
+          <small style="display:block;color:var(--text-muted);line-height:1.55;">${fmtDate(step.at)}${step.note ? ` • ${escHtml(step.note)}` : ''}</small>
+        </div>
+      </div>`;
+  }).join('') || '<p class="order-detail-muted">No timeline yet.</p>';
 
   const proofPreviewHtml = proofUrl
     ? proofIsImage
-      ? `<a href="${proofUrl}" target="_blank" rel="noopener" style="display:block;margin:12px 0 14px;"><img src="${proofUrl}" alt="Uploaded payment proof" style="width:100%;max-height:280px;object-fit:contain;border-radius:16px;border:1px solid var(--border);background:#fff;" /></a>`
-      : `<div style="margin:12px 0 14px;padding:18px;border-radius:16px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:13px;line-height:1.6;"><strong>Payment proof document uploaded.</strong><br/>Open the file to review the full document.</div>`
-    : '<p style="color:var(--text-muted);font-size:13px;margin:0 0 14px;">No proof uploaded yet.</p>';
+      ? `<a href="${proofUrl}" target="_blank" rel="noopener" class="order-detail-proof-preview"><img src="${proofUrl}" alt="Uploaded payment proof" /></a>`
+      : `<div class="order-detail-proof-note"><strong>Payment proof document uploaded.</strong><br/>Open the file to review the full document.</div>`
+    : '<p class="order-detail-muted" style="margin:0;">No proof uploaded yet.</p>';
 
   document.getElementById('payDetailBody').innerHTML = `
-    <div style="display:grid;gap:16px;">
-      <div style="background:var(--gradient);border-radius:20px;padding:22px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;box-shadow:0 16px 34px rgba(102,126,234,.24);">
+    <div class="order-detail-shell">
+      <div class="order-detail-hero">
         <div>
-          <div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.72);margin-bottom:6px;">Transfer amount</div>
-          <div style="font-size:34px;font-weight:900;color:#fff;letter-spacing:-1px;line-height:1;">${fmt(order.amount)}</div>
-          <div style="font-size:12px;color:rgba(255,255,255,.82);margin-top:8px;line-height:1.6;">${escHtml(order.orderRef || order.reference || '—')}<br/>Created ${fmtDate(order.createdAt)}</div>
+          <div class="order-detail-hero-eyebrow">Transfer amount</div>
+          <div class="order-detail-hero-amount">${fmt(order.amount)}</div>
+          <div class="order-detail-hero-meta">${escHtml(order.orderRef || order.reference || '—')}<br/>Created ${fmtDate(order.createdAt)}</div>
         </div>
-        <div style="display:grid;gap:10px;justify-items:end;">
+        <div class="order-detail-actions">
           <span class="status-badge ${statusClass}" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.28);font-size:12px;padding:7px 14px;">${escHtml(orderStatusLabel(order.status))}</span>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-            ${canVerify ? `<button class="btn-view" style="background:#fff;color:#059669;border-color:transparent;" onclick="verifyOrder('${escHtml(order.id || order._id || '')}')"><i class="fas fa-check"></i> Verify transfer</button>` : ''}
-            <button class="btn-del-tx" onclick="deleteOrder('${escHtml(order.id || order._id || '')}')"><i class="fas fa-trash"></i> Delete</button>
+          <div class="order-detail-primary-actions">
+            ${canVerify ? `<button class="btn-view" style="background:#fff;color:#059669;border-color:transparent;" onclick="verifyOrder('${orderId}')"><i class="fas fa-check"></i> Verify transfer</button>` : ''}
+            ${buyerWhatsAppLink ? `<a class="order-detail-contact-btn" href="${buyerWhatsAppLink}" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> WhatsApp buyer</a>` : ''}
+          </div>
+          <div class="order-detail-danger-row">
+            <button class="btn-del-tx" onclick="deleteOrder('${orderId}')"><i class="fas fa-trash"></i> Delete</button>
           </div>
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;">
-        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;">
-          <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Subtotal</div>
-          <div style="font-size:24px;font-weight:900;color:var(--text);">${fmt(order.subtotal || 0)}</div>
+      <div class="order-detail-summary-grid">
+        <div class="order-detail-summary-card">
+          <span class="order-detail-summary-card-label">Subtotal</span>
+          <div class="order-detail-summary-card-value">${fmt(order.subtotal || 0)}</div>
         </div>
-        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;">
-          <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Shipping</div>
-          <div style="font-size:24px;font-weight:900;color:var(--text);">${fmt(order.shippingFee || 0)}</div>
+        <div class="order-detail-summary-card">
+          <span class="order-detail-summary-card-label">Shipping</span>
+          <div class="order-detail-summary-card-value">${fmt(order.shippingFee || 0)}</div>
         </div>
-        <div style="background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(255,255,255,.92));border:1px solid rgba(16,185,129,.2);border-radius:16px;padding:16px;">
-          <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Total received</div>
-          <div style="font-size:24px;font-weight:900;color:#059669;">${fmt(order.amount || 0)}</div>
+        <div class="order-detail-summary-card total">
+          <span class="order-detail-summary-card-label">Total received</span>
+          <div class="order-detail-summary-card-value">${fmt(order.amount || 0)}</div>
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1.15fr .85fr;gap:12px;align-items:start;">
-        <div style="display:grid;gap:12px;">
-          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;">
-            <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
-              <i class="fas fa-user" style="color:var(--success);"></i> Customer profile
-            </h4>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Name</div><span style="font-size:13px;font-weight:700;">${escHtml(order.customerName || order.metadata?.customer_name || 'N/A')}</span></div>
-              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Phone</div><span style="font-size:13px;">${escHtml(order.customerPhone || order.metadata?.customer_phone || 'N/A')}</span></div>
-              <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Email</div><span style="font-size:12px;overflow-wrap:anywhere;">${escHtml(order.email || 'N/A')}</span></div>
-              <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Shipping state</div><span style="font-size:12px;font-weight:700;">${escHtml(order.shippingState || order.metadata?.shipping_state || 'N/A')}</span></div>
-            </div>
-          </div>
-
-          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;">
-            <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
-              <i class="fas fa-shopping-bag" style="color:var(--primary);"></i> Purchased items
-            </h4>
-            ${itemsHtml}
+      <div class="order-detail-grid">
+        <div class="order-detail-panel">
+          <h4 class="order-detail-panel-heading"><i class="fas fa-user" style="color:var(--success);"></i> Customer profile</h4>
+          <div class="order-detail-info-grid">
+            <div class="order-detail-info-block"><span class="order-detail-info-label">Name</span><div class="order-detail-info-value">${escHtml(order.customerName || order.metadata?.customer_name || 'N/A')}</div></div>
+            <div class="order-detail-info-block"><span class="order-detail-info-label">Phone</span><div class="order-detail-info-value subtle">${escHtml(order.customerPhone || order.metadata?.customer_phone || 'N/A')}</div></div>
+            <div class="order-detail-info-block full"><span class="order-detail-info-label">Email</span><div class="order-detail-info-value subtle">${escHtml(order.email || 'N/A')}</div></div>
+            <div class="order-detail-info-block full"><span class="order-detail-info-label">Shipping state</span><div class="order-detail-info-value">${escHtml(order.shippingState || order.metadata?.shipping_state || 'N/A')}</div></div>
           </div>
         </div>
 
-        <div style="display:grid;gap:12px;">
-          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;">
-            <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
-              <i class="fas fa-building-columns" style="color:var(--warning);"></i> Payment handling
-            </h4>
-            <div style="display:grid;gap:10px;">
-              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Method</div><span style="font-size:13px;font-weight:700;">Bank transfer (OPay)</span></div>
-              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Verification mode</div><span style="font-size:12px;">Manual admin confirmation</span></div>
-              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Transaction ID</div><span style="font-size:12px;overflow-wrap:anywhere;">${escHtml(order.transactionId || 'Not provided')}</span></div>
-              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Verified by</div><span style="font-size:12px;">${escHtml(order.verifiedBy || '—')}</span></div>
-              <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Verified at</div><span style="font-size:12px;">${fmtDate(order.verifiedAt)}</span></div>
-            </div>
+        <div class="order-detail-panel">
+          <h4 class="order-detail-panel-heading"><i class="fas fa-building-columns" style="color:var(--warning);"></i> Payment handling</h4>
+          <div class="order-detail-info-grid">
+            <div class="order-detail-info-block"><span class="order-detail-info-label">Method</span><div class="order-detail-info-value">Bank transfer (OPay)</div></div>
+            <div class="order-detail-info-block"><span class="order-detail-info-label">Verification mode</span><div class="order-detail-info-value subtle">Manual admin confirmation</div></div>
+            <div class="order-detail-info-block full"><span class="order-detail-info-label">Transaction ID</span><div class="order-detail-info-value subtle">${escHtml(order.transactionId || 'Not provided')}</div></div>
+            <div class="order-detail-info-block"><span class="order-detail-info-label">Verified by</span><div class="order-detail-info-value subtle">${escHtml(order.verifiedBy || '—')}</div></div>
+            <div class="order-detail-info-block"><span class="order-detail-info-label">Verified at</span><div class="order-detail-info-value subtle">${fmtDate(order.verifiedAt)}</div></div>
           </div>
+        </div>
 
-          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;">
-            <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
-              <i class="fas fa-paperclip" style="color:var(--danger);"></i> Uploaded proof
-            </h4>
-            ${proofPreviewHtml}
-            <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              ${proofUrl ? `<a href="${proofUrl}" target="_blank" rel="noopener" class="btn-view"><i class="fas fa-up-right-from-square"></i> Open proof</a>` : ''}
-              ${receiptUrl ? `<a href="${receiptUrl}" target="_blank" rel="noopener" class="btn-view"><i class="fas fa-file-pdf"></i> Receipt PDF</a>` : ''}
-            </div>
+        <div class="order-detail-panel">
+          <h4 class="order-detail-panel-heading"><i class="fab fa-whatsapp" style="color:#25d366;"></i> WhatsApp contact</h4>
+          <div class="order-detail-info-grid" style="grid-template-columns:1fr;gap:10px;">
+            <div class="order-detail-info-block"><span class="order-detail-info-label">Buyer number</span><div class="order-detail-info-value">${escHtml(order.customerPhone || order.metadata?.customer_phone || 'Not provided')}</div></div>
+            ${buyerWhatsAppLink
+              ? `<a class="order-detail-contact-btn" href="${buyerWhatsAppLink}" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> Contact buyer about delivery / payment</a>`
+              : `<span class="order-detail-contact-btn disabled"><i class="fab fa-whatsapp"></i> WhatsApp number unavailable</span>`}
           </div>
+        </div>
 
-          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;">
-            <h4 style="margin:0 0 12px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:6px;">
-              <i class="fas fa-timeline" style="color:var(--info);"></i> Timeline
-            </h4>
-            ${timeline}
+        <div class="order-detail-panel">
+          <h4 class="order-detail-panel-heading"><i class="fas fa-paperclip" style="color:var(--danger);"></i> Uploaded proof</h4>
+          ${proofPreviewHtml}
+          <div class="order-detail-proof-actions">
+            ${proofUrl ? `<a href="${proofUrl}" target="_blank" rel="noopener" class="btn-view"><i class="fas fa-up-right-from-square"></i> Open proof</a>` : ''}
+            ${receiptUrl ? `<a href="${receiptUrl}" target="_blank" rel="noopener" class="btn-view"><i class="fas fa-file-pdf"></i> Receipt PDF</a>` : ''}
           </div>
+        </div>
+
+        <div class="order-detail-panel">
+          <h4 class="order-detail-panel-heading"><i class="fas fa-shopping-bag" style="color:var(--primary);"></i> Purchased items</h4>
+          ${itemsHtml}
+        </div>
+
+        <div class="order-detail-panel">
+          <h4 class="order-detail-panel-heading"><i class="fas fa-timeline" style="color:var(--info);"></i> Timeline</h4>
+          <div class="order-detail-timeline">${timeline}</div>
         </div>
       </div>
     </div>
@@ -3230,6 +3500,7 @@ if (authToken) {
   loadDashboard();
 }
 </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
 
