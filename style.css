@@ -629,6 +629,39 @@ img { max-width:100%; display:block; }
   display: flex; align-items: center; gap: 6px;
 }
 .btn-view-receipt:hover { background: #161c6b; transform: translateY(-1px); }
+.order-card-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+.btn-secondary-action,
+.btn-danger-soft {
+  border: none;
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: .88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn-secondary-action {
+  background: #eef2ff;
+  color: var(--brand-blue);
+  border: 1px solid rgba(29,35,134,.12);
+}
+.btn-secondary-action:hover {
+  background: #dbe4ff;
+  transform: translateY(-1px);
+}
+.btn-danger-soft {
+  background: rgba(239,68,68,.08);
+  color: #b91c1c;
+  border: 1px solid rgba(239,68,68,.18);
+}
+.btn-danger-soft:hover {
+  background: #fee2e2;
+  transform: translateY(-1px);
+}
 
 .order-empty-state {
   text-align: center; padding: 48px 20px;
@@ -1064,6 +1097,12 @@ img { max-width:100%; display:block; }
 .proof-status-card.paid i {
   color: #10b981;
 }
+.proof-status-card.cancelled {
+  background: linear-gradient(135deg, rgba(239,68,68,.08), #ffffff);
+}
+.proof-status-card.cancelled i {
+  color: #ef4444;
+}
 
 .payment-modal-actions {
   display: flex;
@@ -1234,6 +1273,8 @@ img { max-width:100%; display:block; }
   .auth-modal .modal-content  { padding: 24px 16px; }
   .receipt-meta { grid-template-columns: 1fr; }
   .order-card-footer { flex-direction: column; align-items: flex-start; }
+  .order-card-actions { width: 100%; }
+  .order-card-actions > * { width: 100%; }
   .btn-view-receipt { width: 100%; justify-content: center; }
   .fh-toast { bottom: 16px; font-size: .88rem; }
   .payment-instructions-content { padding: 20px 16px; }

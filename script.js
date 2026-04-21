@@ -233,7 +233,8 @@ function renderTimeline(order) {
   const steps = [
     { key: 'pending_payment', label: 'Order created' },
     { key: 'awaiting_verification', label: 'Proof uploaded' },
-    { key: 'paid', label: 'Payment verified' }
+    { key: 'paid', label: 'Payment verified' },
+    { key: 'cancelled', label: 'Order cancelled' }
   ];
   return `<div class="timeline-list">${steps.map(step => {
     const active = done.has(step.key) || step.key === 'pending_payment';
@@ -650,7 +651,11 @@ function renderPaymentInstructions(order) {
       </form>`
     : order.status === 'awaiting_verification'
       ? `<div class="proof-status-card"><i class="fas fa-hourglass-half"></i><div><strong>Proof received</strong><p>Your proof has been uploaded and is awaiting manual verification.</p></div></div>`
-      : `<div class="proof-status-card paid"><i class="fas fa-check-circle"></i><div><strong>Payment verified</strong><p>Your payment has been verified successfully. Open the order details screen to access the official receipt PDF.</p></div></div>`;
+      : order.status === 'cancelled'
+        ? `<div class="proof-status-card cancelled"><i class="fas fa-ban"></i><div><strong>Order cancelled</strong><p>This pending payment was cancelled successfully. If you still want the items, create a new order from the shop.</p></div></div>`
+        : `<div class="proof-status-card paid"><i class="fas fa-check-circle"></i><div><strong>Payment verified</strong><p>Your payment has been verified successfully. Open the order details screen to access the official receipt PDF.</p></div></div>`;
+
+  const canCancelPendingOrder = order.status === 'pending_payment';
 
   paymentInstructionsContent.innerHTML = `
     <div class="payment-brand-shell">
@@ -765,6 +770,7 @@ function renderPaymentInstructions(order) {
 
       <div class="payment-modal-actions">
         ${helpLink ? `<a class="whatsapp-help-btn" href="${helpLink}" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> Need help on WhatsApp</a>` : ''}
+        ${canCancelPendingOrder ? `<button type="button" class="btn btn-danger-soft" id="cancelPendingOrderFromPayment"><i class="fas fa-ban"></i> Cancel Pending Order</button>` : ''}
         <button type="button" class="btn btn-secondary" id="viewOrderHistoryFromPayment">View My Orders</button>
       </div>
     </div>
@@ -777,6 +783,10 @@ function renderPaymentInstructions(order) {
   document.getElementById('viewOrderHistoryFromPayment')?.addEventListener('click', () => {
     closePaymentInstructions();
     openOrderHistory();
+  });
+
+  document.getElementById('cancelPendingOrderFromPayment')?.addEventListener('click', async () => {
+    await cancelPendingOrder(order.id, { reopenHistory: true });
   });
 
   document.getElementById('paymentProofForm')?.addEventListener('submit', submitPaymentProof);
@@ -862,6 +872,8 @@ async function openOrderHistory() {
       const statusMeta = getStatusMeta(order.status);
       const date = new Date(order.createdAt).toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' });
       const itemsSummary = (order.items || []).map(i => `${i.name} ×${i.quantity || 1}`).join(', ');
+      const canContinuePayment = ['pending_payment', 'failed'].includes(order.status);
+      const canCancelPending = order.status === 'pending_payment';
       return `
         <div class="order-card">
           <div class="order-card-header">
@@ -882,7 +894,8 @@ async function openOrderHistory() {
               <button class="btn-view-receipt" data-order-id="${order.id}" type="button">
                 <i class="fas fa-receipt"></i> View Details
               </button>
-              ${order.status !== 'paid' ? `<button class="btn-secondary-action" data-pay-order-id="${order.id}" type="button"><i class="fas fa-building-columns"></i> Payment</button>` : ''}
+              ${canContinuePayment ? `<button class="btn-secondary-action" data-pay-order-id="${order.id}" type="button"><i class="fas fa-building-columns"></i> Payment</button>` : ''}
+              ${canCancelPending ? `<button class="btn-danger-soft" data-cancel-order-id="${order.id}" type="button"><i class="fas fa-ban"></i> Cancel</button>` : ''}
             </div>
           </div>
         </div>`;
@@ -902,6 +915,12 @@ async function openOrderHistory() {
           orderHistoryModal.style.display = 'none';
           openPaymentInstructions(order);
         }
+      });
+    });
+
+    orderHistoryList.querySelectorAll('[data-cancel-order-id]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await cancelPendingOrder(btn.dataset.cancelOrderId, { reopenHistory: true });
       });
     });
   } catch (err) {
@@ -938,12 +957,14 @@ function openReceipt(order) {
     ? `<div class="receipt-meta-card"><span>Transaction ID / Narration</span><strong>${escapeHtml(order.transactionId)}</strong></div>`
     : '';
 
+  const canCancelPendingOrder = order.status === 'pending_payment';
   const receiptActions = order.status === 'paid'
     ? `
       ${order.receiptPdfUrl ? `<a class="btn btn-secondary receipt-screen-only" href="${order.receiptPdfUrl}" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> Download Receipt PDF</a>` : ''}
       ${helpLink ? `<a class="whatsapp-help-btn receipt-screen-only" href="${helpLink}" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> WhatsApp Help</a>` : ''}`
     : `
       <button type="button" class="btn btn-tertiary receipt-screen-only" id="continuePaymentBtn"><i class="fas fa-building-columns"></i> Continue Payment</button>
+      ${canCancelPendingOrder ? `<button type="button" class="btn btn-danger-soft receipt-screen-only" id="cancelPendingOrderBtn"><i class="fas fa-ban"></i> Cancel Pending Order</button>` : ''}
       ${helpLink ? `<a class="whatsapp-help-btn receipt-screen-only" href="${helpLink}" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> WhatsApp Help</a>` : ''}`;
 
   receiptContent.innerHTML = `
@@ -1019,6 +1040,10 @@ function openReceipt(order) {
     openPaymentInstructions(order);
   });
 
+  document.getElementById('cancelPendingOrderBtn')?.addEventListener('click', async () => {
+    await cancelPendingOrder(order.id, { reopenHistory: true });
+  });
+
   receiptModal.style.display = 'block';
   document.body.style.overflow = 'hidden';
 }
@@ -1054,6 +1079,40 @@ function showLoadingOverlay(message = 'Processing…') {
 function hideLoadingOverlay() {
   const overlay = document.getElementById('paymentLoadingOverlay');
   if (overlay) { overlay.style.animation = 'fadeOutOvl .3s ease'; setTimeout(() => { overlay.remove(); document.body.style.overflow = 'auto'; }, 300); }
+}
+
+
+async function cancelPendingOrder(orderId, options = {}) {
+  if (!orderId) return false;
+  if (!confirm('Cancel this pending payment order? This will remove it from active admin processing.')) return false;
+
+  const shouldReopenHistory = options.reopenHistory !== false;
+  showLoadingOverlay('Cancelling your order…');
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/cancel`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', ...authHeaders() }
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || 'Could not cancel this order');
+
+    currentOrderFlow = null;
+    if (receiptModal) receiptModal.style.display = 'none';
+    if (paymentInstructionsModal) paymentInstructionsModal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+    hideLoadingOverlay();
+    showToast(data.message || 'Order cancelled successfully.', 'success');
+
+    if (shouldReopenHistory) {
+      await openOrderHistory();
+    }
+    return true;
+  } catch (err) {
+    hideLoadingOverlay();
+    showToast(err.message || 'Could not cancel this order.', 'error');
+    return false;
+  }
 }
 
 async function initiateManualCheckout() {
