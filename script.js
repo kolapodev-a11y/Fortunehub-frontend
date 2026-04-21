@@ -41,11 +41,9 @@ let products = [];
 let cart = (() => {
   const saved = JSON.parse(localStorage.getItem('cart')) || [];
   return saved.map(item => {
-    let m = item;
-    if (item.price && item.price > 10000) m = { ...item, price: Math.round(item.price / 100) };
-    const img = String(m.image || '');
-    if (img.startsWith('data:') || img.length > 300) m = { ...m, image: '' };
-    return m;
+    let mapped = item;
+    if (item.price && item.price > 10000) mapped = { ...item, price: Math.round(item.price / 100) };
+    return mapped;
   });
 })();
 
@@ -256,9 +254,29 @@ function getRepoBaseUrl() {
 }
 function resolveAssetUrl(path) {
   if (!path) return '';
-  if (/^https?:\/\//i.test(path)) return path;
+  if (/^(https?:|data:)/i.test(path)) return path;
   if (path.startsWith('/')) return `${window.location.origin}${path}`;
   return new URL(path, getRepoBaseUrl()).toString();
+}
+function getProductImage(product) {
+  if (!product) return '';
+  const galleryImage = Array.isArray(product.images) ? product.images.find(Boolean) : '';
+  return String(product.image || galleryImage || '').trim();
+}
+function getOrderItemImage(item) {
+  const directImage = String(item?.image || '').trim();
+  if (directImage) return resolveAssetUrl(directImage);
+
+  const rawProductId = String(item?.productId || item?.id || '').replace(/^db_/, '');
+  const normalizedName = String(item?.name || '').trim().toLowerCase();
+  const productMatch = products.find((product) => {
+    const productDbId = String(product?._id || product?.id || '').replace(/^db_/, '');
+    if (rawProductId && productDbId && productDbId === rawProductId) return true;
+    return normalizedName && String(product?.name || '').trim().toLowerCase() === normalizedName;
+  });
+
+  const fallbackImage = getProductImage(productMatch);
+  return fallbackImage ? resolveAssetUrl(fallbackImage) : '';
 }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function getInitial(name) { return (name || 'U').charAt(0).toUpperCase(); }
@@ -588,15 +606,19 @@ function renderPaymentInstructions(order) {
         <span class="account-pill">${orderItems.length} item${orderItems.length === 1 ? '' : 's'}</span>
       </div>
       <div class="payment-product-list">
-        ${orderItems.map((item) => `
+        ${orderItems.map((item) => {
+          const productThumb = getOrderItemImage(item);
+          return `
           <div class="payment-product-item">
-            <img src="${escapeHtml(resolveAssetUrl(item.image || 'favicon.png'))}" alt="${escapeHtml(item.name || 'Product')}" class="payment-product-thumb" />
+            ${productThumb
+              ? `<img src="${escapeHtml(productThumb)}" alt="${escapeHtml(item.name || 'Product')}" class="payment-product-thumb" />`
+              : `<div class="payment-product-thumb payment-product-thumb-fallback"><i class="fas fa-box"></i></div>`}
             <div class="payment-product-meta">
               <strong>${escapeHtml(item.name || 'Product')}</strong>
               <span>Qty ${Number(item.quantity || 1)} • ${formatCurrency(Number(item.price || 0) * Number(item.quantity || 1))}</span>
             </div>
-          </div>
-        `).join('')}
+          </div>`;
+        }).join('')}
       </div>
     </div>
   ` : '';
@@ -626,7 +648,7 @@ function renderPaymentInstructions(order) {
       </form>`
     : order.status === 'awaiting_verification'
       ? `<div class="proof-status-card"><i class="fas fa-hourglass-half"></i><div><strong>Proof received</strong><p>Your proof has been uploaded and is awaiting manual verification.</p></div></div>`
-      : `<div class="proof-status-card paid"><i class="fas fa-check-circle"></i><div><strong>Payment verified</strong><p>Your payment has been verified successfully.${order.receiptPdfUrl ? ` <a href="${order.receiptPdfUrl}" target="_blank" rel="noopener">Download receipt PDF</a>.` : ''}</p></div></div>`;
+      : `<div class="proof-status-card paid"><i class="fas fa-check-circle"></i><div><strong>Payment verified</strong><p>Your payment has been verified successfully. Open the order details screen to access the official receipt PDF.</p></div></div>`;
 
   paymentInstructionsContent.innerHTML = `
     <div class="payment-brand-shell">
@@ -889,50 +911,86 @@ function openReceipt(order) {
   if (!order || !receiptModal || !receiptContent) return;
   const date = new Date(order.createdAt).toLocaleDateString('en-NG', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
   const statusMeta = getStatusMeta(order.status);
-  const itemsHtml = (order.items || []).map(i => `
-    <tr>
-      <td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(i.name)}</td>
-      <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;">${i.quantity || 1}</td>
-      <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">${formatCurrency(Number(i.price || 0) * Number(i.quantity || 1))}</td>
-    </tr>`).join('');
+  const itemsHtml = (order.items || []).map((item) => {
+    const quantity = Number(item.quantity || 1);
+    const lineTotal = Number(item.price || 0) * quantity;
+    const itemImage = getOrderItemImage(item);
+    return `
+      <tr>
+        <td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;">
+          <div class="receipt-item-cell">
+            ${itemImage
+              ? `<img src="${escapeHtml(itemImage)}" alt="${escapeHtml(item.name || 'Product')}" class="receipt-item-thumb" />`
+              : `<span class="receipt-empty-thumb"><i class="fas fa-box"></i></span>`}
+            <div>
+              <strong>${escapeHtml(item.name || 'Product')}</strong>
+            </div>
+          </div>
+        </td>
+        <td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:center;">${quantity}</td>
+        <td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatCurrency(lineTotal)}</td>
+      </tr>`;
+  }).join('');
   const helpLink = buildWhatsAppLink(order.orderRef);
 
+  const receiptActions = order.status === 'paid'
+    ? `
+      ${order.receiptPdfUrl ? `<a class="btn btn-secondary receipt-screen-only" href="${order.receiptPdfUrl}" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> Download Receipt PDF</a>` : ''}
+      ${helpLink ? `<a class="whatsapp-help-btn receipt-screen-only" href="${helpLink}" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> WhatsApp Help</a>` : ''}`
+    : `
+      <button type="button" class="btn btn-tertiary receipt-screen-only" id="continuePaymentBtn"><i class="fas fa-building-columns"></i> Continue Payment</button>
+      ${helpLink ? `<a class="whatsapp-help-btn receipt-screen-only" href="${helpLink}" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> WhatsApp Help</a>` : ''}`;
+
   receiptContent.innerHTML = `
-    <div class="receipt-header">
-      <h2>Fortune's <span>Hub</span></h2>
-      <p class="receipt-subtitle">Order Details</p>
-    </div>
-    <div class="receipt-meta">
-      <div><strong>Reference:</strong><code>${escapeHtml(order.orderRef)}</code></div>
-      <div><strong>Date:</strong> ${date}</div>
-      <div><strong>Status:</strong> <span class="status-badge status-${statusMeta.className}">${statusMeta.label}</span></div>
-      <div><strong>Customer:</strong> ${escapeHtml(order.customerName || currentUser?.name || 'Customer')}</div>
-      <div><strong>WhatsApp:</strong> ${escapeHtml(order.customerPhone || 'N/A')}</div>
-      <div><strong>Shipping To:</strong> ${escapeHtml(order.shippingState || 'N/A')}</div>
-      <div><strong>Email:</strong> ${escapeHtml(order.email || currentUser?.email || 'N/A')}</div>
-      <div><strong>Transaction ID:</strong> ${escapeHtml(order.transactionId || 'Not provided')}</div>
-    </div>
-    <table class="receipt-table" style="width:100%;border-collapse:collapse;margin:16px 0;">
-      <thead><tr style="background:#f0f2ff;">
-        <th style="padding:10px;text-align:left;">Item</th>
-        <th style="padding:10px;text-align:center;">Qty</th>
-        <th style="padding:10px;text-align:right;">Amount</th>
-      </tr></thead>
-      <tbody>${itemsHtml}</tbody>
-    </table>
-    <div class="receipt-totals">
-      <div class="receipt-row"><span>Subtotal</span><span>${formatCurrency(order.subtotal)}</span></div>
-      <div class="receipt-row"><span>Shipping</span><span>${formatCurrency(order.shippingFee)}</span></div>
-      <div class="receipt-row receipt-grand"><span>Total</span><span>${formatCurrency(order.amount)}</span></div>
-    </div>
-    <div class="instruction-card" style="margin-top:16px;">
-      <h3><i class="fas fa-route"></i> Order timeline</h3>
-      ${renderTimeline(order)}
-    </div>
-    <div class="payment-modal-actions">
-      ${order.status !== 'paid' ? `<button type="button" class="btn btn-tertiary" id="continuePaymentBtn"><i class="fas fa-building-columns"></i> Continue Payment</button>` : ''}
-      ${order.receiptPdfUrl ? `<a class="btn btn-secondary" href="${order.receiptPdfUrl}" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> Download PDF</a>` : ''}
-      ${helpLink ? `<a class="whatsapp-help-btn" href="${helpLink}" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> WhatsApp Help</a>` : ''}
+    <div class="receipt-sheet">
+      <div class="receipt-header">
+        <div class="receipt-title-row">
+          <div>
+            <span class="payment-eyebrow" style="color:var(--brand-blue);opacity:1;">Order receipt</span>
+            <h2>Fortune's <span>Hub</span></h2>
+            <p class="receipt-sheet-subtitle">A clean single-page summary for your verified bank transfer order.</p>
+          </div>
+          <span class="status-badge status-${statusMeta.className} receipt-inline-status">${statusMeta.label}</span>
+        </div>
+      </div>
+
+      <div class="receipt-summary-grid">
+        <div class="receipt-meta-card"><span>Reference</span><strong><code>${escapeHtml(order.orderRef)}</code></strong></div>
+        <div class="receipt-meta-card"><span>Date</span><strong>${date}</strong></div>
+        <div class="receipt-meta-card"><span>Customer</span><strong>${escapeHtml(order.customerName || currentUser?.name || 'Customer')}</strong></div>
+        <div class="receipt-meta-card"><span>Transaction ID</span><strong>${escapeHtml(order.transactionId || 'Not provided')}</strong></div>
+      </div>
+
+      <div class="receipt-meta">
+        <div><strong>Email:</strong> ${escapeHtml(order.email || currentUser?.email || 'N/A')}</div>
+        <div><strong>WhatsApp:</strong> ${escapeHtml(order.customerPhone || 'N/A')}</div>
+        <div><strong>Shipping To:</strong> ${escapeHtml(order.shippingState || 'N/A')}</div>
+        <div><strong>Payment Method:</strong> Bank transfer</div>
+      </div>
+
+      <table class="receipt-table receipt-table-compact" style="width:100%;border-collapse:collapse;margin:16px 0;">
+        <thead><tr style="background:#f0f2ff;">
+          <th style="padding:12px 10px;text-align:left;">Item</th>
+          <th style="padding:12px 10px;text-align:center;">Qty</th>
+          <th style="padding:12px 10px;text-align:right;">Amount</th>
+        </tr></thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+
+      <div class="receipt-totals">
+        <div class="receipt-row"><span>Subtotal</span><span>${formatCurrency(order.subtotal)}</span></div>
+        <div class="receipt-row"><span>Shipping</span><span>${formatCurrency(order.shippingFee)}</span></div>
+        <div class="receipt-row receipt-grand"><span>Total Paid</span><span>${formatCurrency(order.amount)}</span></div>
+      </div>
+
+      <div class="instruction-card receipt-timeline-card">
+        <h3><i class="fas fa-route"></i> Order timeline</h3>
+        ${renderTimeline(order)}
+      </div>
+
+      <div class="payment-modal-actions receipt-actions">
+        ${receiptActions}
+      </div>
     </div>
   `;
 
@@ -1056,7 +1114,7 @@ function updateCartUI() {
 
   cart.forEach(item => {
     const product = getProductById(item.id);
-    const imgSrc  = resolveAssetUrl(item.image || (product && product.image) || '');
+    const imgSrc  = getOrderItemImage(item) || resolveAssetUrl((product && getProductImage(product)) || '');
     cartItemsContainer.insertAdjacentHTML('beforeend', `
       <div class="cart-item">
         <div class="item-details">
@@ -1105,9 +1163,8 @@ function addToCart(productId, quantity = 1) {
   const cartItem = cart.find(item => String(item.id) === String(productId));
   if (cartItem) { cartItem.quantity += quantity; }
   else {
-    const rawImg  = product.image || '';
-    const safeImg = (rawImg.startsWith('data:') || rawImg.length > 300) ? '' : rawImg;
-    cart.push({ id: product.id, name: product.name, price: product.price, quantity, image: safeImg });
+    const primaryImage = getProductImage(product);
+    cart.push({ id: product.id, productId: product._id || product.id, name: product.name, price: product.price, quantity, image: primaryImage });
   }
   localStorage.setItem('cart', JSON.stringify(cart));
   updateCartUI();

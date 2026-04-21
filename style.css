@@ -1180,11 +1180,51 @@ img { max-width:100%; display:block; }
 /* ==============================
    ✅ PRINT STYLES — receipt only
    ============================== */
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
 @media print {
+  html, body { background: #fff !important; }
   body > *:not(#receiptModal) { display: none !important; }
-  #receiptModal { display: block !important; position: static !important; background: none !important; }
-  #receiptModal .modal-content { box-shadow: none !important; max-width: 100% !important; }
-  #receiptModal .close, #printReceiptBtn { display: none !important; }
+  #receiptModal {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: none !important;
+  }
+  #receiptModal .modal-content {
+    box-shadow: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+  }
+  #receiptModal .close,
+  #receiptModal .receipt-screen-only,
+  #receiptModal .payment-modal-actions { display: none !important; }
+  #receiptContent { padding: 0 !important; }
+  .receipt-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .receipt-table-compact,
+  .receipt-table-compact thead,
+  .receipt-table-compact tbody,
+  .receipt-table-compact tr,
+  .receipt-table-compact td,
+  .receipt-table-compact th {
+    page-break-inside: avoid !important;
+  }
+  .receipt-timeline-card { margin-top: 14px !important; }
 }
 
 /* ==============================
@@ -1291,4 +1331,112 @@ img { max-width:100%; display:block; }
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-5px); }
     75% { transform: translateX(5px); }
+}
+
+
+.receipt-screen-only { display: inline-flex; }
+
+.receipt-sheet {
+  background: linear-gradient(180deg, #ffffff 0%, #f8faff 100%);
+  border: 1px solid rgba(67, 97, 238, 0.12);
+  border-radius: 24px;
+  padding: 22px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+}
+
+.receipt-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.receipt-sheet-subtitle {
+  margin: 6px 0 0;
+  color: var(--gray);
+  font-size: .95rem;
+  line-height: 1.6;
+}
+
+.receipt-inline-status {
+  flex-shrink: 0;
+}
+
+.receipt-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 16px;
+}
+
+.receipt-meta-card {
+  background: rgba(255,255,255,.9);
+  border: 1px solid rgba(67, 97, 238, 0.12);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 6px;
+}
+
+.receipt-meta-card span {
+  font-size: .76rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--gray);
+  font-weight: 800;
+}
+
+.receipt-meta-card strong {
+  color: var(--dark);
+  font-size: .96rem;
+  overflow-wrap: anywhere;
+}
+
+.receipt-item-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.receipt-item-thumb,
+.receipt-empty-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.receipt-item-thumb {
+  object-fit: cover;
+  border: 1px solid rgba(67, 97, 238, 0.12);
+  background: #fff;
+}
+
+.receipt-empty-thumb,
+.payment-product-thumb-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(67,97,238,.12), rgba(118,75,162,.12));
+  color: var(--brand-blue);
+  border: 1px dashed rgba(67, 97, 238, 0.22);
+}
+
+.receipt-table-compact th,
+.receipt-table-compact td {
+  font-size: .92rem;
+}
+
+.receipt-actions {
+  margin-top: 18px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 700px) {
+  .receipt-title-row { flex-direction: column; }
+  .receipt-summary-grid { grid-template-columns: 1fr; }
+  .receipt-sheet { padding: 18px 16px; }
+  .receipt-item-cell { align-items: flex-start; }
+  .receipt-actions { justify-content: stretch; }
+  .receipt-actions > * { width: 100%; justify-content: center; }
 }
