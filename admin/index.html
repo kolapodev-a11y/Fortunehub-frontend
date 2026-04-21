@@ -1581,10 +1581,18 @@
       <div class="view" id="view-payments">
 
         <div class="section-header">
-          <h2>Bank Transfer Verification</h2>
-          <button class="btn btn-danger" id="clearAllBtn" type="button">
-            <i class="fas fa-rotate-right"></i> Refresh Orders
-          </button>
+          <div>
+            <h2>Bank Transfer Verification</h2>
+            <p style="margin-top:6px;color:var(--text-muted);font-size:13px;">Manage transfer approvals, clean up transactions, and keep the payment workflow aligned with the storefront.</p>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-secondary" id="refreshOrdersBtn" type="button">
+              <i class="fas fa-rotate-right"></i> Refresh Orders
+            </button>
+            <button class="btn btn-danger" id="clearAllBtn" type="button">
+              <i class="fas fa-trash-can"></i> Clear All Transactions
+            </button>
+          </div>
         </div>
 
         <!-- Stats Cards -->
@@ -2869,6 +2877,9 @@ async function loadPayments(page = 1) {
               <i class="fas fa-eye"></i> View
             </button>
             ${canVerify ? `<button class="btn-view" style="margin-left:6px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-color:transparent;" onclick="verifyOrder('${orderId}')"><i class="fas fa-check"></i> Verify</button>` : ''}
+            <button class="btn-del-tx" style="margin-left:6px;" onclick="deleteOrder('${orderId}')">
+              <i class="fas fa-trash"></i> Delete
+            </button>
           </td>
         `;
         tbody.appendChild(row);
@@ -2900,6 +2911,9 @@ async function loadPayments(page = 1) {
                   <i class="fas fa-eye"></i> Details
                 </button>
                 ${canVerify ? `<button class="btn-view" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-color:transparent;" onclick="verifyOrder('${orderId}')"><i class="fas fa-check"></i> Verify</button>` : ''}
+                <button class="btn-del-tx" onclick="deleteOrder('${orderId}')">
+                  <i class="fas fa-trash"></i> Delete
+                </button>
               </div>
             </div>
           `;
@@ -3023,7 +3037,10 @@ function displayPaymentDetails(order) {
         </div>
         <div style="display:grid;gap:10px;justify-items:end;">
           <span class="status-badge ${statusClass}" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.28);font-size:12px;padding:7px 14px;">${escHtml(orderStatusLabel(order.status))}</span>
-          ${canVerify ? `<button class="btn-view" style="background:#fff;color:#059669;border-color:transparent;" onclick="verifyOrder('${escHtml(order.id || order._id || '')}')"><i class="fas fa-check"></i> Verify transfer</button>` : ''}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+            ${canVerify ? `<button class="btn-view" style="background:#fff;color:#059669;border-color:transparent;" onclick="verifyOrder('${escHtml(order.id || order._id || '')}')"><i class="fas fa-check"></i> Verify transfer</button>` : ''}
+            <button class="btn-del-tx" onclick="deleteOrder('${escHtml(order.id || order._id || '')}')"><i class="fas fa-trash"></i> Delete</button>
+          </div>
         </div>
       </div>
 
@@ -3123,7 +3140,49 @@ document.getElementById('applyPayFilters').addEventListener('click', () => {
   loadPayments(1);
 });
 
-document.getElementById('clearAllBtn').addEventListener('click', () => loadPayments(1));
+async function deleteOrder(id) {
+  if (!id) return;
+  if (!confirm('Delete this transaction permanently from the admin panel?')) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/orders/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    });
+    if (res.status === 401) { logout(); return; }
+    const result = await res.json();
+    if (!result.success) throw new Error(result.message || 'Could not delete transaction');
+    toast('Transaction deleted successfully', 'success');
+    document.getElementById('payDetailModal').classList.remove('show');
+    await loadPayments(currentPayPage);
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'error');
+  }
+}
+
+async function clearAllOrders() {
+  const statusValue = document.getElementById('paymentStatusFilter')?.value || 'all';
+  const statusHint = statusValue && statusValue !== 'all' ? ` for status "${statusValue}"` : '';
+  if (!confirm(`Delete all transactions${statusHint}? This action cannot be undone.`)) return;
+  try {
+    const params = new URLSearchParams();
+    if (statusValue && statusValue !== 'all') params.set('status', statusValue);
+    const res = await fetch(`${API_BASE}/api/admin/orders${params.toString() ? `?${params.toString()}` : ''}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    });
+    if (res.status === 401) { logout(); return; }
+    const result = await res.json();
+    if (!result.success) throw new Error(result.message || 'Could not clear transactions');
+    toast(result.message || 'Transactions cleared', 'success');
+    document.getElementById('payDetailModal').classList.remove('show');
+    await loadPayments(1);
+  } catch (err) {
+    toast('Clear all failed: ' + err.message, 'error');
+  }
+}
+
+document.getElementById('refreshOrdersBtn').addEventListener('click', () => loadPayments(currentPayPage));
+document.getElementById('clearAllBtn').addEventListener('click', clearAllOrders);
 
 document.getElementById('resetPayFilters').addEventListener('click', () => {
   document.getElementById('paymentStatusFilter').value = 'all';
@@ -3146,6 +3205,8 @@ document.getElementById('paymentSearch').addEventListener('input', () => {
 
 window.viewPayment = viewPayment;
 window.verifyOrder = verifyOrder;
+window.deleteOrder = deleteOrder;
+window.clearAllOrders = clearAllOrders;
 
 function fmtDate(dateString) {
   if (!dateString) return '—';
