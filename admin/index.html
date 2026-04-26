@@ -2365,7 +2365,7 @@ function renderProductsGrid(products, containerId) {
   grid.innerHTML = products.map(p => {
     const imgSrc = p.image || (Array.isArray(p.images) && p.images[0]) || '';
     const displayImg = imgSrc
-      ? `<img src="${escHtml(imgSrc)}" alt="${escHtml(p.name)}" onerror="this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;color:#ccc;font-size:32px;\\'><i class=\\'fas fa-image\\'></i></div>'">`
+      ? `<img src="${escHtml(imgSrc)}" alt="${escHtml(p.name)}" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;color:#ccc;font-size:32px;\\'><i class=\\'fas fa-image\\'></i></div>'">`
       : `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ccc;font-size:32px;"><i class="fas fa-image"></i></div>`;
 
     let badgeHtml = '';
@@ -3262,7 +3262,7 @@ function displayPaymentDetails(order) {
         return `
           <div class="order-detail-item">
             ${imageUrl
-              ? `<img src="${escHtml(imageUrl)}" alt="${escHtml(item.name || 'Item')}" class="order-detail-item-thumb" />`
+              ? `<img src="${escHtml(imageUrl)}" alt="${escHtml(item.name || 'Item')}" class="order-detail-item-thumb" loading="lazy" decoding="async" />`
               : `<div class="order-detail-item-thumb-fallback">📦</div>`}
             <div class="order-detail-item-meta">
               <strong>${escHtml(item.name || 'Item')}</strong>
@@ -3500,7 +3500,6 @@ if (authToken) {
   loadDashboard();
 }
 </script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
 
