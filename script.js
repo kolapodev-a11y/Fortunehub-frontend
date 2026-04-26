@@ -1683,20 +1683,15 @@ document.addEventListener('DOMContentLoaded', initializeApp);
 // - Lazy Google Identity script loading
 // - Smaller product listing DOM
 // - Debounced search / phone sync
-// - Progressive "Load more" rendering
+// - Full filtered product rendering without extra paging controls
 // =====================================================================
 
 const FH_PRODUCTS_CACHE_KEY = 'fh_products_cache_v6';
 const FH_PRODUCTS_CACHE_TTL_MS = 10 * 60 * 1000;
-const FH_PRODUCTS_BATCH_INITIAL = 8;
-const FH_PRODUCTS_BATCH_STEP = 8;
-const fhLoadMoreBtn = document.getElementById('loadMoreProducts');
 
 let fhGoogleScriptPromise = null;
 let fhViewCategory = 'all';
 let fhViewSearch = '';
-let fhVisibleProductCount = FH_PRODUCTS_BATCH_INITIAL;
-let fhCurrentProductsView = [];
 let fhListenersBound = false;
 let fhPhoneSyncTimer = null;
 
@@ -1777,20 +1772,6 @@ function updateCategoryCounts() {
   });
 }
 
-function updateLoadMoreButton() {
-  if (!fhLoadMoreBtn) return;
-  const remaining = Math.max(0, fhCurrentProductsView.length - fhVisibleProductCount);
-  if (remaining <= 0) {
-    fhLoadMoreBtn.hidden = true;
-    fhLoadMoreBtn.setAttribute('hidden', 'hidden');
-    return;
-  }
-
-  fhLoadMoreBtn.hidden = false;
-  fhLoadMoreBtn.removeAttribute('hidden');
-  fhLoadMoreBtn.textContent = `Load more products (${remaining} remaining)`;
-}
-
 function buildProductCardMarkup(product) {
   const isSold = Boolean(product.sold);
   const isOutOfStock = Boolean(product.outOfStock);
@@ -1830,22 +1811,17 @@ function buildProductCardMarkup(product) {
 function displayProducts(productsToShow) {
   if (!productsGrid) return;
 
-  fhCurrentProductsView = Array.isArray(productsToShow) ? productsToShow : [];
-  const visibleItems = fhCurrentProductsView.slice(0, fhVisibleProductCount);
+  const visibleItems = Array.isArray(productsToShow) ? productsToShow : [];
 
   if (!visibleItems.length) {
     productsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#555;"><i class="fas fa-box-open" style="font-size:48px;color:#ccc;margin-bottom:15px;display:block;"></i><p style="font-size:18px;margin:0;">No products found</p></div>`;
-    updateLoadMoreButton();
     return;
   }
 
   productsGrid.innerHTML = visibleItems.map(buildProductCardMarkup).join('');
-  updateLoadMoreButton();
 }
 
-function applyProductFilters(resetVisibleCount = true) {
-  if (resetVisibleCount) fhVisibleProductCount = FH_PRODUCTS_BATCH_INITIAL;
-
+function applyProductFilters() {
   const searchValue = fhViewSearch.trim().toLowerCase();
   const filtered = products.filter((product) => {
     const categoryMatch = fhViewCategory === 'all' || String(product.category || '').toLowerCase() === fhViewCategory;
@@ -1861,12 +1837,12 @@ function applyProductFilters(resetVisibleCount = true) {
 
 function filterProducts(category) {
   fhViewCategory = String(category || 'all').toLowerCase();
-  applyProductFilters(true);
+  applyProductFilters();
 }
 
 function searchProducts(query) {
   fhViewSearch = String(query || '').trim().toLowerCase();
-  applyProductFilters(true);
+  applyProductFilters();
 }
 
 function setActiveFilterButton(category) {
@@ -2041,11 +2017,6 @@ function setupEventListeners() {
         handleCategoryAction();
       }
     });
-  });
-
-  fhLoadMoreBtn?.addEventListener('click', () => {
-    fhVisibleProductCount += FH_PRODUCTS_BATCH_STEP;
-    displayProducts(fhCurrentProductsView);
   });
 
   cartItemsContainer?.addEventListener('click', (event) => {

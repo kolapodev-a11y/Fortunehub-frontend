@@ -1604,21 +1604,6 @@ img { max-width:100%; display:block; }
   contain-intrinsic-size: 700px;
 }
 
-.products-actions {
-  display: flex;
-  justify-content: center;
-  margin-top: 24px;
-}
-
-.load-more-btn {
-  width: auto;
-  min-width: 220px;
-}
-
-.load-more-btn[hidden] {
-  display: none;
-}
-
 .product-card {
   display: flex;
   flex-direction: column;
