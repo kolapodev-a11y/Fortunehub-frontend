@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1D2386" />
   <link rel="icon" type="image/png" href="favicon.png">
   <meta name="description" content="FortuneHub — Your one-stop destination for quality gadgets and accessories at unbeatable prices. Shop phones, laptops, accessories, games, speakers and watches with fast shipping across Nigeria." />
   <title>Fortune's hub - E-commerce website</title>
@@ -16,8 +17,7 @@
   <!-- Preload hero image -->
   <link rel="preload" as="image" href="fot.png" fetchpriority="high" />
 
-  <!-- Google Identity Services (GIS) — for Google Sign-In -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- Google Identity Services is lazy-loaded only when the auth modal is opened -->
 
   <!-- Font Awesome (non-blocking) -->
   <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
@@ -35,6 +35,7 @@
 </head>
 
 <body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
 
   <!-- ===== HEADER ===== -->
   <header class="site-header">
@@ -91,7 +92,10 @@
   <main id="main-content">
 
     <!-- ===== HERO ===== -->
-    <section class="hero" aria-label="Hero">
+    <section class="hero" aria-label="Hero banner">
+      <div class="hero-media" aria-hidden="true">
+        <img src="fot.png" alt="" class="hero-bg-image" width="1080" height="954" fetchpriority="high" decoding="async" />
+      </div>
       <div class="container">
         <div class="hero-content">
           <h1>Shop The Latest Trends</h1>
@@ -166,7 +170,10 @@
           <button class="filter-btn" data-category="speakers" aria-pressed="false">Speakers</button>
           <button class="filter-btn" data-category="watches" aria-pressed="false">Watches</button>
         </div>
-        <div class="products-grid" id="productsGrid"></div>
+        <div class="products-grid" id="productsGrid" aria-live="polite"></div>
+        <div class="products-actions">
+          <button class="btn btn-secondary load-more-btn" id="loadMoreProducts" type="button" hidden>Load more products</button>
+        </div>
       </div>
     </section>
 
@@ -442,7 +449,7 @@
           <ul class="footer-contact">
             <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span>Aloba complex, Idiope Awule Road, Akure.</span></li>
             <li><i class="fas fa-phone" aria-hidden="true"></i><span>09033489520</span></li>
-            <li><i class="fas fa-envelope" aria-hidden="true"></i><span><a href="/cdn-cgi/l/email-protection#f99f968b8d8c979c91989b909bc0b99e94989095d79a9694" style="color:inherit;"><span class="__cf_email__" data-cfemail="63050c1117160d060b02010a015a23040e020a0f4d000c0e">fortunehabib9@gmail.com</span></a></span></li>
+            <li><i class="fas fa-envelope" aria-hidden="true"></i><span><a href="mailto:fortunehabib9@gmail.com" style="color:inherit;">fortunehabib9@gmail.com</a></span></li>
           </ul>
           <div class="footer-mini-note"><i class="fas fa-clock" aria-hidden="true"></i><span>Mon–Sat: 9:00am – 6:00pm</span></div>
         </div>
@@ -458,6 +465,6 @@
     </div>
   </footer>
 
-  <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="script.js" defer></script>
+  <script src="script.js" defer></script>
 </body>
 </html>
