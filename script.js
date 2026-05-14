@@ -2259,3 +2259,187 @@ async function initializeApp() {
   updateCategoryCounts();
   applyProductFilters(false);
 }
+
+
+// =====================================================================
+// FortuneHub catalog scaling upgrade — pagination + server-side filters
+// =====================================================================
+const FH_PAGE_SIZE = 24;
+const fhPaginationState = {
+  page: 1,
+  totalPages: 1,
+  total: 0,
+  categoryCounts: {}
+};
+const productsPagination = document.getElementById('productsPagination');
+
+function updateCategoryCounts(categoryCounts = fhPaginationState.categoryCounts) {
+  if (!categoryCards?.length || !categoryCounts || typeof categoryCounts !== 'object') return;
+  categoryCards.forEach((card) => {
+    const key = String(card.dataset.category || '').toLowerCase();
+    const label = card.querySelector('p');
+    if (!label) return;
+    const count = Number(categoryCounts[key] || 0);
+    label.textContent = `${count}+ item${count === 1 ? '' : 's'}`;
+  });
+}
+
+function renderProductsPagination() {
+  if (!productsPagination) return;
+  const totalPages = Number(fhPaginationState.totalPages || 1);
+  const currentPage = Number(fhPaginationState.page || 1);
+  const total = Number(fhPaginationState.total || 0);
+
+  if (totalPages <= 1) {
+    productsPagination.hidden = true;
+    productsPagination.innerHTML = '';
+    return;
+  }
+
+  const pages = [];
+  const start = Math.max(1, currentPage - 2);
+  const end = Math.min(totalPages, currentPage + 2);
+
+  pages.push(`<button class="products-pagination-btn" type="button" data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''}>Prev</button>`);
+  for (let page = start; page <= end; page += 1) {
+    pages.push(`<button class="products-pagination-btn ${page === currentPage ? 'is-active' : ''}" type="button" data-page="${page}" ${page === currentPage ? 'aria-current="page"' : ''}>${page}</button>`);
+  }
+  pages.push(`<button class="products-pagination-btn" type="button" data-page="${currentPage + 1}" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>`);
+
+  productsPagination.hidden = false;
+  productsPagination.innerHTML = `<span class="products-pagination-summary">Page ${currentPage} of ${totalPages} · ${total} products</span>${pages.join('')}`;
+}
+
+async function fetchProductsWithRetry(page = 1) {
+  const searchParams = new URLSearchParams({
+    page: String(page),
+    limit: String(FH_PAGE_SIZE),
+    includeCategoryCounts: 'true'
+  });
+
+  if (fhViewCategory && fhViewCategory !== 'all') searchParams.set('category', fhViewCategory);
+  if (fhViewSearch) searchParams.set('q', fhViewSearch);
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt === 1) showProductsLoading('idle');
+    else if (attempt === 2) showProductsLoading('waking');
+    else showProductsLoading('retrying', { attempt, maxRetries: MAX_RETRIES });
+
+    const controller = new AbortController();
+    const timerId = setTimeout(() => controller.abort(), PER_ATTEMPT_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/products?${searchParams.toString()}`, {
+        cache: 'default',
+        headers: { Accept: 'application/json' },
+        signal: controller.signal
+      });
+      clearTimeout(timerId);
+
+      if (response.ok) {
+        const data = await response.json();
+        const found = Array.isArray(data?.data) ? data.data : [];
+        fhPaginationState.page = Number(data?.pagination?.page || page || 1);
+        fhPaginationState.totalPages = Number(data?.pagination?.totalPages || 1);
+        fhPaginationState.total = Number(data?.pagination?.total || found.length || 0);
+        fhPaginationState.categoryCounts = data?.categoryCounts || {};
+        return found.map(normalizeProductRecord).filter((item) => item.id);
+      }
+    } catch (error) {
+      clearTimeout(timerId);
+      console.warn(`⚠️ Attempt ${attempt}:`, error.name === 'AbortError' ? 'timed out' : error.message);
+    }
+
+    if (attempt < MAX_RETRIES) await sleep(RETRY_DELAYS[attempt - 1] || 10000);
+  }
+
+  return null;
+}
+
+async function loadCatalogPage(page = 1, useLoadingState = true) {
+  if (useLoadingState) showProductsLoading('idle');
+  const networkProducts = await fetchProductsWithRetry(page);
+
+  if (networkProducts && networkProducts.length) {
+    products = networkProducts;
+    writeProductsCache(products);
+    updateCategoryCounts();
+    displayProducts(products);
+    renderProductsPagination();
+    return;
+  }
+
+  if (!products.length) {
+    try {
+      const fallbackProducts = await fetchProductsFallback();
+      fhPaginationState.page = 1;
+      fhPaginationState.totalPages = 1;
+      fhPaginationState.total = fallbackProducts.length;
+      products = fallbackProducts.slice(0, FH_PAGE_SIZE);
+      writeProductsCache(products);
+      displayProducts(products);
+      renderProductsPagination();
+      return;
+    } catch (fallbackError) {
+      console.error('❌ products.json fallback failed:', fallbackError.message || fallbackError);
+      products = [];
+      showProductsLoading('error', { retryFn: () => initializeApp() });
+      return;
+    }
+  }
+
+  displayProducts(products);
+  renderProductsPagination();
+}
+
+function applyProductFilters(resetPage = true) {
+  const targetPage = resetPage ? 1 : fhPaginationState.page;
+  loadCatalogPage(targetPage, true).catch((error) => {
+    console.error('Failed to apply product filters:', error?.message || error);
+  });
+}
+
+function filterProducts(category) {
+  fhViewCategory = String(category || 'all').toLowerCase();
+  applyProductFilters(true);
+}
+
+function searchProducts(query) {
+  fhViewSearch = String(query || '').trim().toLowerCase();
+  applyProductFilters(true);
+}
+
+async function initializeApp() {
+  loadAuthState();
+  updateAuthUI();
+  setupEventListeners();
+  updateCartUI();
+  setActiveFilterButton(fhViewCategory);
+
+  const runWhenIdle = window.requestIdleCallback || ((callback) => setTimeout(callback, 500));
+  runWhenIdle(() => fetchPaymentConfig().catch(() => {}));
+
+  const cachedProducts = readProductsCache();
+  if (cachedProducts.length) {
+    products = cachedProducts.slice(0, FH_PAGE_SIZE);
+    fhPaginationState.page = 1;
+    fhPaginationState.totalPages = 1;
+    fhPaginationState.total = cachedProducts.length;
+    displayProducts(products);
+    renderProductsPagination();
+  }
+
+  await loadCatalogPage(1, !cachedProducts.length);
+}
+
+productsPagination?.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-page]');
+  if (!button || button.disabled) return;
+  const page = Number(button.dataset.page || 1);
+  if (!page || page < 1 || page === fhPaginationState.page || page > fhPaginationState.totalPages) return;
+  loadCatalogPage(page, true).then(() => {
+    document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }).catch((error) => {
+    console.error('Pagination failed:', error?.message || error);
+  });
+});
