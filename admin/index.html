@@ -1815,6 +1815,14 @@
 
         <div class="products-grid" id="productsListGrid"></div>
 
+        <div class="pagination product-pagination" id="productPagination" style="display:none;">
+          <span class="pagination-info" id="productPageInfo">Page 1 of 1</span>
+          <div class="pagination-btns">
+            <button class="page-btn" id="productPrevPage" type="button">Previous</button>
+            <button class="page-btn" id="productNextPage" type="button">Next</button>
+          </div>
+        </div>
+
         <div class="empty-state" id="productsEmptyState" style="display:none;">
           <i class="fas fa-box-open"></i>
           <h3>No products found</h3>
@@ -2210,6 +2218,14 @@ function toast(msg, type = 'success') {
   setTimeout(() => { el.style.animation = 'none'; el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 3500);
 }
 
+function debounce(fn, delay = 200) {
+  let timerId;
+  return (...args) => {
+    clearTimeout(timerId);
+    timerId = setTimeout(() => fn(...args), delay);
+  };
+}
+
 function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(`view-${name}`).classList.add('active');
@@ -2318,17 +2334,73 @@ document.querySelectorAll('.nav-item[data-view]').forEach(item => {
 // =========================================================
 // 5) PRODUCTS — LOAD
 // =========================================================
-async function loadProducts() {
+const PRODUCT_PAGE_SIZE = 24;
+let productListState = {
+  page: 1,
+  totalPages: 1,
+  total: 0,
+  summary: null
+};
+
+function getProductFilterState() {
+  return {
+    q: document.getElementById('productSearch').value.trim(),
+    category: document.getElementById('categoryFilter').value,
+    status: document.getElementById('statusFilter').value
+  };
+}
+
+function renderProductPagination() {
+  const pager = document.getElementById('productPagination');
+  const pageInfo = document.getElementById('productPageInfo');
+  const prevBtn = document.getElementById('productPrevPage');
+  const nextBtn = document.getElementById('productNextPage');
+  if (!pager || !pageInfo || !prevBtn || !nextBtn) return;
+
+  const totalPages = Number(productListState.totalPages || 1);
+  const page = Number(productListState.page || 1);
+  const total = Number(productListState.total || 0);
+
+  if (totalPages <= 1) {
+    pager.style.display = 'none';
+    return;
+  }
+
+  pager.style.display = 'flex';
+  pageInfo.textContent = `Page ${page} of ${totalPages} · ${total} products`;
+  prevBtn.disabled = page <= 1;
+  nextBtn.disabled = page >= totalPages;
+}
+
+async function loadProducts(page = 1) {
   try {
-    const res = await fetch(`${API_BASE}/api/products`, { cache: 'no-store' });
+    const filters = getProductFilterState();
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(PRODUCT_PAGE_SIZE),
+      adminView: '1',
+      includeSummary: 'true'
+    });
+
+    if (filters.q) params.set('q', filters.q);
+    if (filters.category && filters.category !== 'all') params.set('category', filters.category);
+    if (filters.status && filters.status !== 'all') params.set('status', filters.status);
+
+    const res = await fetch(`${API_BASE}/api/products?${params.toString()}`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    // Handle both { success, data: [...] } and plain array
-    allProducts = Array.isArray(data) ? data : (Array.isArray(data.data) ? data.data : []);
+
+    allProducts = Array.isArray(data?.data) ? data.data : [];
+    productListState.page = Number(data?.pagination?.page || page || 1);
+    productListState.totalPages = Number(data?.pagination?.totalPages || 1);
+    productListState.total = Number(data?.pagination?.total || allProducts.length || 0);
+    productListState.summary = data?.summary || null;
+
     renderProductsGrid(allProducts, 'productsListGrid');
     renderProductsGrid(allProducts.slice(0, 8), 'dashProductsGrid');
     updateProductStats();
     updateProductCount();
+    renderProductPagination();
   } catch (err) {
     console.error('Product load error:', err);
     toast('Failed to load products: ' + err.message, 'error');
@@ -2336,14 +2408,15 @@ async function loadProducts() {
 }
 
 function updateProductStats() {
-  document.getElementById('statTotalProducts').textContent = allProducts.length;
-  document.getElementById('statInStock').textContent = allProducts.filter(p => !p.outOfStock && !p.sold).length;
-  document.getElementById('statOutOfStock').textContent = allProducts.filter(p => p.outOfStock && !p.sold).length;
-  document.getElementById('statSold').textContent = allProducts.filter(p => p.sold).length;
+  const summary = productListState.summary || {};
+  document.getElementById('statTotalProducts').textContent = Number(summary.totalProducts || productListState.total || 0);
+  document.getElementById('statInStock').textContent = Number(summary.inStock || 0);
+  document.getElementById('statOutOfStock').textContent = Number(summary.outOfStock || 0);
+  document.getElementById('statSold').textContent = Number(summary.sold || 0);
 }
 
 function updateProductCount() {
-  document.getElementById('productCount').textContent = `(${allProducts.length})`;
+  document.getElementById('productCount').textContent = `(${productListState.total})`;
 }
 
 function renderProductsGrid(products, containerId) {
@@ -2354,6 +2427,8 @@ function renderProductsGrid(products, containerId) {
     grid.innerHTML = '';
     if (containerId === 'productsListGrid') {
       document.getElementById('productsEmptyState').style.display = 'block';
+      const pager = document.getElementById('productPagination');
+      if (pager) pager.style.display = 'none';
     }
     return;
   }
@@ -2365,7 +2440,7 @@ function renderProductsGrid(products, containerId) {
   grid.innerHTML = products.map(p => {
     const imgSrc = p.image || (Array.isArray(p.images) && p.images[0]) || '';
     const displayImg = imgSrc
-      ? `<img src="${escHtml(imgSrc)}" alt="${escHtml(p.name)}" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;color:#ccc;font-size:32px;\\'><i class=\\'fas fa-image\\'></i></div>'">`
+      ? `<img src="${escHtml(imgSrc)}" alt="${escHtml(p.name)}" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML='<div style=\'display:flex;align-items:center;justify-content:center;height:100%;color:#ccc;font-size:32px;\'><i class=\'fas fa-image\'></i></div>'">`
       : `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ccc;font-size:32px;"><i class="fas fa-image"></i></div>`;
 
     let badgeHtml = '';
@@ -2421,31 +2496,18 @@ function escHtml(str) {
 // 6) PRODUCTS — FILTERS
 // =========================================================
 function applyProductFilters() {
-  const q      = document.getElementById('productSearch').value.toLowerCase();
-  const cat    = document.getElementById('categoryFilter').value;
-  const status = document.getElementById('statusFilter').value;
-
-  let filtered = allProducts.filter(p => {
-    const matchQ = !q
-      || p.name.toLowerCase().includes(q)
-      || (p.category || '').toLowerCase().includes(q)
-      || (p.description || '').toLowerCase().includes(q);
-    const matchCat = cat === 'all' || (p.category || '').toLowerCase() === cat;
-    let matchStatus = true;
-    if (status === 'instock')   matchStatus = !p.outOfStock && !p.sold;
-    if (status === 'outofstock') matchStatus = p.outOfStock;
-    if (status === 'sold')      matchStatus = p.sold;
-    if (status === 'new')       matchStatus = p.tag === 'new';
-    if (status === 'sale')      matchStatus = p.tag === 'sale';
-    return matchQ && matchCat && matchStatus;
-  });
-
-  renderProductsGrid(filtered, 'productsListGrid');
+  loadProducts(1);
 }
 
-document.getElementById('productSearch').addEventListener('input', applyProductFilters);
+document.getElementById('productSearch').addEventListener('input', debounce(() => applyProductFilters(), 250));
 document.getElementById('categoryFilter').addEventListener('change', applyProductFilters);
 document.getElementById('statusFilter').addEventListener('change', applyProductFilters);
+document.getElementById('productPrevPage').addEventListener('click', () => {
+  if (productListState.page > 1) loadProducts(productListState.page - 1);
+});
+document.getElementById('productNextPage').addEventListener('click', () => {
+  if (productListState.page < productListState.totalPages) loadProducts(productListState.page + 1);
+});
 
 // =========================================================
 // 7) PRODUCTS — ADD / EDIT MODAL
