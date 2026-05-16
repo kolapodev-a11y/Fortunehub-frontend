@@ -1630,10 +1630,10 @@
 
     <form id="loginForm" autocomplete="on">
       <div class="form-group">
-        <label for="adminUser">Username</label>
+        <label for="adminUser">Email Address</label>
         <div class="input-wrap">
           <i class="fas fa-user"></i>
-          <input type="text" id="adminUser" placeholder="Enter username" autocomplete="username" required />
+          <input type="email" id="adminUser" placeholder="Enter admin email" autocomplete="username" required />
         </div>
       </div>
       <div class="form-group">
@@ -1648,7 +1648,7 @@
       </button>
     </form>
     <div class="login-error" id="loginError">
-      <i class="fas fa-exclamation-circle"></i> Invalid credentials. Please try again.
+      <i class="fas fa-exclamation-circle"></i> Sign in with an approved admin account to continue.
     </div>
   </div>
 </div>
@@ -2189,8 +2189,32 @@ const API_BASE = 'https://fortunehub-backend.onrender.com';
 // =========================================================
 // 1) STATE
 // =========================================================
-let authToken    = localStorage.getItem('fh_admin_token') || null;
-let adminUser    = localStorage.getItem('fh_admin_user')  || '';
+function readStoredAdminSession() {
+  try {
+    const raw = localStorage.getItem('fh_auth');
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function persistAdminSession(session = null) {
+  if (!session) {
+    localStorage.removeItem('fh_auth');
+    localStorage.removeItem('fh_admin_token');
+    localStorage.removeItem('fh_admin_user');
+    return;
+  }
+
+  localStorage.setItem('fh_auth', JSON.stringify(session));
+  localStorage.setItem('fh_admin_token', session.token || '');
+  localStorage.setItem('fh_admin_user', session.name || session.email || '');
+}
+
+let adminSession = readStoredAdminSession();
+let authToken    = adminSession?.token || localStorage.getItem('fh_admin_token') || null;
+let adminUser    = adminSession?.name || adminSession?.email || localStorage.getItem('fh_admin_user') || '';
 let allProducts  = [];
 let editMode     = false;
 let imageSlots   = [null, null, null]; // base64 or URL strings
@@ -2206,7 +2230,28 @@ function fmt(n) {
 }
 
 function authHeaders() {
-  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` };
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
+  return headers;
+}
+
+function applyAdminSession(session = null) {
+  adminSession = session;
+  authToken = session?.token || null;
+  adminUser = session?.name || session?.email || '';
+}
+
+async function validateAdminAccess() {
+  if (!authToken) return false;
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/summary`, {
+      headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+    });
+    const data = await res.json().catch(() => ({}));
+    return Boolean(res.ok && data.success);
+  } catch (_) {
+    return false;
+  }
 }
 
 function toast(msg, type = 'success') {
@@ -2250,28 +2295,32 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   btn.innerHTML = '<div class="spinner"></div>';
   btn.disabled = true;
 
-  const username = document.getElementById('adminUser').value.trim();
+  const email = document.getElementById('adminUser').value.trim();
   const password = document.getElementById('adminPass').value.trim();
 
   try {
     const res = await fetch(`${API_BASE}/api/admin/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ email, password })
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
 
-    if (data.success) {
-      authToken = data.token;
-      adminUser = username;
-      localStorage.setItem('fh_admin_token', authToken);
-      localStorage.setItem('fh_admin_user', adminUser);
+    if (res.ok && data.success && data.token) {
+      const session = {
+        ...(data.user || {}),
+        token: data.token,
+        isAdmin: true
+      };
+      applyAdminSession(session);
+      persistAdminSession(session);
       startApp();
     } else {
+      errEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${data.message || 'Unable to sign in with this admin account.'}`;
       errEl.style.display = 'block';
     }
   } catch (err) {
-    errEl.textContent = '⚠️ Cannot connect to server. Check your connection.';
+    errEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Cannot connect to server. Check your connection.';
     errEl.style.display = 'block';
   }
 
@@ -2280,29 +2329,38 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 });
 
 function startApp() {
+  const displayName = adminSession?.name || adminSession?.email || adminUser || 'Admin';
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appShell').style.display = 'block';
-  document.getElementById('adminNameDisplay').textContent = adminUser;
-  document.getElementById('adminAvatar').textContent = (adminUser[0] || 'A').toUpperCase();
+  document.getElementById('adminNameDisplay').textContent = displayName;
+  document.getElementById('adminAvatar').textContent = (displayName[0] || 'A').toUpperCase();
   loadDashboard();
   showView('dashboard');
 }
 
-function logout() {
-  authToken = null; adminUser = '';
-  localStorage.removeItem('fh_admin_token');
-  localStorage.removeItem('fh_admin_user');
+function logout({ clearForm = true } = {}) {
+  applyAdminSession(null);
+  persistAdminSession(null);
   document.getElementById('appShell').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
-  document.getElementById('adminUser').value = '';
-  document.getElementById('adminPass').value = '';
+  if (clearForm) {
+    document.getElementById('adminUser').value = '';
+    document.getElementById('adminPass').value = '';
+  }
 }
 
-document.getElementById('logoutBtn').addEventListener('click', logout);
-  document.getElementById('topbarLogoutBtn').addEventListener('click', logout);
+document.getElementById('logoutBtn').addEventListener('click', () => logout());
+document.getElementById('topbarLogoutBtn').addEventListener('click', () => logout());
 
-// Auto-login if token exists
-if (authToken) startApp();
+(async function bootstrapAdminSession() {
+  if (!authToken) return;
+  const hasAccess = await validateAdminAccess();
+  if (hasAccess) {
+    startApp();
+    return;
+  }
+  logout({ clearForm: false });
+})();
 
 // =========================================================
 // 4) SIDEBAR (MOBILE)
