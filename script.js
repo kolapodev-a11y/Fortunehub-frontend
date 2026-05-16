@@ -2092,9 +2092,16 @@ function setupEventListeners() {
   checkoutButton?.addEventListener('click', initiateManualCheckout);
 
   productsGrid?.addEventListener('click', (event) => {
+    const wishlistButton = event.target.closest('.wishlist-toggle');
     const addButton = event.target.closest('.add-to-cart');
     const buyNowButton = event.target.closest('.buy-now');
     const card = event.target.closest('.product-card');
+
+    if (wishlistButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
 
     if (addButton) {
       event.stopPropagation();
@@ -2109,7 +2116,9 @@ function setupEventListeners() {
       return;
     }
 
-    if (card) openProductDetail(card.dataset.productId);
+    if (card && !event.target.closest('button') && !event.target.closest('.thumb')) {
+      openProductDetail(card.dataset.productId);
+    }
   });
 
   productsGrid?.addEventListener('keydown', (event) => {
@@ -2957,7 +2966,6 @@ setupEventListeners = function setupEventListenersPatched() {
   }
 
   bindProductGridActions(productsGrid);
-  bindProductGridActions(wishlistGrid);
 
   wishlistGrid?.addEventListener('click', (event) => {
     const wishlistBtn = event.target.closest('.wishlist-toggle');
@@ -2966,6 +2974,7 @@ setupEventListeners = function setupEventListenersPatched() {
     const card = event.target.closest('.product-card');
 
     if (wishlistBtn) {
+      event.preventDefault();
       event.stopPropagation();
       toggleWishlist(wishlistBtn.dataset.id);
       return;
