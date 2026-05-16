@@ -2356,13 +2356,17 @@ async function fetchProductsWithRetry(page = 1) {
   return null;
 }
 
+function shouldPersistCatalogCache(page = fhPaginationState.page) {
+  return Number(page || 1) === 1 && fhViewCategory === 'all' && !fhViewSearch;
+}
+
 async function loadCatalogPage(page = 1, useLoadingState = true) {
   if (useLoadingState) showProductsLoading('idle');
   const networkProducts = await fetchProductsWithRetry(page);
 
-  if (networkProducts && networkProducts.length) {
+  if (Array.isArray(networkProducts)) {
     products = networkProducts;
-    writeProductsCache(products);
+    if (shouldPersistCatalogCache(page)) writeProductsCache(products);
     updateCategoryCounts();
     displayProducts(products);
     renderProductsPagination();
@@ -2376,7 +2380,7 @@ async function loadCatalogPage(page = 1, useLoadingState = true) {
       fhPaginationState.totalPages = 1;
       fhPaginationState.total = fallbackProducts.length;
       products = fallbackProducts.slice(0, FH_PAGE_SIZE);
-      writeProductsCache(products);
+      if (shouldPersistCatalogCache(1)) writeProductsCache(products);
       displayProducts(products);
       renderProductsPagination();
       return;
@@ -2877,19 +2881,6 @@ signOut = function signOutPatched(options = {}) {
 
 const fhBaseSetupEventListeners = setupEventListeners;
 setupEventListeners = function setupEventListenersPatched() {
-  if (!fhMenuEnhancementsBound) {
-    const stopCardOpenForInnerButtons = (event) => {
-      if (event.target.closest('.wishlist-toggle, .add-to-cart, .buy-now')) {
-        event.stopPropagation();
-      }
-    };
-
-    productsGrid?.addEventListener('click', stopCardOpenForInnerButtons, true);
-    productsGrid?.addEventListener('keydown', stopCardOpenForInnerButtons, true);
-    wishlistGrid?.addEventListener('click', stopCardOpenForInnerButtons, true);
-    wishlistGrid?.addEventListener('keydown', stopCardOpenForInnerButtons, true);
-  }
-
   fhBaseSetupEventListeners();
   if (fhMenuEnhancementsBound) return;
   fhMenuEnhancementsBound = true;

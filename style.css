@@ -1931,9 +1931,15 @@ img { max-width:100%; display:block; }
   transform: scale(1.06);
 }
 .wishlist-toggle.is-active {
-  color: var(--brand-red);
-  background: #fff0f1;
-  border-color: rgba(186,25,33,0.25);
+  color: #9f0712;
+  background: #ffe7ea;
+  border-color: rgba(159,7,18,0.55);
+  box-shadow: 0 10px 22px rgba(159,7,18,0.22);
+  transform: scale(1.08);
+}
+.wishlist-toggle.is-active i {
+  font-weight: 900;
+  color: #c1121f;
 }
 .wishlist-toggle i { pointer-events: none; }
 .profile-modal-content {
