@@ -2711,7 +2711,7 @@ function renderHamburgerMenu() {
     items.push(createDrawerItem({ action: 'orders', icon: 'receipt', label: 'Order History', meta: 'View purchases' }));
     items.push(createDrawerItem({ action: 'profile', icon: 'user', label: 'Profile', meta: 'Manage account' }));
     if (currentUser.isAdmin) {
-      items.push(createDrawerItem({ href: 'admin/', icon: 'shield-halved', label: 'Admin Panel', meta: 'Restricted', external: false }));
+      items.push(createDrawerItem({ href: 'admin/', icon: 'shield-halved', label: 'Admin Panel', meta: 'Open dashboard', external: false }));
     }
     items.push(createDrawerItem({ action: 'logout', icon: 'right-from-bracket', label: 'Logout', meta: 'Sign out', danger: true }));
   } else {
