@@ -130,6 +130,46 @@
       margin-top: 14px; display: none;
     }
 
+    .access-state {
+      text-align: center;
+      padding: 8px 0 4px;
+    }
+
+    .access-state h2 {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .access-state p {
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .access-spinner {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 4px solid rgba(102,126,234,.18);
+      border-top-color: var(--primary);
+      margin: 0 auto 18px;
+      animation: spin .9s linear infinite;
+    }
+
+    .access-actions {
+      margin-top: 24px;
+    }
+
+    .btn-store-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
     /* =========================================================
        APP SHELL (SIDEBAR + MAIN)
     ========================================================= */
@@ -1628,28 +1668,20 @@
       <p>Product Manager Dashboard</p>
     </div>
 
-    <form id="loginForm" autocomplete="on">
-      <div class="form-group">
-        <label for="adminUser">Email Address</label>
-        <div class="input-wrap">
-          <i class="fas fa-user"></i>
-          <input type="email" id="adminUser" placeholder="Enter admin email" autocomplete="username" required />
-        </div>
-      </div>
-      <div class="form-group">
-        <label for="adminPass">Password</label>
-        <div class="input-wrap">
-          <i class="fas fa-lock"></i>
-          <input type="password" id="adminPass" placeholder="Enter password" autocomplete="current-password" required />
-        </div>
-      </div>
-      <button type="submit" class="btn-login" id="loginBtn">
-        <span id="loginBtnText">Sign In to Dashboard</span>
-      </button>
-    </form>
-    <div class="login-error" id="loginError">
-      <i class="fas fa-exclamation-circle"></i> Sign in with an approved admin account to continue.
+    <div class="access-state">
+      <div class="access-spinner" id="accessSpinner"></div>
+      <h2 id="accessTitle">Checking admin access…</h2>
+      <p id="accessMessage">Approved admin sessions are sent straight into the dashboard without a second login screen.</p>
     </div>
+
+    <div class="access-actions">
+      <a class="btn-login btn-store-link" id="storeAccessLink" href="../">
+        <i class="fas fa-store"></i>
+        <span>Back to Store</span>
+      </a>
+    </div>
+
+    <div class="login-error" id="loginError"></div>
   </div>
 </div>
 
@@ -1694,8 +1726,8 @@
           <strong id="adminNameDisplay">Admin</strong>
           <span>Administrator</span>
         </div>
-        <button class="btn-logout" id="logoutBtn" title="Sign out">
-          <i class="fas fa-sign-out-alt"></i>
+        <button class="btn-logout" id="backToStoreBtn" title="Back to store">
+          <i class="fas fa-store"></i>
         </button>
       </div>
     </div>
@@ -1716,9 +1748,9 @@
       </div>
       <div class="topbar-right">
         <span class="topbar-badge" id="liveStatus">🟢 Live</span>
-        <button class="btn-topbar-logout" id="topbarLogoutBtn" title="Sign out">
-          <i class="fas fa-sign-out-alt"></i>
-          <span>Logout</span>
+        <button class="btn-topbar-logout" id="topbarStoreBtn" title="Back to store">
+          <i class="fas fa-store"></i>
+          <span>Back to Store</span>
         </button>
       </div>
     </header>
@@ -2185,6 +2217,7 @@
 // 0) CONFIG
 // =========================================================
 const API_BASE = 'https://fortunehub-backend.onrender.com';
+const STOREFRONT_URL = new URL('../', window.location.href).href;
 
 // =========================================================
 // 1) STATE
@@ -2285,48 +2318,26 @@ function showView(name) {
 }
 
 // =========================================================
-// 3) AUTH
+// 3) AUTH / ACCESS GATE
 // =========================================================
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const btn = document.getElementById('loginBtn');
+function setAccessGateState({ title, message, error = false, loading = true } = {}) {
+  const titleEl = document.getElementById('accessTitle');
+  const messageEl = document.getElementById('accessMessage');
+  const spinnerEl = document.getElementById('accessSpinner');
   const errEl = document.getElementById('loginError');
-  errEl.style.display = 'none';
-  btn.innerHTML = '<div class="spinner"></div>';
-  btn.disabled = true;
 
-  const email = document.getElementById('adminUser').value.trim();
-  const password = document.getElementById('adminPass').value.trim();
-
-  try {
-    const res = await fetch(`${API_BASE}/api/admin/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-    const data = await res.json().catch(() => ({}));
-
-    if (res.ok && data.success && data.token) {
-      const session = {
-        ...(data.user || {}),
-        token: data.token,
-        isAdmin: true
-      };
-      applyAdminSession(session);
-      persistAdminSession(session);
-      startApp();
-    } else {
-      errEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${data.message || 'Unable to sign in with this admin account.'}`;
-      errEl.style.display = 'block';
-    }
-  } catch (err) {
-    errEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Cannot connect to server. Check your connection.';
-    errEl.style.display = 'block';
+  if (titleEl) titleEl.textContent = title || 'Checking admin access…';
+  if (messageEl) messageEl.textContent = message || 'Approved admin sessions are sent straight into the dashboard without a second login screen.';
+  if (spinnerEl) spinnerEl.style.display = loading ? 'block' : 'none';
+  if (errEl) {
+    errEl.style.display = error ? 'block' : 'none';
+    errEl.innerHTML = error ? `<i class="fas fa-exclamation-circle"></i> ${message || 'Admin access is required to continue.'}` : '';
   }
+}
 
-  btn.innerHTML = '<span>Sign In to Dashboard</span>';
-  btn.disabled = false;
-});
+function goToStorefront() {
+  window.location.href = STOREFRONT_URL;
+}
 
 function startApp() {
   const displayName = adminSession?.name || adminSession?.email || adminUser || 'Admin';
@@ -2338,28 +2349,49 @@ function startApp() {
   showView('dashboard');
 }
 
-function logout({ clearForm = true } = {}) {
+function logout({ reason = 'Your admin session has expired. Returning to the store…', redirectDelay = 900 } = {}) {
   applyAdminSession(null);
   persistAdminSession(null);
   document.getElementById('appShell').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
-  if (clearForm) {
-    document.getElementById('adminUser').value = '';
-    document.getElementById('adminPass').value = '';
-  }
+  setAccessGateState({
+    title: 'Admin access required',
+    message: reason,
+    error: true,
+    loading: false
+  });
+  window.setTimeout(goToStorefront, redirectDelay);
 }
 
-document.getElementById('logoutBtn').addEventListener('click', () => logout());
-document.getElementById('topbarLogoutBtn').addEventListener('click', () => logout());
+document.getElementById('backToStoreBtn').addEventListener('click', goToStorefront);
+document.getElementById('topbarStoreBtn').addEventListener('click', goToStorefront);
+document.getElementById('storeAccessLink').setAttribute('href', STOREFRONT_URL);
 
 (async function bootstrapAdminSession() {
-  if (!authToken) return;
+  setAccessGateState({
+    title: 'Checking admin access…',
+    message: 'Approved admin sessions are sent straight into the dashboard without a second login screen.',
+    error: false,
+    loading: true
+  });
+
+  if (!authToken) {
+    setAccessGateState({
+      title: 'Admin access required',
+      message: 'Please sign in with an approved admin account from the store to open the dashboard.',
+      error: true,
+      loading: false
+    });
+    return;
+  }
+
   const hasAccess = await validateAdminAccess();
   if (hasAccess) {
     startApp();
     return;
   }
-  logout({ clearForm: false });
+
+  logout({ reason: 'This account no longer has admin access. Returning to the store…' });
 })();
 
 // =========================================================
