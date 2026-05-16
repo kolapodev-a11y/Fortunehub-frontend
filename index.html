@@ -41,7 +41,7 @@
   <header class="site-header">
     <div class="container">
       <nav class="navbar" aria-label="Primary">
-        <h3 class="logo">Fortune's <span>Hub</span></h3>
+        <a href="#" class="logo" id="brandHomeLink">Fortune's <span>Hub</span></a>
         <ul class="nav-links">
           <li><a href="#">Home</a></li>
           <li><a href="#products">Products</a></li>
@@ -84,10 +84,30 @@
             <i class="fas fa-shopping-cart" aria-hidden="true"></i>
             <span class="cart-count" id="cartCount">0</span>
           </button>
+          <button class="icon-btn hamburger-btn" id="menuToggleBtn" type="button" title="Open Menu" aria-label="Open Menu" aria-expanded="false" aria-controls="hamburgerDrawer">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+          </button>
         </div>
       </nav>
     </div>
   </header>
+
+  <div class="menu-overlay" id="menuOverlay" hidden></div>
+  <aside class="hamburger-drawer" id="hamburgerDrawer" aria-hidden="true" aria-label="Website menu">
+    <div class="drawer-header">
+      <div>
+        <p class="drawer-eyebrow">Navigation</p>
+        <h2>Fortune's Hub</h2>
+      </div>
+      <button class="icon-btn drawer-close-btn" id="closeMenuBtn" type="button" aria-label="Close menu">
+        <i class="fas fa-times" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="drawer-account" id="drawerAccountSummary"></div>
+    <nav class="drawer-nav" id="drawerNav" aria-label="Hamburger menu"></nav>
+  </aside>
 
   <main id="main-content">
 
@@ -172,6 +192,20 @@
         </div>
         <div class="products-grid" id="productsGrid" aria-live="polite"></div>
         <div class="products-pagination" id="productsPagination" aria-label="Products pagination"></div>
+      </div>
+    </section>
+
+    <section class="wishlist-page" id="wishlistPage" hidden>
+      <div class="container">
+        <div class="page-header wishlist-page-header">
+          <div>
+            <p class="page-eyebrow">Saved for later</p>
+            <h2 class="section-title section-title-left">Your Wishlist</h2>
+            <p id="wishlistSummary" class="page-description">Products you save with the heart icon will appear here.</p>
+          </div>
+          <button class="btn btn-secondary wishlist-back-btn" id="wishlistBackBtn" type="button">Continue Shopping</button>
+        </div>
+        <div class="products-grid wishlist-grid" id="wishlistGrid" aria-live="polite"></div>
       </div>
     </section>
 
@@ -383,6 +417,47 @@
 
 
 </form>
+    </div>
+  </div>
+
+  <div id="profileModal" class="modal" aria-hidden="true" role="dialog" aria-label="Profile">
+    <div class="modal-content profile-modal-content" role="document">
+      <button class="close" id="closeProfileModal" type="button" aria-label="Close">&times;</button>
+      <h2><i class="fas fa-user"></i> My Profile</h2>
+      <div class="profile-card">
+        <div class="profile-overview">
+          <div class="profile-avatar" id="profileAvatarBadge">F</div>
+          <div>
+            <h3 id="profileNameText">Guest User</h3>
+            <p id="profileEmailText">Sign in to manage your profile.</p>
+            <span class="profile-role-badge" id="profileRoleBadge">Customer</span>
+          </div>
+        </div>
+        <div class="profile-fields">
+          <div class="form-group">
+            <label for="profileNameInput">Full Name</label>
+            <input type="text" id="profileNameInput" class="form-input" readonly />
+          </div>
+          <div class="form-group">
+            <label for="profileEmailInput">Email Address</label>
+            <input type="email" id="profileEmailInput" class="form-input" readonly />
+          </div>
+          <div class="form-group">
+            <label for="profilePhoneInput">WhatsApp Number</label>
+            <input type="tel" id="profilePhoneInput" class="form-input" placeholder="e.g. 08031234567" autocomplete="tel" />
+            <small class="helper-text">Keep your delivery contact up to date.</small>
+            <small id="profilePhoneError" class="error-msg"></small>
+          </div>
+          <div class="form-group">
+            <label for="profileAuthProviderInput">Account Type</label>
+            <input type="text" id="profileAuthProviderInput" class="form-input" readonly />
+          </div>
+        </div>
+        <div class="profile-actions">
+          <button class="btn btn-secondary" id="closeProfileBtn" type="button">Close</button>
+          <button class="btn btn-buy-now" id="saveProfileBtn" type="button">Save Changes</button>
+        </div>
+      </div>
     </div>
   </div>
 

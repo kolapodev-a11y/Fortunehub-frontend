@@ -1675,7 +1675,7 @@ async function initializeApp() {
   setActiveFilterButton('all');
 }
 
-document.addEventListener('DOMContentLoaded', initializeApp);
+document.addEventListener('DOMContentLoaded', () => initializeApp());
 
 // =====================================================================
 // FortuneHub performance patch v6
@@ -2443,3 +2443,581 @@ productsPagination?.addEventListener('click', (event) => {
     console.error('Pagination failed:', error?.message || error);
   });
 });
+
+
+// =====================================================================
+// FortuneHub navigation + wishlist patch (v7)
+// =====================================================================
+const FH_WISHLIST_KEY = 'fh_wishlist_v1';
+const FH_WISHLIST_HASH = '#wishlist';
+let wishlist = loadWishlistState();
+let fhMenuEnhancementsBound = false;
+let fhViewMode = window.location.hash === FH_WISHLIST_HASH ? 'wishlist' : 'store';
+
+const brandHomeLink = document.getElementById('brandHomeLink');
+const menuToggleBtn = document.getElementById('menuToggleBtn');
+const closeMenuBtn = document.getElementById('closeMenuBtn');
+const menuOverlay = document.getElementById('menuOverlay');
+const hamburgerDrawer = document.getElementById('hamburgerDrawer');
+const drawerAccountSummary = document.getElementById('drawerAccountSummary');
+const drawerNav = document.getElementById('drawerNav');
+const wishlistPage = document.getElementById('wishlistPage');
+const wishlistGrid = document.getElementById('wishlistGrid');
+const wishlistSummary = document.getElementById('wishlistSummary');
+const wishlistBackBtn = document.getElementById('wishlistBackBtn');
+const profileModal = document.getElementById('profileModal');
+const closeProfileModal = document.getElementById('closeProfileModal');
+const closeProfileBtn = document.getElementById('closeProfileBtn');
+const profileAvatarBadge = document.getElementById('profileAvatarBadge');
+const profileNameText = document.getElementById('profileNameText');
+const profileEmailText = document.getElementById('profileEmailText');
+const profileRoleBadge = document.getElementById('profileRoleBadge');
+const profileNameInput = document.getElementById('profileNameInput');
+const profileEmailInput = document.getElementById('profileEmailInput');
+const profilePhoneInput = document.getElementById('profilePhoneInput');
+const profilePhoneError = document.getElementById('profilePhoneError');
+const profileAuthProviderInput = document.getElementById('profileAuthProviderInput');
+const saveProfileBtn = document.getElementById('saveProfileBtn');
+const storeSections = Array.from(document.querySelectorAll('#main-content > section')).filter((section) => section.id !== 'wishlistPage');
+
+function loadWishlistState() {
+  try {
+    const raw = localStorage.getItem(FH_WISHLIST_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(normalizeWishlistItem).filter((item) => item.id) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function normalizeWishlistItem(item = {}) {
+  return {
+    id: String(item.id || item._id || item.productId || '').trim(),
+    _id: String(item._id || item.id || '').trim(),
+    name: String(item.name || '').trim(),
+    category: String(item.category || 'other').trim().toLowerCase(),
+    description: String(item.description || '').trim(),
+    price: Number(item.price || 0),
+    image: String(item.image || '').trim(),
+    images: Array.isArray(item.images) ? item.images.filter(Boolean) : [],
+    tag: String(item.tag || '').trim().toLowerCase(),
+    outOfStock: Boolean(item.outOfStock),
+    sold: Boolean(item.sold)
+  };
+}
+
+function persistWishlist() {
+  localStorage.setItem(FH_WISHLIST_KEY, JSON.stringify(wishlist.map(normalizeWishlistItem)));
+}
+
+function createWishlistSnapshot(product) {
+  return normalizeWishlistItem({
+    id: product.id,
+    _id: product._id || product.id,
+    name: product.name,
+    category: product.category,
+    description: product.description,
+    price: product.price,
+    image: getProductImage(product),
+    images: Array.isArray(product.images) ? product.images : [],
+    tag: product.tag,
+    outOfStock: product.outOfStock,
+    sold: product.sold
+  });
+}
+
+function getWishlistCount() {
+  return wishlist.length;
+}
+
+function isWishlisted(productId) {
+  return wishlist.some((item) => String(item.id) === String(productId));
+}
+
+const fhBaseGetProductById = getProductById;
+getProductById = function getProductByIdPatched(id) {
+  return fhBaseGetProductById(id) || wishlist.find((item) => String(item.id) === String(id)) || null;
+};
+
+function getWishlistItems() {
+  const liveMap = new Map((Array.isArray(products) ? products : []).map((product) => [String(product.id), normalizeWishlistItem({ ...product, image: getProductImage(product) })]));
+  return wishlist.map((item) => liveMap.get(String(item.id)) || item).filter((item) => item.id);
+}
+
+function updateWishlistIndicators() {
+  document.querySelectorAll('.wishlist-toggle').forEach((button) => {
+    const productId = button.dataset.id;
+    const active = isWishlisted(productId);
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    button.setAttribute('title', active ? 'Remove from wishlist' : 'Add to wishlist');
+    const icon = button.querySelector('i');
+    if (icon) {
+      icon.classList.toggle('fas', active);
+      icon.classList.toggle('far', !active);
+    }
+    const card = button.closest('.product-card');
+    if (card) card.classList.toggle('is-wishlisted', active);
+  });
+}
+
+function renderWishlistPage() {
+  if (!wishlistGrid) return;
+  const items = getWishlistItems();
+  if (wishlistSummary) {
+    wishlistSummary.textContent = items.length
+      ? `${items.length} saved product${items.length === 1 ? '' : 's'} ready for your next order.`
+      : 'Products you save with the heart icon will appear here.';
+  }
+
+  if (!items.length) {
+    wishlistGrid.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-heart"></i>
+        <h3>Your wishlist is empty</h3>
+        <p>Save items you love from the catalogue and they will appear here for quick access later.</p>
+        <button class="btn btn-primary" type="button" id="emptyWishlistShopBtn">Browse Products</button>
+      </div>`;
+    const emptyShopBtn = document.getElementById('emptyWishlistShopBtn');
+    emptyShopBtn?.addEventListener('click', () => navigateToStore());
+    return;
+  }
+
+  wishlistGrid.innerHTML = items.map((item) => buildProductCardMarkup(item)).join('');
+  updateWishlistIndicators();
+}
+
+function toggleWishlist(productId, options = {}) {
+  const itemId = String(productId || '').trim();
+  if (!itemId) return;
+  const existingIndex = wishlist.findIndex((item) => String(item.id) === itemId);
+  if (existingIndex >= 0) {
+    const [removed] = wishlist.splice(existingIndex, 1);
+    persistWishlist();
+    renderWishlistPage();
+    updateWishlistIndicators();
+    renderHamburgerMenu();
+    if (!options.silent) showToast(`${removed?.name || 'Product'} removed from wishlist`, 'info');
+    return;
+  }
+
+  const product = getProductById(itemId) || currentProduct;
+  if (!product) {
+    if (!options.silent) showToast('Unable to save this product right now.', 'error');
+    return;
+  }
+
+  wishlist.push(createWishlistSnapshot(product));
+  persistWishlist();
+  renderWishlistPage();
+  updateWishlistIndicators();
+  renderHamburgerMenu();
+  if (!options.silent) showToast(`${product.name} added to wishlist`, 'success');
+}
+
+function syncBodyScrollState() {
+  const isAnyModalOpen = [cartModal, authModal, orderHistoryModal, receiptModal, paymentInstructionsModal, productDetailModal, profileModal]
+    .some((modal) => modal && modal.style.display === 'block');
+  const isMenuOpen = hamburgerDrawer?.classList.contains('open');
+  document.body.style.overflow = isAnyModalOpen || isMenuOpen ? 'hidden' : 'auto';
+}
+
+function openHamburgerMenu() {
+  if (!hamburgerDrawer) return;
+  renderHamburgerMenu();
+  hamburgerDrawer.classList.add('open');
+  hamburgerDrawer.setAttribute('aria-hidden', 'false');
+  menuOverlay.hidden = false;
+  menuToggleBtn?.setAttribute('aria-expanded', 'true');
+  syncBodyScrollState();
+}
+
+function closeHamburgerMenu() {
+  if (!hamburgerDrawer) return;
+  hamburgerDrawer.classList.remove('open');
+  hamburgerDrawer.setAttribute('aria-hidden', 'true');
+  if (menuOverlay) menuOverlay.hidden = true;
+  menuToggleBtn?.setAttribute('aria-expanded', 'false');
+  syncBodyScrollState();
+}
+
+function getAccountSummaryMarkup() {
+  if (currentUser) {
+    const avatar = currentUser.picture
+      ? `<span class="drawer-avatar"><img src="${escapeHtml(currentUser.picture)}" alt="${escapeHtml(currentUser.name || 'User')}"></span>`
+      : `<span class="drawer-avatar">${escapeHtml(getInitial(currentUser.name))}</span>`;
+    const roleLabel = currentUser.isAdmin ? 'Admin account' : 'Signed in';
+    return `
+      <div class="drawer-account-card">
+        ${avatar}
+        <div>
+          <h3>${escapeHtml(currentUser.name || 'Customer')}</h3>
+          <p>${escapeHtml(currentUser.email || '')}</p>
+          <p style="margin-top:4px;font-weight:700;color:var(--brand-blue);">${roleLabel}</p>
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div class="drawer-account-card">
+      <span class="drawer-avatar">F</span>
+      <div>
+        <h3>Welcome to Fortune's Hub</h3>
+        <p>Sign in to manage your wishlist, orders and profile.</p>
+      </div>
+    </div>`;
+}
+
+function createDrawerItem({ action = '', href = '', icon = 'circle', label = '', meta = '', danger = false, external = false }) {
+  const attrs = action ? `data-action="${action}"` : '';
+  const className = `drawer-nav-item${danger ? ' is-danger' : ''}`;
+  const metaMarkup = meta ? `<span class="drawer-nav-meta">${meta}</span>` : '<i class="fas fa-chevron-right drawer-nav-meta" aria-hidden="true"></i>';
+  const inner = `
+    <span class="drawer-nav-left">
+      <i class="fas fa-${icon}" aria-hidden="true"></i>
+      <span>${label}</span>
+    </span>
+    ${metaMarkup}`;
+
+  if (href) {
+    return `<a class="${className}" href="${href}" ${external ? 'target="_blank" rel="noopener noreferrer"' : ''} ${attrs}>${inner}</a>`;
+  }
+  return `<button class="${className}" type="button" ${attrs}>${inner}</button>`;
+}
+
+function renderHamburgerMenu() {
+  if (drawerAccountSummary) drawerAccountSummary.innerHTML = getAccountSummaryMarkup();
+  if (!drawerNav) return;
+
+  const items = [
+    createDrawerItem({ action: 'store', icon: 'store', label: 'Store', meta: 'Main website' }),
+    createDrawerItem({ action: 'wishlist', icon: 'heart', label: 'Wishlist', meta: `<span class="wishlist-chip">${getWishlistCount()}</span>` })
+  ];
+
+  if (currentUser) {
+    items.push(createDrawerItem({ action: 'orders', icon: 'receipt', label: 'Order History', meta: 'View purchases' }));
+    items.push(createDrawerItem({ action: 'profile', icon: 'user', label: 'Profile', meta: 'Manage account' }));
+    if (currentUser.isAdmin) {
+      items.push(createDrawerItem({ href: 'admin/', icon: 'shield-halved', label: 'Admin Panel', meta: 'Restricted', external: false }));
+    }
+    items.push(createDrawerItem({ action: 'logout', icon: 'right-from-bracket', label: 'Logout', meta: 'Sign out', danger: true }));
+  } else {
+    items.push(createDrawerItem({ action: 'signin', icon: 'right-to-bracket', label: 'Login', meta: 'Access account' }));
+    items.push(createDrawerItem({ action: 'signup', icon: 'user-plus', label: 'Signup', meta: 'Create account' }));
+  }
+
+  drawerNav.innerHTML = items.join('');
+}
+
+function setViewMode(view = 'store', { updateHash = true, scrollToTop = true } = {}) {
+  fhViewMode = view === 'wishlist' ? 'wishlist' : 'store';
+  const showWishlist = fhViewMode === 'wishlist';
+  storeSections.forEach((section) => {
+    section.hidden = showWishlist;
+  });
+  if (wishlistPage) wishlistPage.hidden = !showWishlist;
+  if (showWishlist) renderWishlistPage();
+  if (updateHash) {
+    if (showWishlist) {
+      history.replaceState(null, '', `${window.location.pathname}${window.location.search}${FH_WISHLIST_HASH}`);
+    } else {
+      history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    }
+  }
+  if (scrollToTop) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function navigateToStore() {
+  closeHamburgerMenu();
+  setViewMode('store');
+}
+
+function navigateToWishlist() {
+  closeHamburgerMenu();
+  setViewMode('wishlist');
+}
+
+function syncViewModeFromHash() {
+  if (window.location.hash === FH_WISHLIST_HASH) setViewMode('wishlist', { updateHash: false, scrollToTop: false });
+  else setViewMode('store', { updateHash: false, scrollToTop: false });
+}
+
+function populateProfileModal() {
+  if (!profileNameInput) return;
+  if (!currentUser) {
+    profileNameText.textContent = 'Guest User';
+    profileEmailText.textContent = 'Sign in to manage your profile.';
+    profileRoleBadge.textContent = 'Guest';
+    profileNameInput.value = '';
+    profileEmailInput.value = '';
+    profilePhoneInput.value = '';
+    profileAuthProviderInput.value = '';
+    profileAvatarBadge.textContent = 'F';
+    return;
+  }
+
+  profileNameText.textContent = currentUser.name || 'Customer';
+  profileEmailText.textContent = currentUser.email || '';
+  profileRoleBadge.textContent = currentUser.isAdmin ? 'Admin' : 'Customer';
+  profileNameInput.value = currentUser.name || '';
+  profileEmailInput.value = currentUser.email || '';
+  profilePhoneInput.value = currentUser.phone || '';
+  profileAuthProviderInput.value = currentUser.authProvider === 'google' ? 'Google Sign-In' : 'Email & Password';
+  profileAvatarBadge.textContent = getInitial(currentUser.name);
+  if (profilePhoneError) profilePhoneError.style.display = 'none';
+}
+
+function openProfileModal() {
+  if (!currentUser) {
+    closeHamburgerMenu();
+    showToast('Please sign in to view your profile.', 'info');
+    openAuthModal('signin');
+    return;
+  }
+  populateProfileModal();
+  if (profileModal) {
+    profileModal.style.display = 'block';
+    closeHamburgerMenu();
+    syncBodyScrollState();
+  }
+}
+
+function closeProfileModalFn() {
+  if (!profileModal) return;
+  profileModal.style.display = 'none';
+  syncBodyScrollState();
+}
+
+async function saveProfileChanges() {
+  if (!currentUser) return;
+  const phone = String(profilePhoneInput?.value || '').trim();
+  const phoneRegex = /^(0[789][01])\\d{8}$/;
+  if (!phone || !phoneRegex.test(phone)) {
+    if (profilePhoneError) {
+      profilePhoneError.textContent = 'Enter a valid Nigerian WhatsApp number (e.g. 08031234567).';
+      profilePhoneError.style.display = 'block';
+    }
+    return;
+  }
+
+  if (profilePhoneError) profilePhoneError.style.display = 'none';
+  try {
+    saveProfileBtn.disabled = true;
+    const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ phone })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.message || 'Could not update profile');
+    saveAuthState({ ...currentUser, ...data.user, token: getAuthToken() });
+    populateProfileModal();
+    if (customerPhoneInput) customerPhoneInput.value = phone;
+    showToast('Profile updated successfully', 'success');
+    closeProfileModalFn();
+  } catch (error) {
+    if (profilePhoneError) {
+      profilePhoneError.textContent = error.message || 'Could not update profile.';
+      profilePhoneError.style.display = 'block';
+    }
+  } finally {
+    saveProfileBtn.disabled = false;
+  }
+}
+
+async function refreshCurrentUserProfile() {
+  if (!currentUser || !getAuthToken()) return;
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/me`, { headers: { ...authHeaders() } });
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      saveAuthState(null);
+      return;
+    }
+    if (response.ok && data.success && data.user) {
+      saveAuthState({ ...currentUser, ...data.user, token: getAuthToken() });
+    }
+  } catch (_) {
+    // Keep locally cached session on transient failures.
+  }
+}
+
+const fhBaseBuildProductCardMarkup = buildProductCardMarkup;
+buildProductCardMarkup = function buildProductCardMarkupPatched(product) {
+  const normalized = normalizeWishlistItem({ ...product, image: getProductImage(product), images: product.images || [] });
+  const baseMarkup = fhBaseBuildProductCardMarkup({ ...product, ...normalized, image: normalized.image, images: normalized.images });
+  const productId = escapeHtml(normalized.id);
+  const heartMarkup = `<button class="wishlist-toggle ${isWishlisted(normalized.id) ? 'is-active' : ''}" type="button" data-id="${productId}" aria-label="Toggle wishlist" aria-pressed="${isWishlisted(normalized.id) ? 'true' : 'false'}"><i class="${isWishlisted(normalized.id) ? 'fas' : 'far'} fa-heart" aria-hidden="true"></i></button>`;
+  return baseMarkup.replace('<div class="product-image-slider">', `<div class="product-image-slider">${heartMarkup}`);
+};
+
+const fhBaseDisplayProducts = displayProducts;
+displayProducts = function displayProductsPatched(productsToShow) {
+  fhBaseDisplayProducts(productsToShow);
+  updateWishlistIndicators();
+};
+
+const fhBaseUpdateAuthUI = updateAuthUI;
+updateAuthUI = function updateAuthUIPatched() {
+  fhBaseUpdateAuthUI();
+  renderHamburgerMenu();
+  populateProfileModal();
+  updateWishlistIndicators();
+};
+
+const fhBaseSignOut = signOut;
+signOut = function signOutPatched(options = {}) {
+  const skipConfirmation = Boolean(options?.skipConfirmation);
+  if (!skipConfirmation && !window.confirm('Are you sure you want to log out of your account?')) return;
+  fhBaseSignOut();
+  closeHamburgerMenu();
+  closeProfileModalFn();
+  setViewMode('store', { updateHash: true, scrollToTop: false });
+};
+
+const fhBaseSetupEventListeners = setupEventListeners;
+setupEventListeners = function setupEventListenersPatched() {
+  if (!fhMenuEnhancementsBound) {
+    const stopCardOpenForInnerButtons = (event) => {
+      if (event.target.closest('.wishlist-toggle, .add-to-cart, .buy-now')) {
+        event.stopPropagation();
+      }
+    };
+
+    productsGrid?.addEventListener('click', stopCardOpenForInnerButtons, true);
+    productsGrid?.addEventListener('keydown', stopCardOpenForInnerButtons, true);
+    wishlistGrid?.addEventListener('click', stopCardOpenForInnerButtons, true);
+    wishlistGrid?.addEventListener('keydown', stopCardOpenForInnerButtons, true);
+  }
+
+  fhBaseSetupEventListeners();
+  if (fhMenuEnhancementsBound) return;
+  fhMenuEnhancementsBound = true;
+
+  menuToggleBtn?.addEventListener('click', openHamburgerMenu);
+  closeMenuBtn?.addEventListener('click', closeHamburgerMenu);
+  menuOverlay?.addEventListener('click', closeHamburgerMenu);
+  brandHomeLink?.addEventListener('click', (event) => {
+    event.preventDefault();
+    navigateToStore();
+  });
+  wishlistBackBtn?.addEventListener('click', navigateToStore);
+  closeProfileModal?.addEventListener('click', closeProfileModalFn);
+  closeProfileBtn?.addEventListener('click', closeProfileModalFn);
+  saveProfileBtn?.addEventListener('click', saveProfileChanges);
+
+  drawerNav?.addEventListener('click', (event) => {
+    const actionTarget = event.target.closest('[data-action]');
+    if (!actionTarget) return;
+    const action = actionTarget.dataset.action;
+    if (action === 'store') {
+      event.preventDefault();
+      navigateToStore();
+    } else if (action === 'wishlist') {
+      event.preventDefault();
+      navigateToWishlist();
+    } else if (action === 'orders') {
+      event.preventDefault();
+      closeHamburgerMenu();
+      if (!currentUser) {
+        showToast('Please sign in to view your order history.', 'info');
+        openAuthModal('signin');
+        return;
+      }
+      openOrderHistory();
+    } else if (action === 'profile') {
+      event.preventDefault();
+      openProfileModal();
+    } else if (action === 'logout') {
+      event.preventDefault();
+      signOut();
+    } else if (action === 'signin') {
+      event.preventDefault();
+      closeHamburgerMenu();
+      openAuthModal('signin');
+    } else if (action === 'signup') {
+      event.preventDefault();
+      closeHamburgerMenu();
+      openAuthModal('signup');
+    }
+  });
+
+  function bindProductGridActions(container) {
+    container?.addEventListener('click', (event) => {
+      const wishlistBtn = event.target.closest('.wishlist-toggle');
+      const addButton = event.target.closest('.add-to-cart');
+      const buyNowButton = event.target.closest('.buy-now');
+      const card = event.target.closest('.product-card');
+
+      if (wishlistBtn) {
+        event.stopPropagation();
+        const icon = wishlistBtn.querySelector('i');
+        toggleWishlist(wishlistBtn.dataset.id);
+        if (icon) {
+          const active = isWishlisted(wishlistBtn.dataset.id);
+          icon.classList.toggle('fas', active);
+          icon.classList.toggle('far', !active);
+        }
+        return;
+      }
+
+      if (addButton || buyNowButton || !card) return;
+    });
+  }
+
+  bindProductGridActions(productsGrid);
+  bindProductGridActions(wishlistGrid);
+
+  wishlistGrid?.addEventListener('click', (event) => {
+    const wishlistBtn = event.target.closest('.wishlist-toggle');
+    const addButton = event.target.closest('.add-to-cart');
+    const buyNowButton = event.target.closest('.buy-now');
+    const card = event.target.closest('.product-card');
+
+    if (wishlistBtn) {
+      event.stopPropagation();
+      toggleWishlist(wishlistBtn.dataset.id);
+      return;
+    }
+    if (addButton) {
+      event.stopPropagation();
+      addToCart(addButton.dataset.id);
+      return;
+    }
+    if (buyNowButton) {
+      event.stopPropagation();
+      addToCart(buyNowButton.dataset.id, 1);
+      openCartModal();
+      return;
+    }
+    if (card) openProductDetail(card.dataset.productId);
+  });
+
+  wishlistGrid?.addEventListener('keydown', (event) => {
+    const card = event.target.closest('.product-card');
+    if (card && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      openProductDetail(card.dataset.productId);
+    }
+  });
+
+  window.addEventListener('hashchange', syncViewModeFromHash);
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeHamburgerMenu();
+    if (event.key === 'Escape' && profileModal?.style.display === 'block') closeProfileModalFn();
+  });
+  window.addEventListener('click', (event) => {
+    if (profileModal && event.target === profileModal) closeProfileModalFn();
+  });
+};
+
+const fhBaseInitializeApp = initializeApp;
+initializeApp = async function initializeAppPatched() {
+  wishlist = loadWishlistState();
+  await fhBaseInitializeApp();
+  await refreshCurrentUserProfile();
+  renderHamburgerMenu();
+  renderWishlistPage();
+  updateWishlistIndicators();
+  syncViewModeFromHash();
+};
