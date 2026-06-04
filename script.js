@@ -26,7 +26,7 @@
 // Set this to the same GOOGLE_CLIENT_ID used in the backend .env
 const GOOGLE_CLIENT_ID = '694580886466-hu48nsmlesv8qojnpkm218t0i7gpjepl.apps.googleusercontent.com';
 
-const API_BASE_URL = 'https://fortunehub-backend.onrender.com';
+const API_BASE_URL = 'https://fortunehub-backend-xtoa.onrender.com';
 
 let paymentConfig = null;
 
